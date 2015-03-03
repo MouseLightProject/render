@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# usage: ./janitor <destination>
+
+# run this script to clean up the nodes if you have to qdel a ./render
+# if any julia processes remain, manually ssh in and kill them
+
+nodes=($(grep -o -P "(?<=is ready on )[^.]*" $1/render.log))
+
+for node in ${nodes[@]} ; do
+  cmd="ssh -q $node rm -rf /dev/shm/*"; echo "${cmd}"; eval $cmd
+  cmd="ssh -q $node rm -rf /scratch/$(whoami)/*"; echo "${cmd}"; eval $cmd
+  cmd="ssh -q $node ps auxc | grep julia"; echo "${cmd}"; eval $cmd
+done

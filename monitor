@@ -1,0 +1,111 @@
+#!/bin/bash
+
+# usage: ./monitor <jobname> <destination>
+
+# output is also appended to <destination>/monitor.log
+
+interval=120   # in seconds
+
+export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
+JULIA=${RENDER_PATH}/env/login/julia-0c24dca65c/bin/julia
+
+shared_scratch=$($JULIA -L $2/set_parameters.jl -e "print(shared_scratch)")
+
+display_it() {
+  if [ -n "$2" ] ; then
+    echo $1
+    echo "$2"
+    echo
+  fi; }
+
+START=$(date +%s)
+while true ; do
+
+  # list the nodes
+  data=$(qstat)
+  readarray -t alljobs < <(echo "$data" | tr -s ' ' | cut -s -f4 -d ' ')
+  readarray -t allstates < <(echo "$data" | tr -s ' ' | cut -s -f6 -d ' ')
+  readarray -t allnodes < <(echo "$data" | tr -s ' ' | cut -s -f9 -d ' ')
+  readarray -t alllogs < <(echo "$data" | tr -s ' ' | cut -s -f11 -d ' ')
+  nodes=()
+  logs=()
+  for i in $(seq 0 $((${#alljobs[@]} - 1))) ; do
+    if [ ${alljobs[$i]} == $1 -a ${allstates[$i]} == "r" ] ; then
+      tmp=${allnodes[i]}
+      tmp=${tmp##*@}
+      nodes+=(${tmp%%.*})
+      logs+=(${alllogs[i]}.log)
+    fi
+  done
+
+  if [ "${#nodes[@]}" -eq "0" ] ; then break ; fi
+
+  # query nodes for data
+  started=$(stat -c %y $2/set_parameters.jl)
+  ntiles=$(grep "reading input tile" $2/*log | wc -l)
+  sharedscratch1=($(du -sh $shared_scratch))
+  sharedscratch2=($(df -h $shared_scratch))
+  destination1=($(du -sh $2))
+  destination2=($(df -h $2))
+  for i in $(seq 0 $((${#nodes[@]} - 1))) ; do
+    #echo ${nodes[i]}
+    memory[i]=$(qhost -h ${nodes[i]})
+    localscratch[i]=$(ssh -q ${nodes[i]} df -h /scratch)
+    load[i]=$(ssh -q ${nodes[i]} mpstat 1 1)
+    io[i]=$(ssh -q ${nodes[i]} tail -n +3 /proc/net/dev | sed 's/.*://')
+    if [ -e $2/${logs[i]} ] ; then
+      tiles[i]=$(grep -c "reading input tile" $2/${logs[i]})
+    fi
+  done
+
+  # print data to screen, and dump to log
+  currtime=$(date +'%Y-%m-%d %H:%M:%S')
+  echo "currently " $currtime
+  echo started on ${started%%.*}
+  printf "\n"
+
+  echo $ntiles input tile-colors read
+  echo ${sharedscratch1[0]} in ${sharedscratch1[1]} , ${sharedscratch2[10]} available
+  echo ${destination1[0]} in ${destination1[1]} , ${destination2[10]} available
+  printf "\n"
+
+  printf "%4s%8s" "log#" node
+  printf "%17s" memory swap /scratch rx/tx
+  printf "%9s%9s" %load ntiles
+  printf "\n"
+  for i in $(seq 0 $((${#nodes[@]} - 1))) ; do
+    memoryArray=(${memory[i]})
+    localscratchArray=(${localscratch[i]})
+    loadArray=(${load[i]})
+    ioArray=(${io[i]})
+    rX[i]=0;  tX[i]=0
+    for j in $(seq 16 16 $((${#ioArray[@]}-1))) ; do
+      rX[i]=$(( ${rX[i]} + ${ioArray[0+$j]} ))
+      tX[i]=$(( ${tX[i]} + ${ioArray[8+$j]} ))
+    done
+    if [ -z ${last_rX[i]+x} ] ; then
+      rXMBps="--";  tXMBps="--"
+    else
+      rXMBps=$(( (${rX[i]} - ${last_rX[i]}) / $interval / 1024 / 1024 ))
+      tXMBps=$(( (${tX[i]} - ${last_tX[i]}) / $interval / 1024 / 1024 ))
+    fi
+    last_rX[i]=${rX[i]};  last_tX[i]=${tX[i]}
+    printf "%4s%8s" " ${logs[i]%.log}" ${nodes[i]}
+    printf "%9s%8s" ${memoryArray[@]:30:4} ${localscratchArray[@]:8:2}
+    printf "%8sM%7sM" $rXMBps $tXMBps
+    printf "%9s%9s" ${loadArray[22]} ${tiles[i]}
+    printf "\n"
+  done
+
+  printf "\n"
+  display_it "Segmentation faults" "$(grep -c 'Segmentation fault' $2/*log | grep -v :0)"
+  display_it "all errors" "$(grep -c ERROR $2/*log | grep -v :0)"
+  display_it "input tiles that might have failed" "$(grep -c 'might have failed' $2/*log | grep -v :0)"
+  display_it "all warnings" "$(grep WARNING -c $2/*log | grep -v :0)"
+
+  # wait until specified interval
+  while (($(date +%s) - $START < $interval)) ; do
+    sleep 1
+  done
+  START=$(date +%s)
+done

@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# usage: ./render <copy_of_parameters.jl>
+
+# git-pull will complain if parameters.jl is modified
+
+# to monitor progress:
+#   watch -n 120 tail -n 40 <destination>/monitor.log
+
+# data are logged in <destination>/{render,monitor,1,2,3,...,N}.log,
+#   where N=ncpu+nk20+n570 from parameters.jl
+# manual queries into these log files are informative:
+#   cat <destination>/render.log
+#   grep "has finished" <destination>/render.log
+#   grep peons <destination>/*log
+#   grep "reading input tile" <destination>/*log | wc
+
+# also put in <destination> are
+#   set_parameters.jl: a copy of <parameters.jl> specified on the command line
+#   calculated_parameters.jl
+
+set -e
+
+export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
+export LD_LIBRARY_PATH=/usr/local/cuda-5.0/lib64
+JULIA=${RENDER_PATH}/env/login/julia-0c24dca65c/bin/julia
+
+# get vars from parameters.jl file
+destination=$($JULIA -L $1 -e "print(destination)")
+bill=$($JULIA -L $1 -e "print(bill_userid)")
+
+# delete <destination> if it exists
+if [ -d $destination ] ; then
+  echo "deleting destination = $destination"
+  rm -rf $destination
+fi
+mkdir -p $destination
+
+# copy parameters to <destination>
+cp $1 $destination/set_parameters.jl
+
+# create a probably-unique job name
+jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
+
+cmd="$JULIA ${RENDER_PATH}/src/render/director.jl $destination/set_parameters.jl $jobname"
+qsub -A $bill -N $jobname -j y -b y -V -shell n -o $destination/render.log $cmd
+
+sleep 10
+nohup ${RENDER_PATH}/src/render/monitor $jobname $destination &> ${destination}/monitor.log &
