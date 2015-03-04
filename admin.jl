@@ -352,7 +352,11 @@ function rmcontents(dir, available)
   end
   available=="before" && (free=get_available(dir,"end"))
   for file in readdir(dir)
-    try;  rm(joinpath(dir,file), recursive=true);  end
+    try
+      rm(joinpath(dir,file), recursive=true)
+    catch
+      warn("can't delete",joinpath(dir,file))
+    end
   end
   available=="after" && (free=get_available(dir,"start"))
   free
