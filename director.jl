@@ -18,7 +18,7 @@ const tiles = TileBaseOpen(source)
 const tile_type = ndtype(TileShape(TileBaseIndex(tiles,1)))
 
 # email user
-cmd = `echo watch -n 120 tail -n \$((LINES-1)) $destination/monitor.log` |> `mail -s "job $jobname started" $notify_addr`
+cmd = `echo watch -n 60 tail -n \$((LINES-1)) $destination/monitor.log` |> `mail -s "job $jobname started" $notify_addr`
 info(string(cmd))
 run(cmd)
 
@@ -151,8 +151,8 @@ merge_procs = Any[]
         try;  run(cmd);  end
       else
         while isopen(sock)
-          p>nk20 && sleep(3)  # favor faster nodes
-          p>(nk20+n570) && sleep(3)
+          p>nk20 && sleep(10)  # favor faster nodes
+          p>(nk20+ncpu) && sleep(10)
           idx = nextidx()
           tmp = find(map((x)->x[1]==p, merge_procs))
           if idx > nchannels*length(job_aabbs)
@@ -180,9 +180,8 @@ merge_procs = Any[]
   end
 
   nk20>0 && launch_workers(1, nk20, ["-l", "gpu_k20=true", "-pe", "batch", "16"],"/env/k20")
-  n570>0 && launch_workers(nk20+1, nk20+n570, ["-l", "gpu=true", "-pe", "batch", "7"],"/env/570")
-  ncpu>0 && launch_workers(nk20+n570+1, nk20+n570+ncpu, ["-l", "haswell=true", "-pe", "batch", "32"],"/env/cpu")
-  #ncpu>0 && launch_workers(nk20+n570+1, nk20+n570+ncpu, ["-pe", "batch", "16"])
+  ncpu>0 && launch_workers(nk20+1, nk20+ncpu, ["-l", "haswell=true", "-pe", "batch", "32"],"/env/cpu")
+  n570>0 && launch_workers(nk20+ncpu+1, nk20+ncpu+n570, ["-l", "gpu=true", "-pe", "batch", "7"],"/env/570")
 end
 info("squatters took ",string(iround(time()-t0))," sec")
 
