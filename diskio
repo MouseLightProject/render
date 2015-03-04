@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# usage:
+#   qlogin -l interactive=true -pe batch 16
+#   ./diskio
+
+# while the write speeds will display almost immediately, the read
+# speeds will take several 10s of minutes do to clearing the cache
+
+# note that the product of bs=1M and count=128K on line 45 must match the total RAM
+
+date
+hostname
+
+write_it() {
+  echo $1
+  dd if=/dev/zero of=$1 bs=1M count=30 conv=fsync; }
+
+read_it() {
+ echo $1
+ dd of=/dev/null if=$1 bs=1M; }
+
+echo write
+write_it /dev/shm/foo0
+write_it /scratch/arthurb/foo1
+write_it /nobackup/mousebrainmicro/foo2
+write_it /groups/mousebrainmicro/mousebrainmicro/foo3
+write_it /tier2/mousebrainmicro/foo4
+
+# clear cache
+# the slow way which doesn't require root access
+dd if=/dev/zero of=/scratch/arthurb/bar bs=1M count=128K conv=fsync &> /dev/null
+rm /scratch/arthurb/bar
+# purportedly this is ideal
+# echo 1 > /proc/sys/vm/drop_caches
+
+echo read
+read_it /dev/shm/foo0
+read_it /scratch/arthurb/foo1
+read_it /nobackup/mousebrainmicro/foo2
+read_it /groups/mousebrainmicro/mousebrainmicro/foo3
+read_it /tier2/mousebrainmicro/foo4
+
+rm /dev/shm/foo0
+rm /scratch/arthurb/foo1
+rm /nobackup/mousebrainmicro/foo2
+rm /groups/mousebrainmicro/mousebrainmicro/foo3
+rm /tier2/mousebrainmicro/foo4

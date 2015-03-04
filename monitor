@@ -98,7 +98,7 @@ while true ; do
   done
 
   printf "\n"
-  display_it "Segmentation faults" "$(grep -c 'Segmentation fault' $2/*log | grep -v :0)"
+  display_it "Seg faults" "$(grep -c 'Segmentation fault' $2/*log | grep -v :0)"
   display_it "all errors" "$(grep -c ERROR $2/*log | grep -v :0)"
   display_it "input tiles that might have failed" "$(grep -c 'might have failed' $2/*log | grep -v :0)"
   display_it "all warnings" "$(grep WARNING -c $2/*log | grep -v :0)"

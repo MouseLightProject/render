@@ -10,6 +10,8 @@ these bash scripts for command line syntax.
 
 **merge**  combine two partial octrees
 
+**diskio**  measure i/o transfer rates to /scratch, /nobackup, /groups, & /tier2
+
 
 Installation
 ============
