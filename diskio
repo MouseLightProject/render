@@ -22,27 +22,27 @@ read_it() {
 
 echo write
 write_it /dev/shm/foo0
-write_it /scratch/arthurb/foo1
+write_it /scratch/$USER/foo1
 write_it /nobackup/mousebrainmicro/foo2
 write_it /groups/mousebrainmicro/mousebrainmicro/foo3
 write_it /tier2/mousebrainmicro/foo4
 
 # clear cache
 # the slow way which doesn't require root access
-dd if=/dev/zero of=/scratch/arthurb/bar bs=1M count=128K conv=fsync &> /dev/null
-rm /scratch/arthurb/bar
+dd if=/dev/zero of=/scratch/$USER/bar bs=1M count=128K conv=fsync &> /dev/null
+rm /scratch/$USER/bar
 # purportedly this is ideal
 # echo 1 > /proc/sys/vm/drop_caches
 
 echo read
 read_it /dev/shm/foo0
-read_it /scratch/arthurb/foo1
+read_it /scratch/$USER/foo1
 read_it /nobackup/mousebrainmicro/foo2
 read_it /groups/mousebrainmicro/mousebrainmicro/foo3
 read_it /tier2/mousebrainmicro/foo4
 
 rm /dev/shm/foo0
-rm /scratch/arthurb/foo1
+rm /scratch/$USER/foo1
 rm /nobackup/mousebrainmicro/foo2
 rm /groups/mousebrainmicro/mousebrainmicro/foo3
 rm /tier2/mousebrainmicro/foo4
