@@ -118,6 +118,7 @@ try
         " for ",length(in_tiles_idx)," input tiles")
 end
 
+t0=time()
 @sync begin
   # initialize tcp communication with peons
   # as soon as all output tiles for a given node in the octree have been processed,
@@ -171,23 +172,23 @@ end
           out_tile_path = match(sent,tmp).captures[4]
           merge_count[out_tile_path][2]+=1
           if merge_count[out_tile_path][1]==1
-            t0=time()
+            t1=time()
             info("transferring output tile ",out_tile_path," from RAM to shared_scratch")
             save_out_tile(shared_scratch, out_tile_path, join(ARGS[3:5],"-")*".$(channel-1).tif", out_tile) ||
                   error("shared_scratch is full")
-            time_ram_file+=(time()-t0)
+            time_ram_file+=(time()-t1)
           else
-            t0=time()
+            t1=time()
             merge_array[:,:,:,merge_count[out_tile_path][3]] = merge_count[out_tile_path][2]==1 ? out_tile :
                   max(out_tile, merge_array[:,:,:,merge_count[out_tile_path][3]])
-            time_max_files+=(time()-t0)
+            time_max_files+=(time()-t1)
             if merge_count[out_tile_path][1] == merge_count[out_tile_path][2]
-              t0=time()
+              t1=time()
               info("transferring output tile ",out_tile_path," from RAM to shared_scratch")
               save_out_tile(shared_scratch, out_tile_path, join(ARGS[3:5],"-")*".$(channel-1).tif",
                     merge_array[:,:,:,merge_count[out_tile_path][3]]) || error("shared_scratch is full")
               merge_used[merge_count[out_tile_path][3]] = false
-              time_ram_file+=(time()-t0)
+              time_ram_file+=(time()-t1)
             end
           end
         elseif ismatch(finished,tmp)
@@ -198,7 +199,6 @@ end
   end )
 
   # dispatch input tiles to peons
-  t0=time()
   i = 1
   nextidx() = (global i; idx=i; i+=1; idx)
   for p = 1:num_procs
