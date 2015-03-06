@@ -31,7 +31,8 @@ scratch0 = rmcontents(shared_scratch, "after")
 info("deleting shared_scratch = ",shared_scratch," at start took ",string(iround(time()-t0))," sec")
 
 # get the max output tile size
-shape_tiles_nm = AABBGetJ(TileBaseAABB(tiles))[3]
+tiles_bbox = AABBGetJ(TileBaseAABB(tiles))
+const shape_tiles_nm = tiles_bbox[3]
 const nlevels = iceil( log(8, prod(float64(shape_tiles_nm)) / (prod(voxelsize_um)*um2nm^3) / countof_leaf) )
 shape_leaf_tmp = int(round(shape_tiles_nm./um2nm./voxelsize_um./2^nlevels,-1,2))
 # there must be better ways to ensure
@@ -53,9 +54,20 @@ open("$destination/calculated_parameters.jl","w") do f
   println(f,"const nlevels = ",nlevels)
   println(f,"const shape_leaf_px = [",join(map(string,shape_leaf_px),","),"]")
   println(f,"const voxelsize_used_um = ",voxelsize_used_um)
+  println(f,"const origin_nm = [",join(map(string,tiles_bbox[2]),","),"]")
   println(f,"const tile_type = convert(Cint,$tile_type)")
   println(f,"const render_version = \"", readchomp(`git --git-dir=$(dirname(Base.source_path()))/.git log -1 --pretty=format:"%ci %H"`),"\"")
 end
+open("$destination/transform.txt","w") do f  # for large volume viewer
+  println(f,"ox: ",tiles_bbox[2][1])
+  println(f,"oy: ",tiles_bbox[2][2])
+  println(f,"oz: ",tiles_bbox[2][3])
+  println(f,"sx: ",voxelsize_used_um[1]*um2nm*2^nlevels)
+  println(f,"sy: ",voxelsize_used_um[2]*um2nm*2^nlevels)
+  println(f,"sz: ",voxelsize_used_um[3]*um2nm*2^nlevels)
+  println(f,"nl: ",nlevels+1)
+end
+cp(joinpath(source,"tilebase.cache.yml"), joinpath(destination,"tilebase.cache.yml"))
 info("number of levels = ",string(nlevels))
 info("shape of output tiles is [",join(map(string,shape_leaf_px),","),"] pixels")
 info("voxel dimensions used to make output tile shape even and volume divisible by 32*32*4: [",join(map(string,voxelsize_used_um),",")," microns")
@@ -80,10 +92,9 @@ function get_job_aabbs(bbox)
 end
 
 job_aabbs = {}
-bbox = AABBGetJ(TileBaseAABB(tiles))
-bbox[2][:] = int(bbox[2][:] + bbox[3].*region_of_interest[1])
-bbox[3][:] = int(bbox[3][:] .* region_of_interest[2])
-get_job_aabbs(bbox)
+tiles_bbox[2][:] = int(tiles_bbox[2][:] + tiles_bbox[3].*region_of_interest[1])
+tiles_bbox[3][:] = int(tiles_bbox[3][:] .* region_of_interest[2])
+get_job_aabbs(tiles_bbox)
 roi_vol = prod(region_of_interest[2])
 info(string(TileBaseCount(tiles)),(roi_vol<1 ? " * "*string(roi_vol): "")," tiles with ",string(nchannels)," channels split into ",string(nchannels*length(job_aabbs))," jobs")
 
@@ -185,7 +196,7 @@ merge_procs = Any[]
 end
 info("squatters took ",string(iround(time()-t0))," sec")
 
-# merge output tiles when done
+# merge output tiles when done, and build octree
 t0=time()
 info("director is merging output tiles with ",string(length(merge_procs))," nodes")
 @sync begin
