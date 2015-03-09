@@ -205,9 +205,6 @@ function ndalloc(tileshape, tiletype, heap=true)
   tile_ws
 end
 
-# 2 -> sizeof(Uint16), 20e3 -> .tif metadata size, 8 -> max # possible concurrent saves, need to generalize
-enough_free(path) = int(split(readall(`df $path`))[11])*1024 > 8*(prod(shape_leaf_px)*2 + 20e3)
-
 :shape_leaf_px in names(Main) && (save_ws = ndalloc(shape_leaf_px, tile_type, false))
 
 function save_out_tile(filesystem, path, name, data::Array{Uint16,3})
@@ -217,58 +214,41 @@ end
 
 function save_out_tile(filesystem, path, name, data::Ptr{Void})
   try
-    enough_free(filesystem) || return false
     filepath = joinpath(filesystem,path)
     filename = joinpath(filepath,name)
     try;  mkpath(filepath);  end
     ndioClose(ndioWrite(ndioOpen(filename, C_NULL, "w"), data))
-    return true
   catch
     error("in save_out_tile")
   end
 end
 
-function merge_guts(in_tiles, destination, delete,
-      merge1_ws::Ptr{Void}, merge2_ws::Ptr{Void}, merge1::Array{Uint16,3}, merge2::Array{Uint16,3})
-  if length(in_tiles)==1
-    t0=time()
-    info("copying from ",in_tiles[1])
-    info("  to ",destination)
-    cp(in_tiles[1],destination)
-    delete && (info("  deleting ",in_tiles[1]); rm(in_tiles[1]))
-    time_single_file=(time()-t0)
-    return time_single_file, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-  else
-    t0=time()
-    info("merging:")
-    t1=time()
-    ndfill(merge1_ws, 0x0000)
-    time_clear_files=(time()-t1)
-    for in_tile in in_tiles
-      info("  reading ",in_tile)
-      t1=time()
-      ndioClose(ndioRead(ndioOpen( in_tile, C_NULL, "r" ),merge2_ws))
-      time_read_files=(time()-t1)
-      t1=time()
-      merge1[:,:,:] = max(merge1,merge2)
-      time_max_files=(time()-t1)
-      t1=time()
-      delete && (info("  deleting ",in_tile); rm(in_tile))
-      time_delete_files=(time()-t1)
+# the merge API could perhaps be simplified. complexity arises because it is called:
+# by director.jl to build the octree                  (recurse=n/a,    octree=true,  delete=false)
+# by manager.jl to handle overflow into local_scratch (recurse=false,  octree=false, delete=true)
+# by merge to combine multiple previous renders       (recurse=either, octree=false, delete=false)
+
+# sort(reshape(arg,8))[7] but half the time and a third the memory usage
+function seven(arg::Array{Uint16,3})
+  m0::Uint16 = 0x0000
+  m1::Uint16 = 0x0000
+  for i = 1:8
+    @inbounds tmp::Uint16 = arg[i]
+    if tmp>m0
+      m1=m0
+      m0=tmp
+    elseif tmp>m1
+      m1=tmp
     end
-    info("  copying to ",destination)
-    t1=time()
-    ndioClose(ndioWrite(ndioOpen( destination, C_NULL, "w" ),merge1_ws))
-    time_write_files=(time()-t1)
-    time_many_files=(time()-t0)
-    return 0.0, time_many_files, time_clear_files, time_read_files, time_max_files, time_delete_files, time_write_files
   end
+  m1
 end
 
-merge_across_filesystems(source::ASCIIString, destination, prefix, chantype, out_tile_path, recurse::Bool, delete::Bool) =
-      merge_across_filesystems([source], destination, prefix, chantype, out_tile_path, recurse, delete)
+merge_across_filesystems(source::ASCIIString, destination, prefix, chantype, out_tile_path, recurse::Bool, octree::Bool, delete::Bool) =
+      merge_across_filesystems([source], destination, prefix, chantype, out_tile_path, recurse, octree, delete)
 
-function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, prefix, chantype, out_tile_path, recurse::Bool, delete::Bool)
+function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, prefix, chantype, out_tile_path, recurse::Bool, octree::Bool, delete::Bool, flag=false)
+  global time_octree_clear, time_octree_down, time_octree_save
   global time_single_file, time_many_files, time_clear_files, time_read_files, time_max_files, time_delete_files, time_write_files
 
   dirs=ASCIIString[]
@@ -281,51 +261,123 @@ function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, pr
     push!(in_tiles, [joinpath(source,out_tile_path,x) for x in listing[!idx & map(x->endswith(x,chantype), listing)]]...)
   end
 
-  recurse && for dir in unique(dirs)
-    merge_across_filesystems(sources, destination, prefix, chantype, joinpath(out_tile_path,dir), recurse, delete)
+  if octree
+    const level = out_tile_path=="" ? 1 : length(split(out_tile_path,Base.path_separator))+1
+    if length(dirs)>0 && length(in_tiles)==0
+      t0=time()
+      ndfill(out_tiles_ws[level], 0x0000)
+      time_octree_clear+=(time()-t0)
+    end
+  else
+    const level = 1
   end
-  length(in_tiles)==0 && return
 
-  enough_free(dirname(destination)) || throw(Exception)
+  ((!octree && recurse) || (octree && length(in_tiles)==0)) && for dir in unique(dirs)
+    merge_across_filesystems(sources, destination, prefix, chantype, joinpath(out_tile_path,dir), recurse, octree, delete, true)
+  end
+
   try;  mkpath(joinpath(destination,out_tile_path));  end
+  destination2 = joinpath(destination, out_tile_path, prefix * chantype)
 
-  tmp = merge_guts(in_tiles, joinpath(destination, out_tile_path, prefix * chantype), delete, merge1_ws, merge2_ws, merge1, merge2)
+  if length(in_tiles)==1 && in_tiles[1]!=destination2
+    t0=time()
+    info("copying from ",in_tiles[1])
+    info("  to ",destination2)
+    cp(in_tiles[1],destination2)
+    delete && (info("  deleting ",in_tiles[1]); rm(in_tiles[1]))
+    time_single_file+=(time()-t0)
+  elseif length(in_tiles)>1
+    t0=time()
+    info("merging:")
+    t1=time()
+    ndfill(merge1_ws, 0x0000)
+    time_clear_files+=(time()-t1)
+    for in_tile in in_tiles
+      info("  reading ",in_tile)
+      t1=time()
+      ndioClose(ndioRead(ndioOpen( in_tile, C_NULL, "r" ),merge2_ws))
+      time_read_files+=(time()-t1)
+      t1=time()
+      merge1_jl[:,:,:] = max(merge1_jl,merge2_jl)
+      time_max_files+=(time()-t1)
+      t1=time()
+      delete && (info("  deleting ",in_tile); rm(in_tile))
+      time_delete_files+=(time()-t1)
+    end
+    info("  copying to ",destination2)
+    t1=time()
+    ndioClose(ndioWrite(ndioOpen( destination2, C_NULL, "w" ),merge1_ws))
+    time_write_files+=(time()-t1)
+    time_many_files+=(time()-t0)
+  end
 
-  time_single_file += tmp[1]
-  time_many_files += tmp[2]
-  time_clear_files += tmp[3]
-  time_read_files += tmp[4]
-  time_max_files += tmp[5]
-  time_delete_files += tmp[6]
-  time_write_files += tmp[7]
+  if octree
+    if length(in_tiles)==1
+      ndioClose(ndioRead(ndioOpen( in_tiles[1], C_NULL, "r" ),merge1_ws))
+    elseif length(in_tiles)==0
+      t0=time()
+      info("saving output tile ",out_tile_path," to ",destination2)
+      ndioClose(ndioWrite(ndioOpen( destination2, C_NULL, "w" ),out_tiles_ws[level]))
+      time_octree_save+=(time()-t0)
+    end
+    if flag
+      t0=time()
+      info("downsampling output tile ",out_tile_path)
+      i = parseint(out_tile_path[end])
+      tmp = length(in_tiles)==0 ? out_tiles_jl[level] : merge1_jl
+      out_tiles_jl[level-1][ (((i-1)>>0)&1 * shape_leaf_px[1]>>1) + (1:shape_leaf_px[1]>>1),
+                             (((i-1)>>1)&1 * shape_leaf_px[2]>>1) + (1:shape_leaf_px[2]>>1),
+                             (((i-1)>>2)&1 * shape_leaf_px[3]>>1) + (1:shape_leaf_px[3]>>1) ] =
+          [ seven(tmp[x:x+1,y:y+1,z:z+1]) for x=1:2:shape_leaf_px[1]-1, y=1:2:shape_leaf_px[2]-1, z=1:2:shape_leaf_px[3]-1 ]
+      time_octree_down+=(time()-t0)
+    end
+  end
 end
 
-merge_output_tiles(source, destination, prefix, chantype, out_tile_path, recurse::Bool, delete::Bool) =
-      merge_output_tiles(()->merge_across_filesystems(source, destination, prefix, chantype, out_tile_path, recurse, delete))
+function merge_output_tiles(source, destination, prefix, chantype, out_tile_path, recurse::Bool, octree::Bool, delete::Bool)
+  global time_octree_clear=0.0, time_octree_down=0.0, time_octree_save=0.0
+
+  if octree
+    global out_tiles_ws = Array(Ptr{Void}, nlevels)
+    global out_tiles_jl = Array(Array{Uint16,3}, nlevels)
+    for i=1:nlevels
+      out_tiles_ws[i] = ndalloc(shape_leaf_px, tile_type)
+      out_tiles_jl[i] = pointer_to_array(convert(Ptr{Uint16},nddata(out_tiles_ws[i])), tuple(shape_leaf_px...))
+    end
+  end
+
+  merge_output_tiles(()-> merge_across_filesystems(source, destination, prefix, chantype, out_tile_path, recurse, octree, delete))
+
+  octree && map(ndfree,out_tiles_ws)
+
+  info("clearing octree took ",string(signif(time_octree_clear,4,2))," sec")
+  info("downsampling octree took ",string(signif(time_octree_down,4,2))," sec")
+  info("saving octree took ",string(signif(time_octree_save,4,2))," sec")
+end
 
 function merge_output_tiles(callback::Function)
-  global time_single_file=0.0, time_many_files=0.0, time_ram_file=0.0
+  global time_ram_file=0.0, time_single_file=0.0, time_many_files=0.0
   global time_clear_files=0.0, time_read_files=0.0, time_max_files=0.0, time_delete_files=0.0, time_write_files=0.0
 
-  global merge1_ws, merge2_ws, merge1, merge2
+  global merge1_ws, merge1_jl, merge2_ws, merge2_jl
   merge1_ws = ndalloc(shape_leaf_px, tile_type)
+  merge1_jl = pointer_to_array(convert(Ptr{Uint16},nddata(merge1_ws)), tuple(shape_leaf_px...))
   merge2_ws = ndalloc(shape_leaf_px, tile_type)
-  merge1 = pointer_to_array(convert(Ptr{Uint16},nddata(merge1_ws)), tuple(shape_leaf_px...))
-  merge2 = pointer_to_array(convert(Ptr{Uint16},nddata(merge2_ws)), tuple(shape_leaf_px...))
+  merge2_jl = pointer_to_array(convert(Ptr{Uint16},nddata(merge2_ws)), tuple(shape_leaf_px...))
 
   callback()
 
   ndfree(merge1_ws)
   ndfree(merge2_ws)
 
-  info("copying single files took ",string(iround(time_single_file))," sec")
-  info("merging multiple files took ",string(iround(time_many_files))," sec")
-  info("  clearing multiple files took ",string(iround(time_clear_files))," sec")
-  info("  reading multiple files took ",string(iround(time_read_files))," sec")
-  info("  max'ing multiple files took ",string(iround(time_max_files))," sec")
-  info("  deleting multiple files took ",string(iround(time_delete_files))," sec")
-  info("  writing multiple files took ",string(iround(time_write_files))," sec")
-  info("transfering RAM files took ",string(iround(time_ram_file))," sec")
+  info("transfering RAM files took ",string(signif(time_ram_file,4,2))," sec")
+  info("copying single files took ",string(signif(time_single_file,4,2))," sec")
+  info("merging multiple files took ",string(signif(time_many_files,4,2))," sec")
+  info("  clearing multiple files took ",string(signif(time_clear_files,4,2))," sec")
+  info("  reading multiple files took ",string(signif(time_read_files,4,2))," sec")
+  info("  max'ing multiple files took ",string(signif(time_max_files,4,2))," sec")
+  info("  deleting multiple files took ",string(signif(time_delete_files,4,2))," sec")
+  info("  writing multiple files took ",string(signif(time_write_files,4,2))," sec")
 end
 
 # ECONNREFUSED: h09u20 x3

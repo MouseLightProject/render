@@ -39,7 +39,7 @@ while isopen(sock) || nb_available(sock)>0
   if ismatch(dole_out,tmp)
     doit(`$(ENV["RENDER_PATH"])$(envpath)/bin/julia $(ENV["RENDER_PATH"])/src/render/manager.jl $(split(tmp)[6:end])`)
   elseif ismatch(merge,tmp)
-    doit(`$(ENV["RENDER_PATH"])$(envpath)/bin/julia -L $(ENV["RENDER_PATH"])/src/render/admin.jl -L $destination/calculated_parameters.jl -e $(join(split(tmp)[4:end]," "))`)
+    doit(`$(ENV["RENDER_PATH"])$(envpath)/bin/julia -L $destination/set_parameters.jl -L $destination/calculated_parameters.jl -L $(ENV["RENDER_PATH"])/src/render/admin.jl -e $(join(split(tmp)[4:end]," "))`)
   elseif ismatch(terminate,tmp)
     msg = "squatter $proc_num is terminating"
     println("SQUATTER>DIRECTOR: ",msg)

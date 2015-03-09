@@ -23,7 +23,7 @@ include(ENV["RENDER_PATH"]*"/src/render/admin.jl")
 #  gpu_ram = cudaMemGetInfo()[2]
 #  num_procs = min(15,ngpus*ifloor(gpu_ram/tile_ram))  # >4 hits swap
 if ngpus == 7
-  num_procs = 4
+  num_procs = 7
 elseif ngpus == 4
   num_procs = 15
 else
@@ -73,27 +73,23 @@ end
 
 # order tiles to preserve locality, and
 # calculate number of input tiles for each output tile
-out_tile_path=Int[]
-
-function depth_first_traverse(bbox)
+function depth_first_traverse(bbox,out_tile_path)
   AABBHit(bbox, manager_aabb)==1 || return
-  tmp = map((x)->AABBHit(bbox, x), in_tiles_aabb)
-  merge_count[join(out_tile_path, Base.path_separator)] = Uint16[sum(tmp), 0, 0]
   if isleaf(bbox)
+    tmp = map((x)->AABBHit(bbox, x), in_tiles_aabb)
+    merge_count[join(out_tile_path, Base.path_separator)] = Uint16[sum(tmp), 0, 0]
     push!(locality_idx, setdiff(find(tmp), locality_idx)...)
   else
     cboxes = AABBBinarySubdivision(bbox)
     for i=1:8
-      push!(out_tile_path,i)
-      depth_first_traverse(cboxes[i])
+      depth_first_traverse(cboxes[i], [out_tile_path...,i])
       AABBFree(cboxes[i])
-      pop!(out_tile_path)
     end
   end
 end
 
 const total_ram = int(split(readchomp(`cat /proc/meminfo` |> `head -1`))[2])*1024
-ncache = ifloor((total_ram - reserve_ram)/2/prod(shape_leaf_px))   # reserve 32GB for system, scripts, etc.
+ncache = ifloor((total_ram - reserve_ram)/2/prod(shape_leaf_px))   # reserve some RAM for system, scripts, etc.
 merge_array = Array(Uint16, shape_leaf_px..., ncache)
 merge_used = falses(ncache)
 # one entry for each output tile
@@ -102,7 +98,7 @@ merge_count = Dict{ASCIIString,Array{Uint16,1}}()
 info("allocated RAM for ",string(ncache)," output tiles")
 
 locality_idx = Int[]
-depth_first_traverse(TileBaseAABB(tiles))
+depth_first_traverse(TileBaseAABB(tiles),Int[])
 AABBFree(manager_bbox)
 AABBFree(manager_aabb)
 map(AABBFree, in_tiles_aabb)
@@ -121,7 +117,7 @@ end
 t0=time()
 @sync begin
   # initialize tcp communication with peons
-  # as soon as all output tiles for a given node in the octree have been processed,
+  # as soon as all output tiles for a given leaf in the octree have been processed,
   #   concurrently merge and save them to shared_scratch
   hostname2 = readchomp(`hostname`)
   port2 = int(ARGS[10])+1
@@ -163,19 +159,18 @@ t0=time()
           out_tile_path = match(wrote,tmp).captures[4]
           merge_count[out_tile_path][2]+=1
           if merge_count[out_tile_path][1] == merge_count[out_tile_path][2]
-            info("saving output tile ",out_tile_path," from local_scratch to shared_scratch")
-            merge_across_filesystems(local_scratch, shared_scratch, join(ARGS[3:5],"-"), "."*string(channel-1)*".tif", out_tile_path, false, true)
+            merge_across_filesystems(local_scratch, shared_scratch, join(ARGS[3:5],"-"), "."*string(channel-1)*".tif", out_tile_path, false, false, true)
+            info("saved output tile ",out_tile_path," from local_scratch to shared_scratch")
           end
         elseif ismatch(sent,tmp)
           global time_max_files, time_ram_file
-          out_tile = deserialize(sock2)
           out_tile_path = match(sent,tmp).captures[4]
+          out_tile = deserialize(sock2)
           merge_count[out_tile_path][2]+=1
           if merge_count[out_tile_path][1]==1
             t1=time()
-            info("transferring output tile ",out_tile_path," from RAM to shared_scratch")
-            save_out_tile(shared_scratch, out_tile_path, join(ARGS[3:5],"-")*".$(channel-1).tif", out_tile) ||
-                  error("shared_scratch is full")
+            save_out_tile(shared_scratch, out_tile_path, join(ARGS[3:5],"-")*".$(channel-1).tif", out_tile)
+            info("transfered output tile ",out_tile_path," from RAM to shared_scratch")
             time_ram_file+=(time()-t1)
           else
             t1=time()
@@ -184,10 +179,10 @@ t0=time()
             time_max_files+=(time()-t1)
             if merge_count[out_tile_path][1] == merge_count[out_tile_path][2]
               t1=time()
-              info("transferring output tile ",out_tile_path," from RAM to shared_scratch")
               save_out_tile(shared_scratch, out_tile_path, join(ARGS[3:5],"-")*".$(channel-1).tif",
-                    merge_array[:,:,:,merge_count[out_tile_path][3]]) || error("shared_scratch is full")
+                    merge_array[:,:,:,merge_count[out_tile_path][3]])
               merge_used[merge_count[out_tile_path][3]] = false
+              info("transfered output tile ",out_tile_path," from RAM to shared_scratch")
               time_ram_file+=(time()-t1)
             end
           end
@@ -213,14 +208,18 @@ t0=time()
         try
           run(cmd)
         catch
-          warn("input tile $(in_tiles_idx[locality_idx[tile_idx]]) might have failed")
+          warn("peon for input tile $(in_tiles_idx[locality_idx[tile_idx]]) might have failed")
         end
       end
     end
   end
 end
 info("peons took ",string(iround(time()-t0))," sec")
-for x in merge_count;  println(x);  end
+
+for (k,v) in merge_count
+  println((k,v))
+  v[1]!=v[2] && warn("not all input tiles processed for output tile ",string(k)," : ",string(v))
+end
 
 # delete local_scratch
 t0=time()

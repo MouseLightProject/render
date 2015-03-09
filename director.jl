@@ -206,7 +206,7 @@ info("director is merging output tiles with ",string(length(merge_procs))," node
     @async begin
       while isopen(merge_procs[p][2])
         idx = nextidx()
-        if idx > 64*nchannels
+        if idx > 64*nchannels || nlevels <= 2
           cmd = "squatter $(merge_procs[p][1]) terminate"
           println("DIRECTOR>SQUATTER: ",string(cmd))
           println(merge_procs[p][2], cmd)
@@ -216,22 +216,18 @@ info("director is merging output tiles with ",string(length(merge_procs))," node
         octant = (idx-1)>>4+1
         octant2 = ((idx-1)>>1)%8+1
         isdir(joinpath(shared_scratch,string(octant),string(octant2))) || continue
-        cmd = "squatter $(merge_procs[p][1]) merge merge_output_tiles(\"$shared_scratch\", \"$destination\", \"default\", \"$("."*string(channel-1)*".tif")\", \"$(string(octant))/$(string(octant2))\", true, false)"
+        cmd = "squatter $(merge_procs[p][1]) merge merge_output_tiles(\"$shared_scratch\", \"$destination\", \"default\", \"$("."*string(channel-1)*".tif")\", \"$(string(octant))/$(string(octant2))\", true, true, false)"
         println("DIRECTOR>SQUATTER: ",string(cmd))
         println(merge_procs[p][2], cmd)
         wait(events[merge_procs[p][1],2])
       end
     end
   end
-  @async for channel=1:nchannels
-    for octant=1:8
-      isdir(joinpath(shared_scratch,string(octant))) || continue
-      merge_output_tiles(shared_scratch, destination, "default", "."*string(channel-1)*".tif", string(octant), false, false)
-    end
-    merge_output_tiles(shared_scratch, destination, "default", "."*string(channel-1)*".tif", "", false, false)
-  end
 end
-info("inter-node merge took ",string(iround(time()-t0))," sec")
+for channel=1:nchannels
+  merge_output_tiles(nlevels>2 ? destination : shared_scratch, destination, "default", "."*string(channel-1)*".tif", "", true, true, false)
+end
+info("inter-node merge and octree took ",string(iround(time()-t0))," sec")
 
 # delete shared_scratch
 t0=time()

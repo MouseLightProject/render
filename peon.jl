@@ -15,97 +15,46 @@ time_downsampling=0.0
 # keep boss informed
 sock = connect(ARGS[30],int(ARGS[31]))
 
-# sort(reshape(arg,8))[7] but half the time and a third the memory usage
-function seven(arg::Array{Uint16,3})
-  m0::Uint16 = 0x0000
-  m1::Uint16 = 0x0000
-  for i = 1:8
-    @inbounds tmp::Uint16 = arg[i]
-    if tmp>m0
-      m1=m0
-      m0=tmp
-    elseif tmp>m1
-      m1=tmp
-    end
-  end
-  m1
-end
-
 type NDException <: Exception end
 
 write = "manager tells peon for input tile "*ARGS[4]*" to write output tile"
 send = "manager tells peon for input tile "*ARGS[4]*" to send output tile"
 
-function save2ramORscratch(level)
-  println(sock, "peon for input tile ",ARGS[4]," has output tile ",join(out_tile_path, Base.path_separator)," ready")
-  local tmp
-  while true
-    tmp = chomp(readline(sock))
-    length(tmp)==0 || break
-  end
-  println("PEON<MANAGER: ",tmp)
-  if startswith(tmp,write)
-    out_tile_path_str = join(out_tile_path, Base.path_separator)
-    if save_out_tile(local_scratch, out_tile_path_str, string(in_tile_idx)*".$(channel-1).tif", out_tiles_ws[level])
-      try;  println(sock,"peon for input tile ",ARGS[4]," wrote output tile ",out_tile_path_str," to local_scratch");  end
-    elseif save_out_tile(shared_scratch, out_tile_path_str, ARGS[29]*"."*string(in_tile_idx)*".$(channel-1).tif", out_tiles_ws[level])
-      msg = "peon for input tile "*string(ARGS[4])*" wrote output tile "*out_tile_path_str*" to shared_scratch"
-      try;  println(sock,msg);  end
-      warn(msg)
-    else
-      error("peon for input tile "*ARGS[4]*" can't write "*joinpath(string(in_tile_idx)*".$(channel-1).tif")*"anywhere.  all disks full")
-    end
-  elseif startswith(tmp,send)
-    try
-      println(sock,"peon for input tile ",ARGS[4]," will send output tile ",join(out_tile_path, Base.path_separator))
-      serialize(sock, out_tiles[level])
-    end
-  else
-    error("invalid message from manager to peon")
-  end
-end
+# 2 -> sizeof(Uint16), 20e3 -> .tif metadata size, 15 -> max # possible concurrent saves, need to generalize
+enough_free(path) = int(split(readall(`df $path`))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
 
-out_tile_path=Int[]
-
-function depth_first_traverse(bbox)
+function depth_first_traverse(bbox,out_tile_path)
   cboxes = AABBBinarySubdivision(bbox)
 
-  global out_tiles_ws, out_tile_path, time_transforming, time_saving, time_downsampling
-
-  const level = length(out_tile_path)+1
-  try
-    ndfill(out_tiles_ws[level], 0x0000)
-  catch
-    error("in peon/ndfill")
-  end
+  global out_tile_ws, time_transforming, time_saving, time_downsampling
 
   for i=1:8
     AABBHit(cboxes[i], TileAABB(tile))==1 || continue
-    push!(out_tile_path,i)
-
-    const origin_nm = AABBGetJ(cboxes[i])[2]
-    const transform = (transform_nm .- origin_nm) ./ (voxelsize_used_um*um2nm)
+    out_tile_path_next = joinpath(out_tile_path,string(i))
 
     if !isleaf(cboxes[i])
-      depth_first_traverse(cboxes[i])
+      depth_first_traverse(cboxes[i],out_tile_path_next)
     else
-      info("processing output tile ",string(out_tile_path))
+      info("processing output tile ",out_tile_path_next)
 
       t0=time()
+      const origin_nm = AABBGetJ(cboxes[i])[2]
+      const transform = (transform_nm .- origin_nm) ./ (voxelsize_used_um*um2nm)
+
       try
-        ndfill(out_tiles_ws[level+1], 0x0000)
+        ndfill(out_tile_ws, 0x0000)
       catch
-        error("in peon/ndfill2")
+        error("in peon/ndfill")
       end
       try
         if !isnan(thisgpu)
-          BarycentricGPUdestination(resampler, nddata(out_tiles_ws[level+1]))
+          BarycentricGPUdestination(resampler, nddata(out_tile_ws))
           BarycentricGPUresample(resampler, convert(Array{Float32}, transform))
-          BarycentricGPUresult(resampler, nddata(out_tiles_ws[level+1]))
+          BarycentricGPUresult(resampler, nddata(out_tile_ws))
         else
-          BarycentricCPUdestination(resampler, nddata(out_tiles_ws[level+1]))
+          BarycentricCPUdestination(resampler, nddata(out_tile_ws))
           BarycentricCPUresample(resampler, convert(Array{Float32}, transform))
-          BarycentricCPUresult(resampler, nddata(out_tiles_ws[level+1]))
+          BarycentricCPUresult(resampler, nddata(out_tile_ws))
         end
       catch
         error("BarycentricDestination/Resample/Result error:  GPU $thisgpu, input tile $in_tile_idx")
@@ -113,32 +62,38 @@ function depth_first_traverse(bbox)
       time_transforming+=(time()-t0)
 
       t0=time()
-      save2ramORscratch(level+1)
+      println(sock, "peon for input tile ",ARGS[4]," has output tile ",out_tile_path_next," ready")
+      local tmp
+      while true
+        tmp = chomp(readline(sock))
+        length(tmp)==0 || break
+      end
+      println("PEON<MANAGER: ",tmp)
+      if startswith(tmp,send)
+        try
+          println(sock,"peon for input tile ",ARGS[4]," will send output tile ",out_tile_path_next)
+          serialize(sock, out_tile)
+        end
+      elseif startswith(tmp,write)
+        if enough_free(local_scratch)
+          save_out_tile(local_scratch, out_tile_path_next, string(in_tile_idx)*".$(channel-1).tif", out_tile_ws)
+          try;  println(sock,"peon for input tile ",ARGS[4]," wrote output tile ",out_tile_path_next," to local_scratch");  end
+        else
+          save_out_tile(shared_scratch, out_tile_path_next, ARGS[29]*"."*string(in_tile_idx)*".$(channel-1).tif", out_tile_ws)
+          msg = "peon for input tile "*string(ARGS[4])*" wrote output tile "*out_tile_path_next*" to shared_scratch"
+          try;  println(sock,msg);  end
+          warn(msg)
+        end
+      end
       time_saving+=(time()-t0)
     end
 
-    try
-      t0=time()
-      out_tiles[level][ (((i-1)>>0)&1 * shape_leaf_px[1]>>1) + (1:shape_leaf_px[1]>>1),
-                        (((i-1)>>1)&1 * shape_leaf_px[2]>>1) + (1:shape_leaf_px[2]>>1),
-                        (((i-1)>>2)&1 * shape_leaf_px[3]>>1) + (1:shape_leaf_px[3]>>1) ] =
-          [ seven(out_tiles[level+1][x:x+1,y:y+1,z:z+1]) for x=1:2:shape_leaf_px[1]-1, y=1:2:shape_leaf_px[2]-1, z=1:2:shape_leaf_px[3]-1 ]
-      time_downsampling+=(time()-t0)
-    catch
-      error("in peon/seven")
-    end
-
-    pop!(out_tile_path)
     try
       AABBFree(cboxes[i])
     catch
       error("in peon/AABBFree")
     end
   end
-
-  t0=time()
-  save2ramORscratch(level)
-  time_saving+=(time()-t0)
 end
 
 function process_tile(thisgpu_, in_tile_idx_, transform_)
@@ -167,12 +122,8 @@ function process_tile(thisgpu_, in_tile_idx_, transform_)
     ndioClose(ndioRead(ndioOpen("/"*joinpath(tmp...), C_NULL, "r"), in_tile_ws))
     info("reading input tile ",string(in_tile_idx)," took ",string(iround(time()-t1))," sec")
 
-    global out_tiles_ws = Array(Ptr{Void}, nlevels+1)
-    global out_tiles = Array(Array{Uint16,3}, nlevels+1)
-    for i=1:nlevels+1
-      out_tiles_ws[i] = ndalloc(shape_leaf_px, ndtype(in_tile_ws))
-      out_tiles[i] = pointer_to_array(convert(Ptr{Uint16},nddata(out_tiles_ws[i])), tuple(shape_leaf_px...))
-    end
+    global out_tile_ws = ndalloc(shape_leaf_px, ndtype(in_tile_ws))
+    global out_tile = pointer_to_array(convert(Ptr{Uint16},nddata(out_tile_ws)), tuple(shape_leaf_px...))
   catch
     error("in peon/ndalloc")
   end
@@ -183,11 +134,11 @@ function process_tile(thisgpu_, in_tile_idx_, transform_)
     if !isnan(thisgpu)
       cudaSetDevice(thisgpu)
       info("initializing GPU ",string(thisgpu),", ",string(signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2))," GB free")
-      BarycentricGPUinit(resampler, ndshape(in_tile_ws), ndshape(out_tiles_ws[1]), 3)
+      BarycentricGPUinit(resampler, ndshape(in_tile_ws), ndshape(out_tile_ws), 3)
       BarycentricGPUsource(resampler, nddata(in_tile_ws))
       info("initialized GPU ",string(thisgpu),", ",string(signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2))," GB free")
     else
-      BarycentricCPUinit(resampler, ndshape(in_tile_ws), ndshape(out_tiles_ws[1]), 3)
+      BarycentricCPUinit(resampler, ndshape(in_tile_ws), ndshape(out_tile_ws), 3)
       BarycentricCPUsource(resampler, nddata(in_tile_ws))
     end
   catch
@@ -195,9 +146,9 @@ function process_tile(thisgpu_, in_tile_idx_, transform_)
   end
   info("transform initialization for input tile ",string(in_tile_idx)," took ",string(iround(time()-t1))," sec")
 
-  depth_first_traverse(TileBaseAABB(tiles))
+  depth_first_traverse(TileBaseAABB(tiles),"")
   try
-    map(ndfree, out_tiles_ws)
+    ndfree(out_tile_ws)
     ndfree(in_tile_ws)
   catch
     error("in peon/ndfree")
@@ -223,8 +174,8 @@ function process_tile(thisgpu_, in_tile_idx_, transform_)
   end
 
   info("transforming input tile ",string(in_tile_idx)," took ",string(iround(time_transforming))," sec")
-  info("saving output tiles ",string(in_tile_idx)," took ",string(iround(time_saving))," sec")
-  info("downsampling output tiles ",string(in_tile_idx)," took ",string(iround(time_downsampling))," sec")
+  info("saving output tiles for input tile ",string(in_tile_idx)," took ",string(iround(time_saving))," sec")
+  info("downsampling output tiles for input tile ",string(in_tile_idx)," took ",string(iround(time_downsampling))," sec")
   info("input tile ",string(in_tile_idx)," took ",string(iround(time()-t0))," sec overall")
 end
 
