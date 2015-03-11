@@ -23,6 +23,25 @@ const file_infix="ngc"  # need to generalize
 # normalized origin and shape of sub-bounding box to render
 const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
 
+# the (name of the) function to use to build the octree
+#const downsampling_function = mean  # e.g. maximum, mean, or custom like below
+#
+# sort(reshape(arg,8))[7] but half the time and a third the memory usage
+function downsampling_function(arg::Array{Uint16,3})
+  m0::Uint16 = 0x0000
+  m1::Uint16 = 0x0000
+  for i = 1:8
+    @inbounds tmp::Uint16 = arg[i]
+    if tmp>m0
+      m1=m0
+      m0=tmp
+    elseif tmp>m1
+      m1=tmp
+    end
+  end
+  m1
+end
+
 const notify_addr = "<yourId>@janelia.hhmi.org"
 const bill_userid = "<yourId>"
 

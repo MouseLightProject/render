@@ -228,22 +228,6 @@ end
 # by manager.jl to handle overflow into local_scratch (recurse=false,  octree=false, delete=true)
 # by merge to combine multiple previous renders       (recurse=either, octree=false, delete=false)
 
-# sort(reshape(arg,8))[7] but half the time and a third the memory usage
-function seven(arg::Array{Uint16,3})
-  m0::Uint16 = 0x0000
-  m1::Uint16 = 0x0000
-  for i = 1:8
-    @inbounds tmp::Uint16 = arg[i]
-    if tmp>m0
-      m1=m0
-      m0=tmp
-    elseif tmp>m1
-      m1=tmp
-    end
-  end
-  m1
-end
-
 merge_across_filesystems(source::ASCIIString, destination, prefix, chantype, out_tile_path, recurse::Bool, octree::Bool, delete::Bool) =
       merge_across_filesystems([source], destination, prefix, chantype, out_tile_path, recurse, octree, delete)
 
@@ -328,7 +312,7 @@ function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, pr
       out_tiles_jl[level-1][ (((i-1)>>0)&1 * shape_leaf_px[1]>>1) + (1:shape_leaf_px[1]>>1),
                              (((i-1)>>1)&1 * shape_leaf_px[2]>>1) + (1:shape_leaf_px[2]>>1),
                              (((i-1)>>2)&1 * shape_leaf_px[3]>>1) + (1:shape_leaf_px[3]>>1) ] =
-          [ seven(tmp[x:x+1,y:y+1,z:z+1]) for x=1:2:shape_leaf_px[1]-1, y=1:2:shape_leaf_px[2]-1, z=1:2:shape_leaf_px[3]-1 ]
+          [ downsampling_function(tmp[x:x+1,y:y+1,z:z+1]) for x=1:2:shape_leaf_px[1]-1, y=1:2:shape_leaf_px[2]-1, z=1:2:shape_leaf_px[3]-1 ]
       time_octree_down+=(time()-t0)
     end
   end
