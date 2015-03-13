@@ -48,3 +48,5 @@ while isopen(sock) || nb_available(sock)>0
     quit()
   end
 end
+
+closelibs()

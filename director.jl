@@ -240,6 +240,8 @@ cmd = `echo destination = $destination` |> `mail -s "job $jobname finished" $not
 info(string(cmd))
 run(cmd)
 
+closelibs()
+
 info(readchomp(`date`))
 
 # write protect

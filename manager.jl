@@ -226,6 +226,8 @@ t0=time()
 scratch1 = rmcontents(local_scratch, "before")
 info("deleting local_scratch = ",local_scratch," at end took ",string(iround(time()-t0))," sec")
 
+closelibs()
+
 # keep boss informed
 try
   println(sock,"manager ",proc_num," has finished job ",join(ARGS[[3 4 5 2]],".")," on ",readchomp(`hostname`),

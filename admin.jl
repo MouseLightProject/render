@@ -140,8 +140,10 @@ end
 
 # interface to mltk-bary
 
-dlopen("libcudart.so",RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+h=dlopen("libcudart.so",RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
 const libengine = ENV["RENDER_PATH"]*envpath*"/build/mltk-bary/libengine.so"
+
+closelibs() = dlclose(h)
 
 type BarycentricException <: Exception end
 

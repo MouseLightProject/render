@@ -184,6 +184,8 @@ const channel = int(ARGS[3])
 
 process_tile(ARGS[2]=="NaN" ? NaN : int(ARGS[2]), int(ARGS[4]), reshape(int(ARGS[5:28]),3,8))
 
+closelibs()
+
 # keep boss informed
 try
   println(sock,"peon for input tile ",ARGS[4]," is finished")
