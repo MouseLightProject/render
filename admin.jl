@@ -1,5 +1,18 @@
 const um2nm=1e3
 
+macro retry(x)
+  quote
+    for i=1:3
+      try
+        $x
+        break
+      catch e
+        i==10 ? error(e) : (warn(e);  sleep(10))
+      end
+    end
+  end
+end
+
 # interface to CUDA
 
 # map((x)->(cudaSetDevice(x); [cudaMemGetInfo()...]./1024^3), 0:cudaGetDeviceCount()-1)
@@ -218,7 +231,7 @@ function save_out_tile(filesystem, path, name, data::Ptr{Void})
   try
     filepath = joinpath(filesystem,path)
     filename = joinpath(filepath,name)
-    try;  mkpath(filepath);  end
+    @retry mkpath(filepath)
     ndioClose(ndioWrite(ndioOpen(filename, C_NULL, "w"), data))
   catch
     error("in save_out_tile")
@@ -262,7 +275,7 @@ function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, pr
     merge_across_filesystems(sources, destination, prefix, chantype, joinpath(out_tile_path,dir), recurse, octree, delete, true)
   end
 
-  try;  mkpath(joinpath(destination,out_tile_path));  end
+  @retry mkpath(joinpath(destination,out_tile_path))
   destination2 = joinpath(destination, out_tile_path, prefix * chantype)
 
   if length(in_tiles)==1 && in_tiles[1]!=destination2
@@ -365,22 +378,6 @@ function merge_output_tiles(callback::Function)
   info("  deleting multiple files took ",string(signif(time_delete_files,4,2))," sec")
   info("  writing multiple files took ",string(signif(time_write_files,4,2))," sec")
 end
-
-# ECONNREFUSED: h09u20 x3
-#=
-macro retry(x)
-  quote
-    for i=1:10
-      try
-        $x
-        break
-      catch e
-        i==10 ? error(e) : (warn(e);  sleep(10))
-      end
-    end
-  end
-end
-=#
 
 function rmcontents(dir, available)
   function get_available(dir,msg)
