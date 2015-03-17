@@ -1,13 +1,14 @@
 const um2nm=1e3
 
 macro retry(x)
+  n=3; s=10
   quote
-    for i=1:3
+    for i=1:$n
       try
         $x
         break
       catch e
-        i==10 ? error(e) : (warn(e);  sleep(10))
+        i==$n ? error(e) : (warn($(string(x)));  sleep($s))
       end
     end
   end
