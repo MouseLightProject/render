@@ -5,9 +5,11 @@
 #   ./diskio
 
 # while the write speeds will display almost immediately, the read
-# speeds will take several 10s of minutes do to clearing the cache
+# speeds will take several 10s of minutes due to clearing the cache
 
-# note that the product of bs=1M and count=128K on line 45 must match the total RAM
+# note that the product of bs=1M and count=256K on line 45 must equal or exceed total RAM
+
+# qsub -l gpu=true -pe batch 7 -N diskio -j y -b y -V -shell n -o ${PWD}/diskio.570.log ${PWD}/diskio
 
 date
 hostname
@@ -21,28 +23,28 @@ read_it() {
  dd of=/dev/null if=$1 bs=1M; }
 
 echo write
-write_it /dev/shm/foo0
-write_it /scratch/$USER/foo1
-write_it /nobackup/mousebrainmicro/foo2
-write_it /groups/mousebrainmicro/mousebrainmicro/foo3
-write_it /tier2/mousebrainmicro/foo4
+write_it /dev/shm/${HOSTNAME}0
+write_it /scratch/$USER/${HOSTNAME}1
+write_it /nobackup/mousebrainmicro/${HOSTNAME}2
+write_it /groups/mousebrainmicro/mousebrainmicro/${HOSTNAME}3
+write_it /tier2/mousebrainmicro/${HOSTNAME}4
 
 # clear cache
 # the slow way which doesn't require root access
-dd if=/dev/zero of=/scratch/$USER/bar bs=1M count=128K conv=fsync &> /dev/null
+dd if=/dev/zero of=/scratch/$USER/bar bs=1M count=256K conv=fsync &> /dev/null
 rm /scratch/$USER/bar
 # purportedly this is ideal
 # echo 1 > /proc/sys/vm/drop_caches
 
 echo read
-read_it /dev/shm/foo0
-read_it /scratch/$USER/foo1
-read_it /nobackup/mousebrainmicro/foo2
-read_it /groups/mousebrainmicro/mousebrainmicro/foo3
-read_it /tier2/mousebrainmicro/foo4
+read_it /dev/shm/${HOSTNAME}0
+read_it /scratch/$USER/${HOSTNAME}1
+read_it /nobackup/mousebrainmicro/${HOSTNAME}2
+read_it /groups/mousebrainmicro/mousebrainmicro/${HOSTNAME}3
+read_it /tier2/mousebrainmicro/${HOSTNAME}4
 
-rm /dev/shm/foo0
-rm /scratch/$USER/foo1
-rm /nobackup/mousebrainmicro/foo2
-rm /groups/mousebrainmicro/mousebrainmicro/foo3
-rm /tier2/mousebrainmicro/foo4
+rm /dev/shm/${HOSTNAME}0
+rm /scratch/$USER/${HOSTNAME}1
+rm /nobackup/mousebrainmicro/${HOSTNAME}2
+rm /groups/mousebrainmicro/mousebrainmicro/${HOSTNAME}3
+rm /tier2/mousebrainmicro/${HOSTNAME}4
