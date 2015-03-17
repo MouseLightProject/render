@@ -119,6 +119,7 @@ nfinished = 0
         tmp = chomp(readline(sock))
         length(tmp)==0 && continue
         println("DIRECTOR<SQUATTER: ",tmp)
+        flush(STDOUT);  flush(STDERR)
         if ismatch(ready,tmp)
           m=match(ready,tmp)
           notify(events[int(m.match),1], sock)
@@ -142,8 +143,6 @@ function launch_workers(t1,t2,queue,envpath)
   info(string(cmd))
   push!(jobids, match(r"(?<=job-array )[0-9]*", readchomp(cmd)).match)
 end
-
-flush(STDOUT);  flush(STDERR)
 
 t0=time()
 merge_procs = Any[]
@@ -184,7 +183,6 @@ merge_procs = Any[]
           println(sock, cmd)
           nfinished = wait(events[p,2])
           info("director has finished ",string(nfinished)," of ",string(nchannels*length(job_aabbs))," jobs.  ",string(signif(nfinished / (nchannels*length(job_aabbs)) * 100,7,2)),"% done")
-          flush(STDOUT);   flush(STDERR)
         end
       end
     end
@@ -245,6 +243,4 @@ closelibs()
 info(readchomp(`date`))
 
 # write protect
-flush(STDOUT)
-flush(STDERR)
 run(`chmod -R a-w $destination`)
