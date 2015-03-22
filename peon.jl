@@ -1,5 +1,5 @@
 # spawned by manager
-# processes all output tiles, both leaf and downsampled, from a given input tile
+# processes all leaf output tiles from a given input tile
 # saves stdout/err to <destination>/[0-9]*.log
 
 # julia peon.jl parameters.jl gpu channel in_tile transform[1-24] origin_str hostname port
@@ -10,7 +10,6 @@ include(ENV["RENDER_PATH"]*"/src/render/admin.jl")
 
 time_transforming=0.0
 time_saving=0.0
-time_downsampling=0.0
 
 # keep boss informed
 sock = connect(ARGS[30],int(ARGS[31]))
@@ -26,7 +25,7 @@ enough_free(path) = int(split(readall(`df $path`))[11])*1024 > 15*((prod(shape_l
 function depth_first_traverse(bbox,out_tile_path)
   cboxes = AABBBinarySubdivision(bbox)
 
-  global out_tile_ws, time_transforming, time_saving, time_downsampling
+  global out_tile_ws, time_transforming, time_saving
 
   for i=1:8
     AABBHit(cboxes[i], TileAABB(tile))==1 || continue
@@ -175,7 +174,6 @@ function process_tile(thisgpu_, in_tile_idx_, transform_)
 
   info("transforming input tile ",string(in_tile_idx)," took ",string(iround(time_transforming))," sec")
   info("saving output tiles for input tile ",string(in_tile_idx)," took ",string(iround(time_saving))," sec")
-  info("downsampling output tiles for input tile ",string(in_tile_idx)," took ",string(iround(time_downsampling))," sec")
   info("input tile ",string(in_tile_idx)," took ",string(iround(time()-t0))," sec overall")
 end
 
