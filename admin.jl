@@ -328,7 +328,7 @@ function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, pr
       out_tiles_jl[level-1][ (((i-1)>>0)&1 * shape_leaf_px[1]>>1) + (1:shape_leaf_px[1]>>1),
                              (((i-1)>>1)&1 * shape_leaf_px[2]>>1) + (1:shape_leaf_px[2]>>1),
                              (((i-1)>>2)&1 * shape_leaf_px[3]>>1) + (1:shape_leaf_px[3]>>1) ] =
-          [ downsampling_function(tmp[x:x+1,y:y+1,z:z+1]) for x=1:2:shape_leaf_px[1]-1, y=1:2:shape_leaf_px[2]-1, z=1:2:shape_leaf_px[3]-1 ]
+          [ uint16(downsampling_function(tmp[x:x+1,y:y+1,z:z+1])) for x=1:2:shape_leaf_px[1]-1, y=1:2:shape_leaf_px[2]-1, z=1:2:shape_leaf_px[3]-1 ]
       time_octree_down+=(time()-t0)
     end
   end
