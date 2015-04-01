@@ -110,11 +110,10 @@ finished = r"(?<=squatter )[0-9]*(?= is finished)"
 
 nfinished = 0
 @async begin
-  sock = Any[]
   server = listen(port)
   while true
-    push!(sock, accept(server))
-    @async let sock=sock[end]
+    sock = accept(server)
+    @async begin
       while isopen(sock) || nb_available(sock)>0
         tmp = chomp(readline(sock))
         length(tmp)==0 && continue

@@ -1,8 +1,10 @@
 # spawned by manager
 # processes all leaf output tiles from a given input tile
+# for outputs with more than one input, sends results back to manager vi tcp
+#    (or saves to local_scratch if needed), otherwise saves to shared_scratch
 # saves stdout/err to <destination>/[0-9]*.log
 
-# julia peon.jl parameters.jl gpu channel in_tile transform[1-24] origin_str hostname port
+# julia peon.jl parameters.jl gpu channel in_tile transform[1-24] origin_str solo_out_tiles hostname port
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
@@ -10,14 +12,16 @@ include(ENV["RENDER_PATH"]*"/src/render/admin.jl")
 
 time_transforming=0.0
 time_saving=0.0
+time_waiting=0.0
 
 # keep boss informed
-sock = connect(ARGS[30],int(ARGS[31]))
+sock = connect(ARGS[31],int(ARGS[32]))
 
 type NDException <: Exception end
 
-write = "manager tells peon for input tile "*ARGS[4]*" to write output tile"
-send = "manager tells peon for input tile "*ARGS[4]*" to send output tile"
+const write = "manager tells peon for input tile "*ARGS[4]*" to write output tile"
+const send = "manager tells peon for input tile "*ARGS[4]*" to send output tile"
+const receive = "manager tells peon for input tile "*ARGS[4]*" to receive output tile"
 
 # 2 -> sizeof(Uint16), 20e3 -> .tif metadata size, 15 -> max # possible concurrent saves, need to generalize
 enough_free(path) = int(split(readall(`df $path`))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
@@ -25,7 +29,7 @@ enough_free(path) = int(split(readall(`df $path`))[11])*1024 > 15*((prod(shape_l
 function depth_first_traverse(bbox,out_tile_path)
   cboxes = AABBBinarySubdivision(bbox)
 
-  global out_tile_ws, time_transforming, time_saving
+  global out_tile_ws, out_tile, time_transforming, time_saving, time_waiting
 
   for i=1:8
     AABBHit(cboxes[i], TileAABB(tile))==1 || continue
@@ -61,27 +65,37 @@ function depth_first_traverse(bbox,out_tile_path)
       time_transforming+=(time()-t0)
 
       t0=time()
-      println(sock, "peon for input tile ",ARGS[4]," has output tile ",out_tile_path_next," ready")
-      local tmp
-      while true
-        tmp = chomp(readline(sock))
-        length(tmp)==0 || break
-      end
-      println("PEON<MANAGER: ",tmp)
-      if startswith(tmp,send)
-        try
+      if out_tile_path_next in solo_out_tiles
+        save_out_tile(shared_scratch, out_tile_path_next, ARGS[29]*".$(channel-1).tif", out_tile_ws)
+        info("peon transfered output tile ",out_tile_path_next," from RAM to shared_scratch")
+      else
+        println(sock, "peon for input tile ",ARGS[4]," has output tile ",out_tile_path_next," ready")
+        t1=time()
+        local tmp
+        while true
+          tmp = chomp(readline(sock))
+          length(tmp)==0 || break
+        end
+        time_waiting+=(time()-t1)
+        println("PEON<MANAGER: ",tmp)
+        if startswith(tmp,send)
           println(sock,"peon for input tile ",ARGS[4]," will send output tile ",out_tile_path_next)
           serialize(sock, out_tile)
-        end
-      elseif startswith(tmp,write)
-        if enough_free(local_scratch)
-          save_out_tile(local_scratch, out_tile_path_next, string(in_tile_idx)*".$(channel-1).tif", out_tile_ws)
-          try;  println(sock,"peon for input tile ",ARGS[4]," wrote output tile ",out_tile_path_next," to local_scratch");  end
-        else
-          save_out_tile(shared_scratch, out_tile_path_next, ARGS[29]*"."*string(in_tile_idx)*".$(channel-1).tif", out_tile_ws)
-          msg = "peon for input tile "*string(ARGS[4])*" wrote output tile "*out_tile_path_next*" to shared_scratch"
-          try;  println(sock,msg);  end
-          warn(msg)
+        elseif startswith(tmp,receive)
+          out_tile[:] = max(out_tile::Array{Uint16,3}, deserialize(sock)::Array{Uint16,3})
+          save_out_tile(shared_scratch, out_tile_path_next, ARGS[29]*".$(channel-1).tif", out_tile_ws)
+          println(sock,"peon for input tile ",ARGS[4]," saved output tile ",out_tile_path_next)
+          info("peon transfered output tile ",out_tile_path_next," from RAM to shared_scratch")
+        elseif startswith(tmp,write)
+          if enough_free(local_scratch)
+            save_out_tile(local_scratch, out_tile_path_next, string(in_tile_idx)*".$(channel-1).tif", out_tile_ws)
+            println(sock,"peon for input tile ",ARGS[4]," wrote output tile ",out_tile_path_next," to local_scratch")
+          else
+            save_out_tile(shared_scratch, out_tile_path_next, ARGS[29]*"."*string(in_tile_idx)*".$(channel-1).tif", out_tile_ws)
+            msg = "peon for input tile "*string(ARGS[4])*" wrote output tile "*out_tile_path_next*" to shared_scratch"
+            println(sock,msg)
+            warn(msg)
+          end
         end
       end
       time_saving+=(time()-t0)
@@ -174,11 +188,13 @@ function process_tile(thisgpu_, in_tile_idx_, transform_)
 
   info("transforming input tile ",string(in_tile_idx)," took ",string(iround(time_transforming))," sec")
   info("saving output tiles for input tile ",string(in_tile_idx)," took ",string(iround(time_saving))," sec")
+  info("waiting for manager for input tile ",string(in_tile_idx)," took ",string(iround(time_waiting))," sec")
   info("input tile ",string(in_tile_idx)," took ",string(iround(time()-t0))," sec overall")
 end
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
 const channel = int(ARGS[3])
+const solo_out_tiles = eval(parse(ARGS[30]))
 
 process_tile(ARGS[2]=="NaN" ? NaN : int(ARGS[2]), int(ARGS[4]), reshape(int(ARGS[5:28]),3,8))
 

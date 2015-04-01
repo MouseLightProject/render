@@ -1,6 +1,8 @@
 # spawned by squatter
 # concurrently spawns local peons for each input tile within the sub bounding box
-# merges output tiles in memory and local_scratch, and then copies to shared_scratch
+# merges output tiles with more than one input in memory (and local_scratch if needed),
+#   otherwise instructs peons to save to shared_scratch
+# if used, copies local_scratch to shared_scratch
 # saves stdout/err to <destination>/[0-9]*.log
 
 # julia manager.jl parameters.jl channel originX originY originZ shapeX shapeY shapeZ hostname port
@@ -77,7 +79,7 @@ function depth_first_traverse(bbox,out_tile_path)
   AABBHit(bbox, manager_aabb)==1 || return
   if isleaf(bbox)
     tmp = map((x)->AABBHit(bbox, x), in_tiles_aabb)
-    merge_count[join(out_tile_path, Base.path_separator)] = Uint16[sum(tmp), 0, 0]
+    merge_count[join(out_tile_path, Base.path_separator)] = Uint16[sum(tmp), 0, 0, 0]
     push!(locality_idx, setdiff(find(tmp), locality_idx)...)
   else
     cboxes = AABBBinarySubdivision(bbox)
@@ -93,12 +95,13 @@ ncache = ifloor((total_ram - reserve_ram)/2/prod(shape_leaf_px))   # reserve som
 merge_array = Array(Uint16, shape_leaf_px..., ncache)
 merge_used = falses(ncache)
 # one entry for each output tile
-# [total # input tiles, input tiles processed so far, index to merge_array (0=not assigned yet, Inf=use local_scratch)]
+# [total # input tiles, input tiles processed so far, input tiles sent so far, index to merge_array (0=not assigned yet, Inf=use local_scratch)]
 merge_count = Dict{ASCIIString,Array{Uint16,1}}()
 info("allocated RAM for ",string(ncache)," output tiles")
 
 locality_idx = Int[]
 depth_first_traverse(TileBaseAABB(tiles),Int[])
+solo_out_tiles = setdiff( ASCIIString[x[2][1]==1 ? x[1] : "" for x in merge_count] ,[""])
 AABBFree(manager_bbox)
 AABBFree(manager_aabb)
 map(AABBFree, in_tiles_aabb)
@@ -124,10 +127,11 @@ t0=time()
   global sock2 = Any[]
   server2 = listen(port2)
 
-  ready = r"(peon for input tile )([0-9]*)( has output tile )([1-8/]*)( ready)"
-  wrote = r"(peon for input tile )([0-9]*)( wrote output tile )([1-8/]*)( to )"
-  sent = r"(peon for input tile )([0-9]*)( will send output tile )([1-8/]*)"
-  finished = r"(?<=peon for input tile )[0-9]*(?= is finished)"
+  const ready = r"(peon for input tile )([0-9]*)( has output tile )([1-8/]*)( ready)"
+  const wrote = r"(peon for input tile )([0-9]*)( wrote output tile )([1-8/]*)( to )"
+  const sent = r"(peon for input tile )([0-9]*)( will send output tile )([1-8/]*)"
+  const saved = r"(peon for input tile )([0-9]*)( saved output tile )([1-8/]*)"
+  const finished = r"(?<=peon for input tile )[0-9]*(?= is finished)"
 
   @async merge_output_tiles(() -> while length(sock2)<length(in_tiles_idx)
     push!(sock2, accept(server2))
@@ -136,56 +140,54 @@ t0=time()
         tmp = chomp(readline(sock2))
         length(tmp)==0 && continue
         println("MANAGER<PEON: ",tmp)
+        local in_tile_num, out_tile_path
         if ismatch(ready,tmp)
           in_tile_num, out_tile_path = match(ready,tmp).captures[[2,4]]
-          if merge_count[out_tile_path][1]>1 && merge_count[out_tile_path][3]==0
+          merge_count[out_tile_path][2]+=1
+          if merge_count[out_tile_path][4]==0
             idx = findfirst(merge_used,false)
             if idx!=0
               merge_used[idx] = true
-              merge_count[out_tile_path][3] = idx
+              merge_count[out_tile_path][4] = idx
               info("using RAM slot ",string(idx)," for output tile ",out_tile_path)
             else
-              merge_count[out_tile_path][3] = 0xffff
+              merge_count[out_tile_path][4] = 0xffff
             end
           end
-          if merge_count[out_tile_path][3]==0xffff
-            msg = "manager tells peon for input tile $in_tile_num to write output tile $out_tile_path to scratch"
-          else
+          if merge_count[out_tile_path][4]==0xffff
+            msg = "manager tells peon for input tile $in_tile_num to write output tile $out_tile_path to local_scratch"
+            println(sock2, msg)
+            println("MANAGER>PEON: ",msg)
+          elseif merge_count[out_tile_path][2] < merge_count[out_tile_path][1]
             msg = "manager tells peon for input tile $in_tile_num to send output tile $out_tile_path via tcp"
+            println(sock2, msg)
+            println("MANAGER>PEON: ",msg)
+          else
+            while merge_count[out_tile_path][3] < merge_count[out_tile_path][1]-1;  yield();  end
+            msg = "manager tells peon for input tile $in_tile_num to receive output tile $out_tile_path via tcp"
+            println(sock2, msg)
+            serialize(sock2, merge_array[:,:,:,merge_count[out_tile_path][4]])
+            println("MANAGER>PEON: ",msg)
           end
-          println("MANAGER>PEON: ",msg)
-          println(sock2, msg)
         elseif ismatch(wrote,tmp)
           out_tile_path = match(wrote,tmp).captures[4]
-          merge_count[out_tile_path][2]+=1
-          if merge_count[out_tile_path][1] == merge_count[out_tile_path][2]
+          merge_count[out_tile_path][3]+=1
+          if merge_count[out_tile_path][1] == merge_count[out_tile_path][3]
             merge_across_filesystems(local_scratch, shared_scratch, join(ARGS[3:5],"-"), "."*string(channel-1)*".tif", out_tile_path, false, false, true)
             info("saved output tile ",out_tile_path," from local_scratch to shared_scratch")
           end
         elseif ismatch(sent,tmp)
-          global time_max_files, time_ram_file
+          global time_max_files
           out_tile_path = match(sent,tmp).captures[4]
-          out_tile = deserialize(sock2)
-          merge_count[out_tile_path][2]+=1
-          if merge_count[out_tile_path][1]==1
-            t1=time()
-            save_out_tile(shared_scratch, out_tile_path, join(ARGS[3:5],"-")*".$(channel-1).tif", out_tile)
-            info("transfered output tile ",out_tile_path," from RAM to shared_scratch")
-            time_ram_file+=(time()-t1)
-          else
-            t1=time()
-            merge_array[:,:,:,merge_count[out_tile_path][3]] = merge_count[out_tile_path][2]==1 ? out_tile :
-                  max(out_tile, merge_array[:,:,:,merge_count[out_tile_path][3]])
-            time_max_files+=(time()-t1)
-            if merge_count[out_tile_path][1] == merge_count[out_tile_path][2]
-              t1=time()
-              save_out_tile(shared_scratch, out_tile_path, join(ARGS[3:5],"-")*".$(channel-1).tif",
-                    merge_array[:,:,:,merge_count[out_tile_path][3]])
-              merge_used[merge_count[out_tile_path][3]] = false
-              info("transfered output tile ",out_tile_path," from RAM to shared_scratch")
-              time_ram_file+=(time()-t1)
-            end
-          end
+          out_tile::Array{Uint16,3} = deserialize(sock2)
+          merge_count[out_tile_path][3]+=1
+          t1=time()
+          merge_array[:,:,:,merge_count[out_tile_path][4]] = merge_count[out_tile_path][3]==1 ? out_tile :
+                max(out_tile, merge_array[:,:,:,merge_count[out_tile_path][4]]::Array{Uint16,3})
+          time_max_files+=(time()-t1)
+        elseif ismatch(saved,tmp)
+          out_tile_path = match(saved,tmp).captures[4]
+          merge_used[merge_count[out_tile_path][4]] = false
         elseif ismatch(finished,tmp)
           break
         end
@@ -203,7 +205,7 @@ t0=time()
         tile_idx>length(in_tiles_idx) && break
         cmd = `$(ENV["RENDER_PATH"])$(envpath)/bin/julia $(ENV["RENDER_PATH"])/src/render/peon.jl $(ARGS[1]) $(ngpus>0 ? (p-1) % ngpus : NaN)
               $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(transform[in_tiles_idx[locality_idx[tile_idx]]])
-              $(join(ARGS[3:5],"-")) $hostname2 $port2`
+              $(join(ARGS[3:5],"-")) $(string(solo_out_tiles)) $hostname2 $port2`
         info(string(cmd))
         try
           run(cmd)
@@ -218,7 +220,7 @@ info("peons took ",string(iround(time()-t0))," sec")
 
 for (k,v) in merge_count
   println((k,v))
-  v[1]!=v[2] && warn("not all input tiles processed for output tile ",string(k)," : ",string(v))
+  v[1]>1 && v[1]!=v[2] && warn("not all input tiles processed for output tile ",string(k)," : ",string(v))
 end
 
 # delete local_scratch
