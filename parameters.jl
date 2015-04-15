@@ -2,7 +2,9 @@ const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size.
 # voxelsize_used_um is that actually used,
 #   adjusted to make tile widths even and tile volume a multiple of 32*32*4,
 #   saved in destination/calculated_parameters.jl
+
 const countof_leaf=120e6  # maximum number of pixels in output tiles
+
 const countof_job=120e9  # number of pixels in sub bounding boxes.
 # size to use all of RAM and local_scratch
 #   or, it might be faster to size to just RAM;  need to test
@@ -23,10 +25,16 @@ const file_infix="ngc"  # need to generalize
 # normalized origin and shape of sub-bounding box to render
 const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
 
-# the (name of the) function to use to build the octree
-#const downsampling_function = mean  # e.g. maximum, mean, or custom like below
-#
-# sort(reshape(arg,8))[7] but half the time and a third the memory usage
+const notify_addr = "<yourId>@janelia.hhmi.org"
+const bill_userid = "<yourId>"
+
+const bad_nodes = []  # e.g. ["h09u20"]
+
+
+# the function to use to build the octree.  should return uint16
+
+# 2nd brightest of the 8 pixels
+# equivalent to sort(reshape(arg,8))[7] but half the time and a third the memory usage
 function downsampling_function(arg::Array{Uint16,3})
   m0::Uint16 = 0x0000
   m1::Uint16 = 0x0000
@@ -42,7 +50,5 @@ function downsampling_function(arg::Array{Uint16,3})
   m1
 end
 
-const notify_addr = "<yourId>@janelia.hhmi.org"
-const bill_userid = "<yourId>"
-
-const bad_nodes = []  # e.g. ["h09u20"]
+# equivalent to mean(arg) but 30x faster and half the memory
+#downsampling_function(arg::Array{Uint16,3}) = uint16(sum(arg)>>3)
