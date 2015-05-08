@@ -6,8 +6,9 @@
 
 interval=120   # in seconds
 
-export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
-JULIA=${RENDER_PATH}/env/login/julia-0c24dca65c/bin/julia
+#export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
+export RENDER_PATH=/home/arthurb/projects/mouselight
+JULIA=${RENDER_PATH}/env/julia-79599ada44/bin/julia
 
 shared_scratch=$($JULIA -L $2/set_parameters.jl -e "print(shared_scratch)")
 
@@ -30,7 +31,7 @@ while true ; do
   nodes=()
   logs=()
   for i in $(seq 0 $((${#alljobs[@]} - 1))) ; do
-    if [ ${alljobs[$i]} == $1 -a ${allstates[$i]} == "r" ] ; then
+    if [ ${alljobs[$i]%%[0-9]} == $1 -a ${allstates[$i]} == "r" ] ; then
       tmp=${allnodes[i]}
       tmp=${tmp##*@}
       nodes+=(${tmp%%.*})
@@ -38,7 +39,10 @@ while true ; do
     fi
   done
 
-  if [ "${#nodes[@]}" -eq "0" ] ; then break ; fi
+  if [ "${#nodes[@]}" -eq "0" ] ; then
+    echo FINISHED!
+    break
+  fi
 
   # query nodes for data
   started=$(stat -c %y $2/set_parameters.jl)

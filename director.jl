@@ -17,11 +17,6 @@ const jobname = ARGS[2]
 const tiles = TileBaseOpen(source)
 const tile_type = ndtype(TileShape(TileBaseIndex(tiles,1)))
 
-# email user
-cmd = `echo watch -n 60 tail -n \$((LINES-1)) $destination/monitor.log` |> `mail -s "job $jobname started" $notify_addr`
-info(string(cmd))
-run(cmd)
-
 # delete scratch
 t0=time()
 info("source = ",source)
@@ -101,8 +96,7 @@ info(string(TileBaseCount(tiles)),(roi_vol<1 ? " * "*string(roi_vol): "")," tile
 TileBaseClose(tiles)
 
 # initialze tcp communication with squatters
-nproc = nk20 + n570 + ncpu
-events = Array(Condition,nproc,2)
+events = Array(Condition,nnodes,2)
 hostname = readchomp(`hostname`)
 port = 2000
 ready = r"(?<=squatter )[0-9]*(?= is ready)"
@@ -134,47 +128,30 @@ end
 
 # dispatch sub bounding boxes to squatters,
 # in a way which greedily hangs on to nodes instead of re-waiting in the queue
-jobids = String[]
-
-function launch_workers(t1,t2,queue,envpath)
-  cmd = `qsub -A $bill_userid -t $t1-$t2 $queue -N $jobname -b y -j y -V -shell n -o $destination/'$TASK_ID.log'
-        $(ENV["RENDER_PATH"])$(envpath)/bin/julia $(ENV["RENDER_PATH"])/src/render/squatter.jl $(ARGS[1]) $hostname $port`
-  info(string(cmd))
-  push!(jobids, match(r"(?<=job-array )[0-9]*", readchomp(cmd)).match)
-end
-
 t0=time()
-merge_procs = Any[]
 @sync begin
   i = 1
   nextidx() = (idx=i; i+=1; idx)
-  for p = 1:nproc
+  for p = 1:nnodes
     events[p,1]=Condition()
     events[p,2]=Condition()
 
     @async begin
       sock = wait(events[p,1])
       if sock==nothing
-        cmd = `qdel $(p<=nk20 ? jobids[1] : p<=(nk20+n570) ? jobids[2] : jobids[3]).$p`
+        cmd = `qdel $(jobid).$p`
         info("deleting squatter ",string(p),": ",string(cmd))
         try;  run(cmd);  end
       else
         while isopen(sock)
-          p>nk20 && sleep(10)  # favor faster nodes
-          p>(nk20+ncpu) && sleep(10)
           idx = nextidx()
-          tmp = find(map((x)->x[1]==p, merge_procs))
           if idx > nchannels*length(job_aabbs)
-            if length(tmp)==0 || length(merge_procs)>8*nchannels
-              deleteat!(merge_procs, tmp)
-              cmd = "squatter $p terminate"
-              println("DIRECTOR>SQUATTER: ",string(cmd))
-              println(sock, cmd)
-            end
-            map((x)->notify(events[x,1], nothing), 1:nproc)
+            cmd = "squatter $p terminate"
+            println("DIRECTOR>SQUATTER: ",string(cmd))
+            println(sock, cmd)
+            map((x)->notify(events[x,1], nothing), 1:nnodes)
             break
           end
-          length(tmp)==0 && push!(merge_procs, (p, sock))
           channel = (idx-1)%2+1
           shape = job_aabbs[(idx+1)>>1]
           cmd = "squatter $p dole out job $(ARGS[1]) $channel $(shape[2][1]) $(shape[2][2]) $(shape[2][3]) $(shape[3][1]) $(shape[3][2]) $(shape[3][3]) $hostname $port"
@@ -187,59 +164,15 @@ merge_procs = Any[]
     end
   end
 
-  nk20>0 && launch_workers(1, nk20, ["-l", "gpu_k20=true", "-pe", "batch", "16"],"/env/k20")
-  ncpu>0 && launch_workers(nk20+1, nk20+ncpu, ["-l", "haswell=true", "-pe", "batch", "32"],"/env/cpu")
-  n570>0 && launch_workers(nk20+ncpu+1, nk20+ncpu+n570, ["-l", "gpu=true", "-pe", "batch", "7"],"/env/570")
+  #launch_workers
+  cmd = `qsub -A $bill_userid -t 1-$nnodes -l haswell=true -pe batch 32 -N $jobname
+        -b y -j y -V -shell n -o $destination/squatter'$TASK_ID.log'
+        $(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/squatter.jl $(ARGS[1]) $hostname $port`
+  info(string(cmd))
+  jobid = match(r"(?<=job-array )[0-9]*", readchomp(cmd)).match
 end
 info("squatters took ",string(iround(time()-t0))," sec")
-
-# merge output tiles when done, and build octree
-t0=time()
-info("director is merging output tiles with ",string(length(merge_procs))," nodes")
-@sync begin
-  i = 1
-  nextidx() = (idx=i; i+=1; idx)
-  for p = 1:length(merge_procs)
-    @async begin
-      while isopen(merge_procs[p][2])
-        idx = nextidx()
-        if idx > 64*nchannels || nlevels <= 2
-          cmd = "squatter $(merge_procs[p][1]) terminate"
-          println("DIRECTOR>SQUATTER: ",string(cmd))
-          println(merge_procs[p][2], cmd)
-          break
-        end
-        channel = (idx-1)%2+1
-        octant = (idx-1)>>4+1
-        octant2 = ((idx-1)>>1)%8+1
-        isdir(joinpath(shared_scratch,string(octant),string(octant2))) || continue
-        cmd = "squatter $(merge_procs[p][1]) merge merge_output_tiles(\"$shared_scratch\", \"$destination\", \"default\", \"$("."*string(channel-1)*".tif")\", \"$(string(octant))/$(string(octant2))\", true, true, false)"
-        println("DIRECTOR>SQUATTER: ",string(cmd))
-        println(merge_procs[p][2], cmd)
-        wait(events[merge_procs[p][1],2])
-      end
-    end
-  end
-end
-for channel=1:nchannels
-  merge_output_tiles(nlevels>2 ? destination : shared_scratch, destination, "default", "."*string(channel-1)*".tif", "", true, true, false)
-end
-info("inter-node merge and octree took ",string(iround(time()-t0))," sec")
-
-# delete shared_scratch
-t0=time()
-scratch1 = rmcontents(shared_scratch, "before")
-info("deleting shared_scratch at end took ",string(iround(time()-t0))," sec")
-info("director has finished using ",string(signif((scratch0-scratch1)/1024/1024,4,2))," GB of shared_scratch")
-
-# email user
-cmd = `echo destination = $destination` |> `mail -s "job $jobname finished" $notify_addr`
-info(string(cmd))
-run(cmd)
 
 closelibs()
 
 info(readchomp(`date`))
-
-# write protect
-run(`chmod -R a-w $destination`)

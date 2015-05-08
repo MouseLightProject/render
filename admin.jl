@@ -52,17 +52,9 @@ catch
   global ngpus = 0
 end
 
-if ngpus == 7
-  envpath="/env/570"
-elseif ngpus == 4
-  envpath="/env/k20"
-else
-  envpath="/env/cpu"
-end
-
 # interface to tilebase
 
-const libtilebase = ENV["RENDER_PATH"]*envpath*"/lib/libtilebase.so"
+const libtilebase = ENV["RENDER_PATH"]*"/env/lib/libtilebase.so"
 
 TileBaseOpen(source) = ccall((:TileBaseOpen, libtilebase), Ptr{Void}, (Ptr{Uint8},Ptr{Uint8}), source, C_NULL)
 TileBaseClose(tiles) = ccall((:TileBaseClose, libtilebase), Void, (Ptr{Void},), tiles)
@@ -109,7 +101,7 @@ end
 
 # interface to nd
 
-const libnd = ENV["RENDER_PATH"]*envpath*"/lib/libnd.so"
+const libnd = ENV["RENDER_PATH"]*"/env/lib/libnd.so"
 
 ndinit() = ccall((:ndinit, libnd), Ptr{Void}, ())
 ndheap(nd_t) = ccall((:ndheap, libnd), Ptr{Void}, (Ptr{Void},), nd_t)
@@ -155,7 +147,7 @@ end
 # interface to mltk-bary
 
 h=dlopen("libcudart.so",RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
-const libengine = ENV["RENDER_PATH"]*envpath*"/build/mltk-bary/libengine.so"
+const libengine = ENV["RENDER_PATH"]*"/env/build/mltk-bary/libengine.so"
 
 closelibs() = dlclose(h)
 
@@ -240,7 +232,7 @@ function save_out_tile(filesystem, path, name, data::Ptr{Void})
 end
 
 # the merge API could perhaps be simplified. complexity arises because it is called:
-# by director.jl to build the octree                  (recurse=n/a,    octree=true,  delete=false)
+# by render to build the octree                       (recurse=n/a,    octree=true,  delete=false)
 # by manager.jl to handle overflow into local_scratch (recurse=false,  octree=false, delete=true)
 # by merge to combine multiple previous renders       (recurse=either, octree=false, delete=false)
 
@@ -260,6 +252,8 @@ function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, pr
     push!(dirs, listing[idx]...)
     push!(in_tiles, [joinpath(source,out_tile_path,x) for x in listing[!idx & map(x->endswith(x,chantype), listing)]]...)
   end
+
+  length(dirs)==0 && length(in_tiles)==0 && return
 
   if octree
     const level = out_tile_path=="" ? 1 : length(split(out_tile_path,Base.path_separator))+1

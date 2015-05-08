@@ -203,7 +203,7 @@ t0=time()
       while true
         tile_idx = nextidx()
         tile_idx>length(in_tiles_idx) && break
-        cmd = `$(ENV["RENDER_PATH"])$(envpath)/bin/julia $(ENV["RENDER_PATH"])/src/render/peon.jl $(ARGS[1]) $(ngpus>0 ? (p-1) % ngpus : NaN)
+        cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/peon.jl $(ARGS[1]) $(ngpus>0 ? (p-1) % ngpus : NaN)
               $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(transform[in_tiles_idx[locality_idx[tile_idx]]])
               $(join(ARGS[3:5],"-")) $(string(solo_out_tiles)) $hostname2 $port2`
         info(string(cmd))

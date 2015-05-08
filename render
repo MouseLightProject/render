@@ -7,8 +7,8 @@
 # to monitor progress:
 #   watch -n 120 tail -n 40 <destination>/monitor.log
 
-# data are logged in <destination>/{render,monitor,1,2,3,...,N}.log,
-#   where N=ncpu+nk20+n570 from parameters.jl
+# data are logged in <destination>/{render,director,monitor,squatter1-N,merge1-130}.log,
+#   where N=nnodes from parameters.jl
 # manual queries into these log files are informative:
 #   cat <destination>/render.log
 #   grep "has finished" <destination>/render.log
@@ -21,17 +21,21 @@
 
 set -e
 
-export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
+#export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
+export RENDER_PATH=/home/arthurb/projects/mouselight
 export LD_LIBRARY_PATH=/usr/local/cuda-5.0/lib64
-JULIA=${RENDER_PATH}/env/login/julia-0c24dca65c/bin/julia
+export JULIA=${RENDER_PATH}/env/julia-79599ada44/bin/julia
 
 # get vars from parameters.jl file
-destination=$($JULIA -L $1 -e "print(destination)")
-bill=$($JULIA -L $1 -e "print(bill_userid)")
+read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',notify_addr,' ',bill_userid)")
+destination=${tmp[0]}
+shared_scratch=${tmp[1]}
+notify_addr=${tmp[2]}
+bill_userid=${tmp[3]}
 
 # delete <destination> if it exists
 if [ -d $destination ] ; then
-  echo "deleting destination = $destination"
+  echo "deleting destination = $destination" > $destination/render.log
   rm -rf $destination
 fi
 mkdir -p $destination
@@ -42,8 +46,32 @@ cp $1 $destination/set_parameters.jl
 # create a probably-unique job name
 jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
 
+# create the leaf nodes
 cmd="$JULIA ${RENDER_PATH}/src/render/director.jl $destination/set_parameters.jl $jobname"
-qsub -A $bill -N $jobname -j y -b y -V -shell n -o $destination/render.log $cmd
+qsub -A $bill_userid -N $jobname -j y -b y -V -shell n -l sandy=true -o $destination/director.log $cmd
 
 sleep 10
 nohup ${RENDER_PATH}/src/render/monitor $jobname $destination &> ${destination}/monitor.log &
+
+# downsample the octree
+expr="id=int(ENV[\"SGE_TASK_ID\"]); ch=(id-1)%2+1; oct=(id-1)>>4+1; oct2=((id-1)>>1)%8+1; merge_output_tiles(\"$shared_scratch\", \"$destination\", \"default\", \".\"*string(ch-1)*\".tif\", string(oct)*\"/\"*string(oct2), true, true, false)"
+qsub -A $bill_userid -N ${jobname}2 -t 1:128 -tc 32 -pe batch 9 -j y -b y -V -shell n -hold_jid $jobname \
+      -l sandy=true -o $destination/merge'$TASK_ID'.log \
+      $JULIA -L $destination/set_parameters.jl -L $destination/calculated_parameters.jl -L ${RENDER_PATH}/src/render/admin.jl -e "$expr"
+
+expr="id=int(ENV[\"SGE_TASK_ID\"]); ch=(id-129)%2+1; merge_output_tiles(nlevels>2 ? \"$destination\" : \"$shared_scratch\", \"$destination\", \"default\", \".\"*string(ch-1)*\".tif\", \"\", true, true, false)"
+qsub -A $bill_userid -N ${jobname}3 -t 129:130 -pe batch 9 -j y -b y -V -shell n -hold_jid ${jobname}2 \
+      -l sandy=true -o $destination/merge'$TASK_ID'.log \
+      $JULIA -L $destination/set_parameters.jl -L $destination/calculated_parameters.jl -L ${RENDER_PATH}/src/render/admin.jl -e "$expr"
+
+# delete shared_scratch; write-protect destination
+cmd="df $shared_scratch \
+     echo deleting shared_scratch \
+     rm -rf $shared_scratch \
+     chmod -R a-w $destination \
+     echo destination = $destination | mail -s \"job $jobname finished\" $notify_addr \
+     echo render has finished"
+qsub -A $bill_userid -N ${jobname}4 -j y -b y -V -shell n -hold_jid ${jobname}3 -l sandy=true -o $destination/render.log $cmd
+
+# email user
+echo watch -n 60 tail -n '$((LINES-1))' $destination/monitor.log | mail -s "job $jobname started" $notify_addr

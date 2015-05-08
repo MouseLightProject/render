@@ -9,9 +9,7 @@ const countof_job=120e9  # number of pixels in sub bounding boxes.
 # size to use all of RAM and local_scratch
 #   or, it might be faster to size to just RAM;  need to test
 
-const nk20 = 2  # number of computers with k20 GPUs to use, max is 2
-const n570 = 18  # number of computers with 570 GPUs to use, max is 18
-const ncpu = 32  # number of non-GPU 32-core compute nodes to use, max is 32
+const nnodes = 32  # number of non-GPU 32-core compute nodes to use, max is 32
 
 const source="/groups/mousebrainmicro/mousebrainmicro/stitch/2014-10-06/Stitch9_corners"
 const destination="/tier2/mousebrainmicro/render/stitch9"

@@ -20,26 +20,21 @@ split(readchomp(`hostname`),".")[1] in bad_nodes && exit(1)
 sock = connect(ARGS[2],int(ARGS[3]))
 println(sock,"squatter ",proc_num," is ready on ",readchomp(`hostname`))
 
-function doit(cmd)
-  info(string(cmd))
-  try
-    run(cmd)
-  catch
-    warn("manager $proc_num might have failed")
-  end
-  msg = "squatter $proc_num is finished"
-  println("SQUATTER>DIRECTOR: ",msg)
-  println(sock,msg)
-end
-
 while isopen(sock) || nb_available(sock)>0
   tmp = chomp(readline(sock))
   length(tmp)==0 && continue
   println("SQUATTER<DIRECTOR: ",tmp)
   if ismatch(dole_out,tmp)
-    doit(`$(ENV["RENDER_PATH"])$(envpath)/bin/julia $(ENV["RENDER_PATH"])/src/render/manager.jl $(split(tmp)[6:end])`)
-  elseif ismatch(merge,tmp)
-    doit(`$(ENV["RENDER_PATH"])$(envpath)/bin/julia -L $destination/set_parameters.jl -L $destination/calculated_parameters.jl -L $(ENV["RENDER_PATH"])/src/render/admin.jl -e $(join(split(tmp)[4:end]," "))`)
+    cmd=`$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/manager.jl $(split(tmp)[6:end])`
+    info(string(cmd))
+    try
+      run(cmd)
+    catch
+      warn("manager $proc_num might have failed")
+    end
+    msg = "squatter $proc_num is finished"
+    println("SQUATTER>DIRECTOR: ",msg)
+    println(sock,msg)
   elseif ismatch(terminate,tmp)
     msg = "squatter $proc_num is terminating"
     println("SQUATTER>DIRECTOR: ",msg)

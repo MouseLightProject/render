@@ -4,8 +4,9 @@
 
 set -e
 
-export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
-JULIA=${RENDER_PATH}/env/login/julia-0c24dca65c/bin/julia
+#export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
+export RENDER_PATH=/home/arthurb/projects/mouselight
+JULIA=${RENDER_PATH}/env/julia-79599ada44/bin/julia
 
 # get vars from parameters.jl file
 bill=$($JULIA -L $1/set_parameters.jl -e "print(bill_userid)")
@@ -37,16 +38,20 @@ df -h ${@: -1}
 
 # do it
 sources=$(printf "\"%s\", " ${@:1:(($#-1))})
+
 expr="id=int(ENV[\"SGE_TASK_ID\"]); ch=(id-1)%2+1; oct=(id-1)>>4+1; oct2=((id-1)>>1)%8+1; merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".tif\", string(oct)*\"/\"*string(oct2), true, false, false)"
-qsub -A $bill -N $jobname -t 1:128 -tc 16 -pe batch 9 -j y -b y -V -shell n -o ${@: -1}/merge/'$TASK_ID'.log \
-      $JULIA -L ${RENDER_PATH}/src/render/admin.jl -L $1/calculated_parameters.jl -e "$expr"
+qsub -A $bill -N $jobname -t 1:128 -tc 32 -pe batch 9 -j y -b y -V -shell n -o ${@: -1}/merge/'$TASK_ID'.log \
+      $JULIA -L $1/calculated_parameters.jl -L ${RENDER_PATH}/src/render/admin.jl -e "$expr"
+
 expr="id=int(ENV[\"SGE_TASK_ID\"]); ch=(id-129)%2+1; oct=(id-129)>>1+1; merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".tif\", string(oct), false, false, false)"
 qsub -A $bill -N $jobname -t 129:144 -pe batch 9 -j y -b y -V -shell n -o ${@: -1}/merge/'$TASK_ID'.log \
-      $JULIA -L ${RENDER_PATH}/src/render/admin.jl -L $1/calculated_parameters.jl -e "$expr"
+      $JULIA -L $1/calculated_parameters.jl -L ${RENDER_PATH}/src/render/admin.jl -e "$expr"
+
 expr="id=int(ENV[\"SGE_TASK_ID\"]); ch=(id-145)%2+1; merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".tif\", \"\", false, false, false)"
 qsub -A $bill -N $jobname -t 145:146 -pe batch 9 -j y -b y -V -shell n -o ${@: -1}/merge/'$TASK_ID'.log \
-      $JULIA -L ${RENDER_PATH}/src/render/admin.jl -L $1/calculated_parameters.jl -e "$expr"
+      $JULIA -L $1/calculated_parameters.jl -L ${RENDER_PATH}/src/render/admin.jl -e "$expr"
 
+# copy metadata and log files
 for i in $(seq 1 $(($#-1))) ; do
   mkdir -p ${@: -1}/source$i
   cp ${!i}/*.{log,jl}  ${@: -1}/source$i
