@@ -56,7 +56,7 @@ function depth_first_traverse(bbox,out_tile_path)
           BarycentricGPUresult(resampler, nddata(out_tile_ws))
         else
           BarycentricCPUdestination(resampler, nddata(out_tile_ws))
-          BarycentricCPUresample(resampler, convert(Array{Float32}, transform))
+          BarycentricCPUresample(resampler, convert(Array{Float32}, transform), interpolation)
           BarycentricCPUresult(resampler, nddata(out_tile_ws))
         end
       catch

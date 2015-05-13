@@ -153,18 +153,18 @@ closelibs() = dlclose(h)
 
 type BarycentricException <: Exception end
 
-BarycentricCPUinit(r,src_shape,dst_shape,ndims) =  ccall((:BarycentricCPUinit, libengine),
+BarycentricCPUinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricCPUinit, libengine),
       Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
-BarycentricGPUinit(r,src_shape,dst_shape,ndims) =  ccall((:BarycentricGPUinit, libengine),
+BarycentricGPUinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricGPUinit, libengine),
       Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
-BarycentricCPUresample(r,cube) =  ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat}),
-      r,cube) !=1 && throw(BarycentricException())
+BarycentricCPUresample(r,cube,interpolation) = ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint),
+      r,cube,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
 
-BarycentricGPUresample(r,cube) =  ccall((:BarycentricGPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat}),
+BarycentricGPUresample(r,cube) = ccall((:BarycentricGPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat}),
       r,cube) !=1 && throw(BarycentricException())
 
 BarycentricCPUrelease(r) = ccall((:BarycentricCPUrelease, libengine), Void, (Ptr{Ptr{Void}},), r)

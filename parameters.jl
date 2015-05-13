@@ -1,7 +1,6 @@
 const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size.
-# voxelsize_used_um is that actually used,
+# voxelsize_used_um, in destination/calculated_parameters.jl, is that actually used.
 #   adjusted to make tile widths even and tile volume a multiple of 32*32*4,
-#   saved in destination/calculated_parameters.jl
 
 const countof_leaf=120e6  # maximum number of pixels in output tiles
 
@@ -15,7 +14,6 @@ const source="/groups/mousebrainmicro/mousebrainmicro/stitch/2014-10-06/Stitch9_
 const destination="/tier2/mousebrainmicro/render/stitch9"
 
 const shared_scratch="/nobackup/mousebrainmicro/scratch"
-#const shared_scratch="/groups/mousebrainmicro/mousebrainmicro/scratch"
 
 const nchannels=2  # need to generalize
 const file_infix="ngc"  # need to generalize
@@ -28,25 +26,27 @@ const bill_userid = "<yourId>"
 
 const bad_nodes = []  # e.g. ["h09u20"]
 
+const interpolation = "linear"  # "linear" or "nearest"
+
 
 # the function to use to build the octree.  should return uint16
 
+# equivalent to mean(arg) but 30x faster and half the memory
+downsampling_function(arg::Array{Uint16,3}) = uint16(sum(arg)>>3)
+
 # 2nd brightest of the 8 pixels
 # equivalent to sort(reshape(arg,8))[7] but half the time and a third the memory usage
-function downsampling_function(arg::Array{Uint16,3})
-  m0::Uint16 = 0x0000
-  m1::Uint16 = 0x0000
-  for i = 1:8
-    @inbounds tmp::Uint16 = arg[i]
-    if tmp>m0
-      m1=m0
-      m0=tmp
-    elseif tmp>m1
-      m1=tmp
-    end
-  end
-  m1
-end
-
-# equivalent to mean(arg) but 30x faster and half the memory
-#downsampling_function(arg::Array{Uint16,3}) = uint16(sum(arg)>>3)
+#function downsampling_function(arg::Array{Uint16,3})
+#  m0::Uint16 = 0x0000
+#  m1::Uint16 = 0x0000
+#  for i = 1:8
+#    @inbounds tmp::Uint16 = arg[i]
+#    if tmp>m0
+#      m1=m0
+#      m0=tmp
+#    elseif tmp>m1
+#      m1=tmp
+#    end
+#  end
+#  m1
+#end

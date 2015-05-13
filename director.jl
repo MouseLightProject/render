@@ -44,6 +44,8 @@ end
 cost==Inf32 && error("can't find satisfactory shape_leaf_px")
 const shape_leaf_px = shape_leaf_tmp+xyz
 const voxelsize_used_um = shape_tiles_nm./um2nm./2^nlevels ./ shape_leaf_px
+
+# write parameter files to destination
 open("$destination/calculated_parameters.jl","w") do f
   println(f,"const jobname = \"",jobname,"\"")
   println(f,"const nlevels = ",nlevels)
@@ -67,7 +69,7 @@ info("number of levels = ",string(nlevels))
 info("shape of output tiles is [",join(map(string,shape_leaf_px),","),"] pixels")
 info("voxel dimensions used to make output tile shape even and volume divisible by 32*32*4: [",join(map(string,voxelsize_used_um),",")," microns")
 
-# divide in halves instead of eighths for finer-grained use of local_scratch
+# divide in halves instead of eighths for finer-grained use of RAM and local_scratch
 function AABBHalveSubdivision(bbox)
   bbox1 = deepcopy(bbox)
   bbox2 = deepcopy(bbox)

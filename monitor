@@ -8,7 +8,7 @@ interval=120   # in seconds
 
 #export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
 export RENDER_PATH=/home/arthurb/projects/mouselight
-JULIA=${RENDER_PATH}/env/julia-79599ada44/bin/julia
+JULIA=/usr/local/julialang-0.3.8/bin/julia
 
 shared_scratch=$($JULIA -L $2/set_parameters.jl -e "print(shared_scratch)")
 
@@ -30,16 +30,20 @@ while true ; do
   readarray -t alllogs < <(echo "$data" | tr -s ' ' | cut -s -f11 -d ' ')
   nodes=()
   logs=()
+  cont=0
   for i in $(seq 0 $((${#alljobs[@]} - 1))) ; do
-    if [ ${alljobs[$i]%%[0-9]} == $1 -a ${allstates[$i]} == "r" ] ; then
-      tmp=${allnodes[i]}
-      tmp=${tmp##*@}
-      nodes+=(${tmp%%.*})
-      logs+=(${alllogs[i]}.log)
+    if [ ${alljobs[$i]%%[0-9]} == $1 ] ; then
+      cont=1
+      if [ ${allstates[$i]} == "r" ] ; then
+        tmp=${allnodes[i]}
+        tmp=${tmp##*@}
+        nodes+=(${tmp%%.*})
+        logs+=(${alllogs[i]}.log)
+      fi
     fi
   done
 
-  if [ "${#nodes[@]}" -eq "0" ] ; then
+  if [ cont == 0 ] ; then
     echo FINISHED!
     break
   fi

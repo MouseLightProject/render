@@ -6,7 +6,7 @@ set -e
 
 #export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
 export RENDER_PATH=/home/arthurb/projects/mouselight
-JULIA=${RENDER_PATH}/env/julia-79599ada44/bin/julia
+JULIA=/usr/local/julialang-0.3.8/bin/julia
 
 # get vars from parameters.jl file
 bill=$($JULIA -L $1/set_parameters.jl -e "print(bill_userid)")
