@@ -4,9 +4,8 @@ const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size.
 
 const countof_leaf=120e6  # maximum number of pixels in output tiles
 
-const countof_job=120e9  # number of pixels in sub bounding boxes.
-# size to use all of RAM and local_scratch
-#   or, it might be faster to size to just RAM;  need to test
+const countof_job=480e9  # number of pixels in sub bounding boxes.
+# size to use all of RAM
 
 const nnodes = 32  # number of non-GPU 32-core compute nodes to use, max is 32
 
@@ -20,19 +19,26 @@ const file_infix="ngc"  # need to generalize
 
 # normalized origin and shape of sub-bounding box to render
 const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
+# use the following code to convert morton order to origin & shape
+#morton = [8,1,7,3]
+#const region_of_interest = (
+#    squeeze(sum( [(((morton[depth]-1)>>xyz)&1)/2^depth for xyz=0:2, depth=1:length(morton)] ,2),2),
+#    fill(0.5^length(morton),3) )
 
 const notify_addr = "<yourId>@janelia.hhmi.org"
 const bill_userid = "<yourId>"
 
 const bad_nodes = []  # e.g. ["h09u20"]
 
-const interpolation = "linear"  # "linear" or "nearest"
+const interpolation = "nearest"  # "linear" or "nearest"
 
+# build the octree with a function below.  should return uint16
 
-# the function to use to build the octree.  should return uint16
+# the simplest and fastest
+downsampling_function(arg::Array{Uint16,3}) = arg[1,1,1]
 
 # equivalent to mean(arg) but 30x faster and half the memory
-downsampling_function(arg::Array{Uint16,3}) = uint16(sum(arg)>>3)
+#downsampling_function(arg::Array{Uint16,3}) = uint16(sum(arg)>>3)
 
 # 2nd brightest of the 8 pixels
 # equivalent to sort(reshape(arg,8))[7] but half the time and a third the memory usage

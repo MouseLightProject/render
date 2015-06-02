@@ -16,7 +16,7 @@ end
 
 # interface to CUDA
 
-# map((x)->(cudaSetDevice(x); [cudaMemGetInfo()...]./1024^3), 0:cudaGetDeviceCount()-1)
+# map(x->(cudaSetDevice(x); [cudaMemGetInfo()...]./1024^3), 0:cudaGetDeviceCount()-1)
 
 const libcudart = ENV["LD_LIBRARY_PATH"]*"/libcudart.so"
 
@@ -105,7 +105,7 @@ const libnd = ENV["RENDER_PATH"]*"/env/lib/libnd.so"
 
 ndinit() = ccall((:ndinit, libnd), Ptr{Void}, ())
 ndheap(nd_t) = ccall((:ndheap, libnd), Ptr{Void}, (Ptr{Void},), nd_t)
-ndfree(nd_t) = ccall((:ndheap, libnd), Void, (Ptr{Void},), nd_t)
+ndfree(nd_t) = ccall((:ndfree, libnd), Void, (Ptr{Void},), nd_t)
 nddata(nd_t) = ccall((:nddata, libnd), Ptr{Void}, (Ptr{Void},), nd_t)
 ndtype(nd_t) = ccall((:ndtype, libnd), Cint, (Ptr{Void},), nd_t)
 ndkind(nd_t) = ccall((:ndkind, libnd), Cint, (Ptr{Void},), nd_t)
@@ -161,8 +161,9 @@ BarycentricGPUinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricGPUinit, li
       Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
-BarycentricCPUresample(r,cube,interpolation) = ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint),
-      r,cube,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
+BarycentricCPUresample(r,cube,orientation,interpolation) =
+      ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint,Cint),
+      r,cube,orientation,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
 
 BarycentricGPUresample(r,cube) = ccall((:BarycentricGPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat}),
       r,cube) !=1 && throw(BarycentricException())
@@ -199,7 +200,23 @@ function startswith(a::String, b::String)
     done(b,i)
 end
 
-# used by both director and deputy
+# below used by director, manager, render, merge, ...
+
+subtile_corner_indices(ix,iy) =
+    Int[ (1+[ix-1+b&1 iy-1+(b>>1)&1 (b>>2)&1]*[1, length(xlims), length(xlims)*length(ylims)])[1] for b=0:7 ]
+
+function calc_in_subtiles_aabb(tile,xlims,ylims,transform_nm)
+  in_subtiles_aabb = Array(Ptr{Void},length(xlims)-1,length(ylims)-1)
+  origin, shape = AABBGetJ(TileAABB(tile))[2:3]
+  for ix=1:length(xlims)-1, iy=1:length(ylims)-1
+    it = subtile_corner_indices(ix,iy)
+    sub_origin = minimum(transform_nm[:,it],2)
+    sub_shape =  maximum(transform_nm[:,it],2) - sub_origin
+    in_subtiles_aabb[ix,iy] = AABBMake(3)
+    AABBSet(in_subtiles_aabb[ix,iy], 3, sub_origin, sub_shape)
+  end
+  in_subtiles_aabb
+end
 
 function ndalloc(tileshape, tiletype, heap=true)
   tmp_ws = ndinit()

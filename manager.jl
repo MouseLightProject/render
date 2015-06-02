@@ -53,32 +53,44 @@ info("deleting /dev/shm and local_scratch = ",local_scratch," at start took ",st
 
 # read in the transform parameters
 using YAML
-const meta = YAML.load_file(source*"/tilebase.cache.yml")["tiles"]
-const transform = [reshape(meta[i]["transform"],3,8) for i=1:length(meta)]
+const meta = YAML.load(replace(readall(source*"/tilebase.cache.yml"),['[',',',']'],""))
+const dims = [int(split(x["shape"]["dims"]))[1:3] for x in meta["tiles"]]
+const xlims = int(split(meta["tiles"][1]["grid"]["xlims"]))
+const ylims = int(split(meta["tiles"][1]["grid"]["ylims"]))
+const zlims = [int(split(x["grid"]["zlims"])) for x in meta["tiles"]]
+const transform = [int(split(x["grid"]["coordinates"])) for x in meta["tiles"]]
+@assert all(diff(diff(xlims)).==0)
+@assert all(diff(diff(ylims)).==0)
+for x in meta["tiles"]
+  @assert xlims == int(split(x["grid"]["xlims"]))
+  @assert ylims == int(split(x["grid"]["ylims"]))
+end
 
-# get input tiles assigned to this manager
+# get input tiles assigned to this manager, and
+# precalculate input subtiles' bounding boxes
 in_tiles_idx = Int[]
-in_tiles_aabb = Any[]
+in_subtiles_aabb = Array{Ptr{Void},2}[]
 manager_aabb = C_NULL  # unioned bbox of assigned input tiles
 for i = 1:TileBaseCount(tiles)
-  global in_tiles_aabb, manager_aabb
-  if AABBHit(TileAABB(TileBaseIndex(tiles, i)), manager_bbox)==1
-    if all(AABBGetJ(TileAABB(TileBaseIndex(tiles, i)))[2] .>= AABBGetJ(manager_bbox)[2])
-      push!(in_tiles_idx, i)
-      tile = TileBaseIndex(tiles, i)
-      push!(in_tiles_aabb, AABBCopy(C_NULL, TileAABB(tile)))
-      #TileFree(tile)  -> causes TileBaseAABB(tiles) below to segfault
-      manager_aabb = AABBUnionIP(manager_aabb, in_tiles_aabb[end])
-    end
+  global in_subtiles_aabb, manager_aabb
+  tile = TileBaseIndex(tiles, i)
+  tile_aabb = TileAABB(tile)
+  if AABBHit(tile_aabb, manager_bbox)==1 &&
+        all(AABBGetJ(tile_aabb)[2] .>= AABBGetJ(manager_bbox)[2])
+    push!(in_tiles_idx, i)
+    push!(in_subtiles_aabb,
+        calc_in_subtiles_aabb(tile,xlims,ylims, reshape(transform[i],3,length(xlims)*length(ylims)*2)) )
+    #TileFree(tile)  -> causes TileBaseAABB(tiles) below to segfault
+    manager_aabb = AABBUnionIP(manager_aabb, AABBCopy(C_NULL, tile_aabb))
   end
 end
 
-# order tiles to preserve locality, and
+# order input tiles to preserve locality, and
 # calculate number of input tiles for each output tile
 function depth_first_traverse(bbox,out_tile_path)
   AABBHit(bbox, manager_aabb)==1 || return
   if isleaf(bbox)
-    tmp = map((x)->AABBHit(bbox, x), in_tiles_aabb)
+    tmp = map(x->any(map(y->AABBHit(bbox,y),x)), in_subtiles_aabb)
     merge_count[join(out_tile_path, Base.path_separator)] = Uint16[sum(tmp), 0, 0, 0]
     push!(locality_idx, setdiff(find(tmp), locality_idx)...)
   else
@@ -104,7 +116,7 @@ depth_first_traverse(TileBaseAABB(tiles),Int[])
 solo_out_tiles = setdiff( ASCIIString[x[2][1]==1 ? x[1] : "" for x in merge_count] ,[""])
 AABBFree(manager_bbox)
 AABBFree(manager_aabb)
-map(AABBFree, in_tiles_aabb)
+map(x->map(AABBFree,x), in_subtiles_aabb)
 TileBaseClose(tiles)
 
 info("assigned ",string(length(in_tiles_idx))," input tiles")
@@ -204,8 +216,11 @@ t0=time()
         tile_idx = nextidx()
         tile_idx>length(in_tiles_idx) && break
         cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/peon.jl $(ARGS[1]) $(ngpus>0 ? (p-1) % ngpus : NaN)
-              $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(transform[in_tiles_idx[locality_idx[tile_idx]]])
-              $(join(ARGS[3:5],"-")) $(string(solo_out_tiles)) $hostname2 $port2`
+              $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(join(ARGS[3:5],"-")) $(string(solo_out_tiles))
+              $hostname2 $port2 $(length(xlims)) $xlims $(length(ylims)) $ylims
+              $(zlims[in_tiles_idx[locality_idx[tile_idx]]])
+              $(dims[in_tiles_idx[locality_idx[tile_idx]]])
+              $(transform[in_tiles_idx[locality_idx[tile_idx]]])`
         info(string(cmd))
         try
           run(cmd)

@@ -43,7 +43,7 @@ while true ; do
     fi
   done
 
-  if [ cont == 0 ] ; then
+  if [ $cont == 0 ] ; then
     echo FINISHED!
     break
   fi
@@ -55,14 +55,15 @@ while true ; do
   sharedscratch2=($(df -h $shared_scratch))
   destination1=($(du -sh $2))
   destination2=($(df -h $2))
+  unset tiles
   for i in $(seq 0 $((${#nodes[@]} - 1))) ; do
     #echo ${nodes[i]}
     memory[i]=$(qhost -h ${nodes[i]})
     localscratch[i]=$(ssh -q ${nodes[i]} df -h /scratch)
     load[i]=$(ssh -q ${nodes[i]} mpstat 1 1)
     io[i]=$(ssh -q ${nodes[i]} tail -n +3 /proc/net/dev | sed 's/.*://')
-    if [ -e $2/${logs[i]} ] ; then
-      tiles[i]=$(grep -c "reading input tile" $2/${logs[i]})
+    if [ -e $2/squatter${logs[i]} ] ; then
+      tiles[i]=$(grep -c "reading input tile" $2/squatter${logs[i]})
     fi
   done
 
