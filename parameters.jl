@@ -12,7 +12,8 @@ const nnodes = 32  # number of non-GPU 32-core compute nodes to use, max is 32
 const source="/groups/mousebrainmicro/mousebrainmicro/stitch/2014-10-06/Stitch9_corners"
 const destination="/tier2/mousebrainmicro/render/stitch9"
 
-const shared_scratch="/nobackup/mousebrainmicro/scratch"
+const shared_scratch="/nobackup/mousebrainmicro/scratch/<yourId>"
+const logfile_scratch="/groups/mousebrainmicro/scratch/<yourId>"  # should be on /groups
 
 const nchannels=2  # need to generalize
 const file_infix="ngc"  # need to generalize

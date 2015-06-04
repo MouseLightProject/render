@@ -1,16 +1,19 @@
 #!/bin/bash
 
-# usage: ./monitor <jobname> <destination>
+# usage: ./monitor <jobname> <path_to_set_parameters.jl>
 
-# output is also appended to <destination>/monitor.log
+# output is also appended to <destination>/logs.tar.gz/monitor.log
 
 interval=120   # in seconds
 
 #export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
 export RENDER_PATH=/home/arthurb/projects/mouselight
-JULIA=/usr/local/julialang-0.3.8/bin/julia
+export JULIA=/usr/local/julialang-0.3.8/bin/julia
 
-shared_scratch=$($JULIA -L $2/set_parameters.jl -e "print(shared_scratch)")
+read -a tmp <<< $($JULIA -L $2 -e "print(destination,' ',shared_scratch,' ',logfile_scratch)")
+destination=${tmp[0]}
+shared_scratch=${tmp[1]}
+logfile_scratch=${tmp[2]}
 
 display_it() {
   if [ -n "$2" ] ; then
@@ -49,12 +52,12 @@ while true ; do
   fi
 
   # query nodes for data
-  started=$(stat -c %y $2/set_parameters.jl)
-  ntiles=$(grep "reading input tile" $2/*log | wc -l)
-  sharedscratch1=($(du -sh $shared_scratch))
+  started=$(stat -c %y $destination/set_parameters.jl)
+  ntiles=$(grep "reading input tile" $logfile_scratch/*log | wc -l)
+  sharedscratch1=$( grep -s -E "(receive|write) output" $logfile_scratch/squatter*.log | wc -l )
   sharedscratch2=($(df -h $shared_scratch))
-  destination1=($(du -sh $2))
-  destination2=($(df -h $2))
+  destination1=$( grep -s -E "(copying (from|to))|(saving output)" $logfile_scratch/merge*.log | wc -l )
+  destination2=($(df -h $destination))
   unset tiles
   for i in $(seq 0 $((${#nodes[@]} - 1))) ; do
     #echo ${nodes[i]}
@@ -62,8 +65,8 @@ while true ; do
     localscratch[i]=$(ssh -q ${nodes[i]} df -h /scratch)
     load[i]=$(ssh -q ${nodes[i]} mpstat 1 1)
     io[i]=$(ssh -q ${nodes[i]} tail -n +3 /proc/net/dev | sed 's/.*://')
-    if [ -e $2/squatter${logs[i]} ] ; then
-      tiles[i]=$(grep -c "reading input tile" $2/squatter${logs[i]})
+    if [ -e $logfile_scratch/squatter${logs[i]} ] ; then
+      tiles[i]=$(grep -c "reading input tile" $logfile_scratch/squatter${logs[i]})
     fi
   done
 
@@ -74,8 +77,8 @@ while true ; do
   printf "\n"
 
   echo $ntiles input tile-colors read
-  echo ${sharedscratch1[0]} in ${sharedscratch1[1]} , ${sharedscratch2[10]} available
-  echo ${destination1[0]} in ${destination1[1]} , ${destination2[10]} available
+  echo $sharedscratch1 output tiles saved to shared_scratch = $shared_scratch , ${sharedscratch2[10]} available
+  echo $destination1 output tiles saved to destination = $destination , ${destination2[10]} available
   printf "\n"
 
   printf "%4s%8s" "log#" node
@@ -107,10 +110,10 @@ while true ; do
   done
 
   printf "\n"
-  display_it "Seg faults" "$(grep -c 'Segmentation fault' $2/*log | grep -v :0)"
-  display_it "all errors" "$(grep -c ERROR $2/*log | grep -v :0)"
-  display_it "input tiles that possibly failed" "$(grep -c 'might have failed' $2/*log | grep -v :0)"
-  display_it "all warnings" "$(grep WARNING -c $2/*log | grep -v :0)"
+  display_it "Seg faults" "$(grep -c 'Segmentation fault' $logfile_scratch/*log | grep -v :0)"
+  display_it "all errors" "$(grep -c ERROR $logfile_scratch/*log | grep -v :0)"
+  display_it "input tiles that possibly failed" "$(grep -c 'might have failed' $logfile_scratch/*log | grep -v :0)"
+  display_it "all warnings" "$(grep WARNING -c $logfile_scratch/*log | grep -v :0)"
 
   # wait until specified interval
   while (($(date +%s) - $START < $interval)) ; do

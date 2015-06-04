@@ -151,7 +151,7 @@ t0=time()
       while isopen(sock2) || nb_available(sock2)>0
         tmp = chomp(readline(sock2))
         length(tmp)==0 && continue
-        println("MANAGER<PEON: ",tmp)
+        println(STDERR,"MANAGER<PEON: ",tmp)
         local in_tile_num, out_tile_path
         if ismatch(ready,tmp)
           in_tile_num, out_tile_path = match(ready,tmp).captures[[2,4]]
@@ -169,17 +169,17 @@ t0=time()
           if merge_count[out_tile_path][4]==0xffff
             msg = "manager tells peon for input tile $in_tile_num to write output tile $out_tile_path to local_scratch"
             println(sock2, msg)
-            println("MANAGER>PEON: ",msg)
+            println(STDERR,"MANAGER>PEON: ",msg)
           elseif merge_count[out_tile_path][2] < merge_count[out_tile_path][1]
             msg = "manager tells peon for input tile $in_tile_num to send output tile $out_tile_path via tcp"
             println(sock2, msg)
-            println("MANAGER>PEON: ",msg)
+            println(STDERR,"MANAGER>PEON: ",msg)
           else
             while merge_count[out_tile_path][3] < merge_count[out_tile_path][1]-1;  yield();  end
             msg = "manager tells peon for input tile $in_tile_num to receive output tile $out_tile_path via tcp"
             println(sock2, msg)
             serialize(sock2, merge_array[:,:,:,merge_count[out_tile_path][4]])
-            println("MANAGER>PEON: ",msg)
+            println(STDERR,"MANAGER>PEON: ",msg)
           end
         elseif ismatch(wrote,tmp)
           out_tile_path = match(wrote,tmp).captures[4]
@@ -234,7 +234,7 @@ end
 info("peons took ",string(iround(time()-t0))," sec")
 
 for (k,v) in merge_count
-  println((k,v))
+  info(string((k,v)))
   v[1]>1 && v[1]!=v[2] && warn("not all input tiles processed for output tile ",string(k)," : ",string(v))
 end
 

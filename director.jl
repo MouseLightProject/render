@@ -168,7 +168,7 @@ t0=time()
 
   #launch_workers
   cmd = `qsub -A $bill_userid -t 1-$nnodes -l haswell=true -pe batch 32 -N $jobname
-        -b y -j y -V -shell n -o $destination/squatter'$TASK_ID.log'
+        -b y -j y -V -shell n -o $logfile_scratch/squatter'$TASK_ID.log'
         $(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/squatter.jl $(ARGS[1]) $hostname $port`
   info(string(cmd))
   jobid = match(r"(?<=job-array )[0-9]*", readchomp(cmd)).match

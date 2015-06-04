@@ -80,7 +80,7 @@ function depth_first_traverse(bbox, out_tile_path, sub_tile_str, sub_transform_n
             length(tmp)==0 || break
           end
           time_waiting+=(time()-t1)
-          println("PEON<MANAGER: ",tmp)
+          println(STDERR,"PEON<MANAGER: ",tmp)
           if startswith(tmp,send)
             println(sock,"peon for input tile ",ARGS[4]," will send output tile ",out_tile_path_next)
             serialize(sock, out_tiles_jl[out_tile_path_next])
@@ -233,7 +233,7 @@ const merge_count = Dict{ASCIIString,Array{Uint8,1}}()
 process_tile()
 
 for (k,v) in merge_count
-  println((k,v))
+  info(string((k,v)))
   v[1]>1 && v[1]!=v[2] && warn("not all input subtiles processed for output tile ",string(k)," : ",string(v))
 end
 
