@@ -243,7 +243,5 @@ map(AABBFree,in_subtiles_aabb)
 closelibs()
 
 # keep boss informed
-try
-  println(sock,"peon for input tile ",ARGS[4]," is finished")
-  close(sock)
-end
+println(sock,"peon for input tile ",ARGS[4]," is finished")
+close(sock)

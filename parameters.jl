@@ -13,7 +13,8 @@ const source="/groups/mousebrainmicro/mousebrainmicro/stitch/2014-10-06/Stitch9_
 const destination="/tier2/mousebrainmicro/render/stitch9"
 
 const shared_scratch="/nobackup/mousebrainmicro/scratch/<yourId>"
-const logfile_scratch="/groups/mousebrainmicro/scratch/<yourId>"  # should be on /groups
+const logfile_scratch="/groups/mousebrainmicro/mousebrainmicro/scratch/<yourId>"  # should be on /groups
+const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
 
 const nchannels=2  # need to generalize
 const file_infix="ngc"  # need to generalize
