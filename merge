@@ -4,8 +4,8 @@
 
 set -e
 
-#export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
-export RENDER_PATH=/home/arthurb/projects/mouselight
+export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
+#export RENDER_PATH=/home/arthurb/projects/mouselight
 JULIA=/usr/local/julialang-0.3.8/bin/julia
 
 # get vars from parameters.jl file

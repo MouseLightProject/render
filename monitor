@@ -6,8 +6,8 @@
 
 interval=120   # in seconds
 
-#export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
-export RENDER_PATH=/home/arthurb/projects/mouselight
+export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
+#export RENDER_PATH=/home/arthurb/projects/mouselight
 export JULIA=/usr/local/julialang-0.3.8/bin/julia
 
 read -a tmp <<< $($JULIA -L $2 -e "print(destination,' ',shared_scratch,' ',logfile_scratch)")
