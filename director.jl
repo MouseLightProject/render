@@ -95,6 +95,9 @@ get_job_aabbs(tiles_bbox)
 roi_vol = prod(region_of_interest[2])
 info(string(TileBaseCount(tiles)),(roi_vol<1 ? " * "*string(roi_vol): "")," tiles with ",string(nchannels)," channels split into ",string(nchannels*length(job_aabbs))," jobs")
 
+include_origins_outside_roi && length(job_aabbs)>1 &&
+      warn("include_origins_outside_roi should be true only when number of jobs == number of channels")
+
 TileBaseClose(tiles)
 
 # initialze tcp communication with squatters

@@ -76,7 +76,7 @@ for i = 1:TileBaseCount(tiles)
   tile = TileBaseIndex(tiles, i)
   tile_aabb = TileAABB(tile)
   if AABBHit(tile_aabb, manager_bbox)==1 &&
-        all(AABBGetJ(tile_aabb)[2] .>= AABBGetJ(manager_bbox)[2])
+        (include_origins_outside_roi || (all(AABBGetJ(tile_aabb)[2] .>= AABBGetJ(manager_bbox)[2])))
     push!(in_tiles_idx, i)
     push!(in_subtiles_aabb,
         calc_in_subtiles_aabb(tile,xlims,ylims, reshape(transform[i],3,length(xlims)*length(ylims)*2)) )
