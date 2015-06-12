@@ -38,26 +38,26 @@ notify_addr=${tmp[4]}
 bill_userid=${tmp[5]}
 
 # delete <logfile_scratch> and <destination> if they exist
-if [ -d $destination ] ; then
-  echo "deleting destination = $destination" # > $destination/render.log
-  rm -rf $destination
-fi
-mkdir -p $destination
 if [ -d $logfile_scratch ] ; then
-  echo "deleting logfile_scratch = $logfile_scratch"  >> $destination/render.log
+  echo "deleting logfile_scratch = $logfile_scratch"  #>> $logfile_scratch/render.log
   rm -rf $logfile_scratch
 fi
 mkdir -p $logfile_scratch
+if [ -d $destination ] ; then
+  echo "deleting destination = $destination" >> $logfile_scratch/render.log
+  rm -rf $destination
+fi
+mkdir -p $destination
 
-date >> $destination/render.log
-hostname >> $destination/render.log
+date >> $logfile_scratch/render.log
+hostname >> $logfile_scratch/render.log
 
 # copy parameters to <destination>
 cp $1 $destination/set_parameters.jl
 
 # create a probably-unique job name
 jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
-echo jobname = $jobname >> $destination/render.log
+echo jobname = $jobname >> $logfile_scratch/render.log
 
 # create the leaf nodes
 cmd="$JULIA ${RENDER_PATH}/src/render/director.jl $destination/set_parameters.jl $jobname"
@@ -101,24 +101,17 @@ cmd="date;
 echo $cmd | qsub -A $bill_userid -N ${jobname}3 -t 129:130 -pe batch 9 -j y -b n -V \
       -hold_jid ${jobname}2 -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
 
-# delete shared_scratch; tar log files; write-protect destination
+# delete shared_scratch
 cmd="date;
      hostname;
      df -h $shared_scratch;
      echo deleting shared_scratch = $shared_scratch;
      rm -rf $shared_scratch;
-     echo tar\'ing log files;
-     cd $logfile_scratch;
-     tar czf $destination/logs.tar.gz *log;
-     rm -rf $logfile_scratch;
-     echo write protecting destination = $destination;
-     chmod -R a-w $destination;
-     echo destination = $destination | mail -s \"job $jobname finished\" $notify_addr;
-     echo render has finished;
+     echo ./savelogs $destination | mail -s \"job $jobname finished\" $notify_addr;
      date"
-echo $cmd | qsub -A $bill_userid -N ${jobname}4 -j y -b n -V -S /bin/bash \
+echo $cmd | qsub -A $bill_userid -N ${jobname}4 -j y -b n -V \
       -hold_jid ${jobname}3 -l sandy=true \
-      -o $destination/render.log -m e -M $notify_addr
+      -o $logfile_scratch/render.log -m e -M $notify_addr
 
 # email user
 echo watch -n 60 tail -n '$((LINES-2))' $logfile_scratch/monitor.log | mail -s "job $jobname started" $notify_addr
@@ -126,4 +119,4 @@ echo watch -n 60 tail -n '$((LINES-2))' $logfile_scratch/monitor.log | mail -s "
 # start the monitor process
 nohup sh -c "sleep 10; ${RENDER_PATH}/src/render/monitor $jobname $destination/set_parameters.jl &> ${logfile_scratch}/monitor.log" 2>/dev/null &
 
-date >> $destination/render.log
+date >> $logfile_scratch/render.log
