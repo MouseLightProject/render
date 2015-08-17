@@ -22,10 +22,11 @@ const file_infix="ngc"  # need to generalize
 # normalized origin and shape of sub-bounding box to render
 const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
 # use the following code to convert morton order to origin & shape
-#morton = [8,1,7,3]
+#morton_order = [8,1,7,3]
 #const region_of_interest = (
-#    squeeze(sum( [(((morton[depth]-1)>>xyz)&1)/2^depth for xyz=0:2, depth=1:length(morton)] ,2),2),
-#    fill(0.5^length(morton),3) )
+#    squeeze(sum(
+#        [(((morton_order[depth]-1)>>xyz)&1)/2^depth for xyz=0:2, depth=1:length(morton_order)] ,2),2),
+#    fill(0.5^length(morton_order),3) )
 const include_origins_outside_roi=false   # set to true to render all of small test ROI
 
 const notify_addr = "<yourId>@janelia.hhmi.org"

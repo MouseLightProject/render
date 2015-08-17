@@ -1,40 +1,111 @@
-Basic Usage
-===========
+MouseLight Rendering Pipeline
+=============================
 
-Three executables are provided.  See the documentation within each of
-these bash scripts for command line syntax.
+Given a set of raw 3D tiff stacks from the microscope and a tilebase.cache.yml
+file containing the stitching parameters, use barycentric transforms to
+generate an octree for viewing with the Janelia Workstation.
 
-**render**  render a set of tiles using a barycentric transform to an octree
+Requirements
+============
 
-**janitor**  delete temporary files on the cluster if a render is aborted
+Julia, version 3, plus the YAML package.
 
-**merge**  combine two partial octrees
+Nathan Clack's nd, tilebase, and mltk-bary libraries.
 
-**diskio**  measure i/o transfer rates to /scratch, /nobackup, /groups, & /tier2
+Tested with Julia v0.3.8, YAML v0.1.9, nd master (branch) / de5c54 (commit),
+ndio-series use-tre/b36bd0, ndio-tiff ndio-format-context/5ae150, tilebase
+master/092be1, and mltk-bary master/0db387.
 
 
 Installation
 ============
 
-Install nd, tilebase, and mltk-bary libraries using make.sh.  Be sure to edit
-```rootdir``` and ```installdir``` therein appropriately.
+Install nd, tilebase, and mltk-bary libraries using make.sh.  Be sure
+to edit ```rootdir``` and ```installdir``` therein appropriately.
 
-Install Julia by either downloading a precompiled binary, or building from source.
-For the latter, create Make.user with
+Install Julia by downloading a precompiled binary of the latest point
+release of version 3.  Install the YAML package by starting Julia on the
+unix command line and executing Pkg.Add("YAML").  If desired, use the
+bash environment variable JULIA_PKGDIR to place it somewhere other than
+your home directory.  For example, somewhere on Julia's LOAD_PATH, like
+<julia-install-dir>/share/julia/site/v0.3, would permit others to use the
+pipeline without having to install all the packages themselves.
+
+Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, and ```JULIA```
+in ```render```, ```monitor```, ```savelogs```, and ```merge``` are all
+set appropriately.
+
+
+Basic Usage
+===========
+
+First, set the desired parameters by editing a copy of parameters.jl.
+At a minimum, the source variable should point to the full path of the
+tilebase.cache.yml file and the destination variable to the directory in
+which to save the octree.
+
+Start the render as follows:
 
 ```
-OPENBLAS_DYNAMIC_ARCH=0
-prefix=/path/to/install/directory/
+ssh login1
+cd /groups/mousebrainmicro/mousebrainmicro/Software/barycentric/src
+./render <copy_of_parameters.jl>
 ```
 
-and create base/user.img with
+An email will be sent to you confirming that it started.  In the message
+body will be a command with which you can monitor its progress:
 
 ```
-require("YAML")
+./monitor <jobname> <path_to_set_parameters.jl>
 ```
 
-Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, and ```JULIA``` in
-```render```, ```monitor```, and ```merge``` are all set appropriately.
+Shown is are the RAM, CPU, disk, and i/o utilization for each node on the
+cluster currently being used, updated every minute.  One can also point a
+browser to http://cluster-status.int.janelia.org, or use the ```qstat```
+command on the unix command line.
+
+Once the render is done you will be sent another email with a command you
+need to execute to transfer and compress the log files:
+
+```
+./savelogs <destination>
+```
+
+Don't forget to do this, as otherwise it will be difficult to subsequently
+diagnose any errors.
+
+To kill the render before it completes, use the qdel command:
+
+```
+qdel -u <yourUserId>
+```
+
+Should you kill the render, or in case it crashes or hangs before it finishes,
+be sure to delete all the temporary files on the cluster nodes:
+
+```
+./janitor <destination>
+```
+
+The render can be restricted to a partial sub-volume using the
+region_of_interest or morton_order variables in the copy of parameters.jl.
+To merge two different such octrees from the same brain into a single octree,
+use the merge script:
+
+```
+./merge <source1> <source2> ... <sourceN> <destination>
+```
+
+The merge script can also be used to fix sub-volumes that have not been
+rendered correctly.  Simply re-render the region in question and merge with
+the rest.
+
+Finally, Janelia has many file systems to use for the source, destination, and
+scratch spaces.  Test their relative I/O performance as follows:
+
+```
+./diskio
+```
 
 
 Troubleshooting
@@ -43,10 +114,12 @@ Troubleshooting
 If a squatter hangs, you can spoof its communication and get the director to continue
 with the inter-node merge by:
 
+```
 julia> sock = connect("<node_name>.int.janelia.org",2000)
 TcpSocket(open, 0 bytes waiting)
 
 julia> println(sock,"squatter <squatter_num> is finished")
+```
 
 
 Author
