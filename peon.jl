@@ -10,6 +10,7 @@ include(ARGS[1])
 include("$destination/calculated_parameters.jl")
 include(ENV["RENDER_PATH"]*"/src/render/admin.jl")
 
+time_initing=0.0
 time_transforming=0.0
 time_saving=0.0
 time_waiting=0.0
@@ -171,8 +172,7 @@ function process_tile()
     catch
       error("BarycentricInit error:  GPU $thisgpu, input tile $in_tile_idx")
     end
-    info("transform initialization for input tile ",string(in_tile_idx),
-        " took ",string(iround(time()-t1))," sec")
+    time_initing+=(time()-t1)
 
     depth_first_traverse(TileBaseAABB(tiles), "", string(ix)*"x"*string(iy),
         transform_nm[:,subtile_corner_indices(ix,iy)],
@@ -201,6 +201,7 @@ function process_tile()
     error("BarycentricRelease error:  GPU $thisgpu, input tile $in_tile_idx")
   end
 
+  info("initializing input tile ",string(in_tile_idx), " took ",string(iround(time_initing))," sec")
   info("transforming input tile ",string(in_tile_idx)," took ",string(iround(time_transforming))," sec")
   info("saving output tiles for input tile ",string(in_tile_idx)," took ",string(iround(time_saving))," sec")
   info("waiting for manager for input tile ",string(in_tile_idx)," took ",string(iround(time_waiting))," sec")

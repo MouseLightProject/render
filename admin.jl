@@ -367,7 +367,7 @@ function merge_output_tiles(source, destination, prefix, chantype, out_tile_path
 end
 
 function merge_output_tiles(callback::Function)
-  global time_ram_file=0.0, time_single_file=0.0, time_many_files=0.0
+  global time_single_file=0.0, time_many_files=0.0
   global time_clear_files=0.0, time_read_files=0.0, time_max_files=0.0, time_delete_files=0.0, time_write_files=0.0
 
   global merge1_ws, merge1_jl, merge2_ws, merge2_jl
@@ -381,7 +381,6 @@ function merge_output_tiles(callback::Function)
   ndfree(merge1_ws)
   ndfree(merge2_ws)
 
-  info("transfering RAM files took ",string(signif(time_ram_file,4,2))," sec")
   info("copying single files took ",string(signif(time_single_file,4,2))," sec")
   info("merging multiple files took ",string(signif(time_many_files,4,2))," sec")
   info("  clearing multiple files took ",string(signif(time_clear_files,4,2))," sec")
