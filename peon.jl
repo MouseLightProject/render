@@ -118,6 +118,8 @@ end
 function process_tile()
   t0=time()
 
+  global time_initing
+
   local tiles
   try
     tiles = TileBaseOpen(source)
