@@ -184,7 +184,7 @@ end
 
 function isleaf(bbox)
   c = AABBVolume(bbox) / (prod(voxelsize_used_um)*um2nm^3)
-  c < countof_leaf
+  c < max_pixels_per_leaf
 end
 
 # port some of julia 4.0 base since we're using julia 3.x

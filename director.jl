@@ -28,7 +28,8 @@ info("deleting shared_scratch = ",shared_scratch," at start took ",string(iround
 # get the max output tile size
 tiles_bbox = AABBGetJ(TileBaseAABB(tiles))
 const shape_tiles_nm = tiles_bbox[3]
-const nlevels = iceil( log(8, prod(float64(shape_tiles_nm)) / (prod(voxelsize_um)*um2nm^3) / countof_leaf) )
+const nlevels = iceil(
+    log(8, prod(float64(shape_tiles_nm)) / (prod(voxelsize_um)*um2nm^3) / max_pixels_per_leaf) )
 shape_leaf_tmp = int(round(shape_tiles_nm./um2nm./voxelsize_um./2^nlevels,-1,2))
 # there must be better ways to ensure
 # that prod(shape_leaf_px) is divisible by 32*32*4, and
@@ -53,7 +54,8 @@ open("$destination/calculated_parameters.jl","w") do f
   println(f,"const voxelsize_used_um = ",voxelsize_used_um)
   println(f,"const origin_nm = [",join(map(string,tiles_bbox[2]),","),"]")
   println(f,"const tile_type = convert(Cint,$tile_type)")
-  println(f,"const render_version = \"", readchomp(`git --git-dir=$(dirname(Base.source_path()))/.git log -1 --pretty=format:"%ci %H"`),"\"")
+  println(f,"const render_version = \"",
+      readchomp(`git --git-dir=$(dirname(Base.source_path()))/.git log -1 --pretty=format:"%ci %H"`),"\"")
 end
 open("$destination/transform.txt","w") do f  # for large volume viewer
   println(f,"ox: ",tiles_bbox[2][1])
@@ -67,7 +69,8 @@ end
 cp(joinpath(source,"tilebase.cache.yml"), joinpath(destination,"tilebase.cache.yml"))
 info("number of levels = ",string(nlevels))
 info("shape of output tiles is [",join(map(string,shape_leaf_px),","),"] pixels")
-info("voxel dimensions used to make output tile shape even and volume divisible by 32*32*4: [",join(map(string,voxelsize_used_um),",")," microns")
+info("voxel dimensions used to make output tile shape even and volume divisible by 32*32*4: [",
+    join(map(string,voxelsize_used_um),",")," microns")
 
 # divide in halves instead of eighths for finer-grained use of RAM and local_scratch
 function AABBHalveSubdivision(bbox)
@@ -81,11 +84,20 @@ function AABBHalveSubdivision(bbox)
 end
 
 function get_job_aabbs(bbox)
-  if prod(float64(bbox[3])) / (prod(voxelsize_used_um)*um2nm^3) > countof_job
+  bbox_aabb=AABBSet(C_NULL,3,bbox[2],bbox[3])
+  ntiles=0
+  for i=1:TileBaseCount(tiles)
+    tile_aabb = TileAABB(TileBaseIndex(tiles,i))
+    AABBHit(tile_aabb, bbox_aabb)==1 &&
+        (include_origins_outside_roi || (all(AABBGetJ(tile_aabb)[2] .>= bbox[2]))) &&
+        (ntiles+=1)
+  end
+  if ntiles > max_tiles_per_job
     map(get_job_aabbs, AABBHalveSubdivision(bbox))
-  else
+  elseif ntiles>0
     push!(job_aabbs, bbox)
   end
+  AABBFree(bbox_aabb)
 end
 
 job_aabbs = {}

@@ -2,9 +2,9 @@ const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size.
 # voxelsize_used_um, in destination/calculated_parameters.jl, is that actually used.
 #   adjusted to make tile widths even and tile volume a multiple of 32*32*4,
 
-const countof_leaf=120e6  # maximum number of pixels in output tiles
+const max_pixels_per_leaf=120e6  # maximum number of pixels in output tiles
 
-const countof_job=480e9  # number of pixels in sub bounding boxes.
+const max_tiles_per_job=1000  # maximum number of input tiles per cluster job
 # size to use all of RAM
 
 const nnodes = 32  # number of non-GPU 32-core compute nodes to use, max is 32
