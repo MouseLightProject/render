@@ -48,7 +48,7 @@ Start the render as follows:
 
 ```
 ssh login1
-cd /groups/mousebrainmicro/mousebrainmicro/Software/barycentric/src
+cd /groups/mousebrainmicro/mousebrainmicro/Software/barycentric/src/render
 ./render <copy_of_parameters.jl>
 ```
 
