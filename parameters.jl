@@ -36,6 +36,9 @@ const bad_nodes = []  # e.g. ["h09u20"]
 
 const interpolation = "nearest"  # "linear" or "nearest"
 
+const raw_compression_ratios = [10,80]
+const octree_compression_ratios = [10,80]
+
 # build the octree with a function below.  should return uint16
 
 # the simplest and fastest

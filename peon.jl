@@ -143,6 +143,11 @@ function process_tile()
     push!(tmp, tmp[end]*"-$file_infix."*string(channel-1)*".tif")
     ndioClose(ndioRead(ndioOpen("/"*joinpath(tmp...), C_NULL, "r"), in_tile_ws))
     info("reading input tile ",string(in_tile_idx)," took ",string(iround(time()-t1))," sec")
+    filename = "/"*joinpath(tmp...)
+    for ratio in octree_compression_ratios
+      spawn(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $(dirname(filename)) $(splitext(basename(filename))[1]) 0`)
+    end
+
   catch
     error("in peon/ndalloc")
   end

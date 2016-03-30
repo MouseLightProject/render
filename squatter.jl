@@ -1,6 +1,5 @@
 # qsub'ed by director
 # sequentially spawns a local manager for each sub-bounding box, and
-# handle one thread of inter-node merge by copying shared_scratch to destination
 # saves stdout/err to <destination>/[0-9]*.log
 
 # julia squatter.jl parameters.jl hostname port
@@ -11,7 +10,6 @@ include(ENV["RENDER_PATH"]*"/src/render/admin.jl")
 const proc_num = ENV["SGE_TASK_ID"]
 
 const dole_out = Regex("squatter "*proc_num*" dole out job")
-const merge = Regex("squatter "*proc_num*" merge")
 const terminate = Regex("squatter "*proc_num*" terminate")
 
 split(readchomp(`hostname`),".")[1] in bad_nodes && exit(1)

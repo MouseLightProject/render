@@ -243,6 +243,9 @@ function save_out_tile(filesystem, path, name, data::Ptr{Void})
     filename = joinpath(filepath,name)
     @retry mkpath(filepath)
     ndioClose(ndioWrite(ndioOpen(filename, C_NULL, "w"), data))
+    for ratio in raw_compression_ratios
+      run(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $filepath $(splitext(name)[1]) 0`)
+    end
   catch
     error("in save_out_tile")
   end
@@ -318,6 +321,9 @@ function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, pr
     info("  copying to ",destination2)
     t1=time()
     ndioClose(ndioWrite(ndioOpen( destination2, C_NULL, "w" ),merge1_ws))
+    for ratio in raw_compression_ratios
+      run(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $destination2 $(joinpath(destination,out_tile_path)) $(splitext(prefix*chantype)[1]) 0`)
+    end
     time_write_files+=(time()-t1)
     time_many_files+=(time()-t0)
   end
@@ -329,6 +335,9 @@ function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, pr
       t0=time()
       info("saving output tile ",out_tile_path," to ",destination2)
       ndioClose(ndioWrite(ndioOpen( destination2, C_NULL, "w" ),out_tiles_ws[level]))
+      for ratio in raw_compression_ratios
+        run(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $destination2 $(joinpath(destination,out_tile_path)) $(splitext(prefix*chantype)[1]) 0`)
+      end
       time_octree_save+=(time()-t0)
     end
     if flag

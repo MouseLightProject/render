@@ -108,7 +108,7 @@ merge_array = Array(Uint16, shape_leaf_px..., ncache)
 merge_used = falses(ncache)
 # one entry for each output tile
 # [total # input tiles, input tiles processed so far, input tiles sent so far, index to merge_array (0=not assigned yet, Inf=use local_scratch)]
-merge_count = Dict{ASCIIString,Array{Uint16,1}}()
+merge_count = Dict{ASCIIString,Array{Uint16,1}}()  # expected, write cmd, write ack, RAM slot
 info("allocated RAM for ",string(ncache)," output tiles")
 
 locality_idx = Int[]
