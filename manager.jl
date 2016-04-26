@@ -91,7 +91,10 @@ function depth_first_traverse(bbox,out_tile_path)
   AABBHit(bbox, manager_aabb)==1 || return
   if isleaf(bbox)
     tmp = map(x->any(map(y->AABBHit(bbox,y),x)), in_subtiles_aabb)
+    sum(tmp)>0 || return
     merge_count[join(out_tile_path, Base.path_separator)] = Uint16[sum(tmp), 0, 0, 0]
+    info("output tile ",join(out_tile_path, Base.path_separator),
+         " overlaps with input tiles ",join(in_tiles_idx[find(tmp)],", "))
     push!(locality_idx, setdiff(find(tmp), locality_idx)...)
   else
     cboxes = AABBBinarySubdivision(bbox)
