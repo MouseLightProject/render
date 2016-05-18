@@ -7,12 +7,14 @@ const max_pixels_per_leaf=120e6  # maximum number of pixels in output tiles
 const max_tiles_per_job=1000  # maximum number of input tiles per cluster job
 # size to use all of RAM
 
-const nnodes = 32  # number of non-GPU 32-core compute nodes to use, max is 32
+const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
+const nnodes = 32  # for which_cluster=="janelia", number of non-GPU 32-core compute nodes to use, max is 32
+const bad_nodes = []  # e.g. ["h09u20"]
 
-const source="/groups/mousebrainmicro/mousebrainmicro/stitch/2014-10-06/Stitch9_corners"
-const destination="/tier2/mousebrainmicro/render/stitch9"
+const source="/groups/mousebrainmicro/mousebrainmicro/stitch/..."  # path to tilebase.cache.yml
+const destination="/nobackup2/mouselight/..."  # path to octree
 
-const shared_scratch="/nobackup/mousebrainmicro/scratch/<yourId>"
+const shared_scratch="/nobackup2/mouselight/scratch/<yourId>"
 const logfile_scratch="/groups/mousebrainmicro/mousebrainmicro/scratch/<yourId>"  # should be on /groups
 const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
 
@@ -32,12 +34,10 @@ const include_origins_outside_roi=false   # set to true to render all of small t
 const notify_addr = "<yourId>@janelia.hhmi.org"
 const bill_userid = "<yourId>"
 
-const bad_nodes = []  # e.g. ["h09u20"]
-
 const interpolation = "nearest"  # "linear" or "nearest"
 
-const raw_compression_ratios = [10,80]
-const octree_compression_ratios = [10,80]
+const raw_compression_ratios = [] # or e.g. [10,80]
+const octree_compression_ratios = []
 
 # build the octree with a function below.  should return uint16
 

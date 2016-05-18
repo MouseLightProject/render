@@ -156,9 +156,13 @@ t0=time()
     @async begin
       sock = wait(events[p,1])
       if sock==nothing
-        cmd = `qdel $(jobid).$p`
-        info("deleting squatter ",string(p),": ",string(cmd))
-        try;  run(cmd);  end
+        info("deleting squatter ",string(p))
+        if which_cluster=="janelia"
+          cmd = `qdel $(jobid).$p`
+          try;  run(cmd);  end
+        else
+          kill(proc[p])
+        end
       else
         while isopen(sock)
           idx = nextidx()
@@ -182,11 +186,20 @@ t0=time()
   end
 
   #launch_workers
-  cmd = `qsub -A $bill_userid -t 1-$nnodes -l haswell=true -pe batch 32 -N $jobname
-        -b y -j y -V -shell n -o $logfile_scratch/squatter'$TASK_ID.log'
-        $(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/squatter.jl $(ARGS[1]) $hostname $port`
-  info(string(cmd))
-  jobid = match(r"(?<=job-array )[0-9]*", readchomp(cmd)).match
+  cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/squatter.jl $(ARGS[1]) $hostname $port`
+  if which_cluster=="janelia"
+    pcmd = `qsub -A $bill_userid -t 1-$nnodes -l haswell=true -pe batch 32 -N $jobname
+          -b y -j y -V -shell n -o $logfile_scratch/squatter'$TASK_ID'.log $cmd`
+    info(string(pcmd))
+    jobid = match(r"(?<=job-array )[0-9]*", readchomp(pcmd)).match
+  else
+    proc = Array(Any,length(which_cluster))
+    for i=1:length(which_cluster)
+      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[i]) export RENDER_PATH=$(ENV["RENDER_PATH"]); export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]); export JULIA=$(ENV["JULIA"]); export SGE_TASK_ID=$i; $cmd &> $logfile_scratch/squatter$i.log`
+      info(string(pcmd))
+      proc[i] = spawn(pcmd)
+    end
+  end
 end
 info("squatters took ",string(iround(time()-t0))," sec")
 

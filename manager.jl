@@ -29,7 +29,7 @@ if ngpus == 7
 elseif ngpus == 4
   num_procs = 15
 else
-  nthreads = 8
+  nthreads = 4
   num_procs = ifloor(CPU_CORES/nthreads)
 end
 info(string(CPU_CORES)," CPUs and ",string(ngpus)," GPUs present which can collectively process ",string(num_procs)," tiles simultaneously")

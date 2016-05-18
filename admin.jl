@@ -46,11 +46,13 @@ end
 
 cudaDeviceReset() =  ccall((:cudaDeviceReset, libcudart), Cint, (), )==0 || throw(Exception)
 
-try
-  global ngpus = cudaGetDeviceCount()
-catch
+# nvidia's unified virtual addressing causes memory swap problems with multiple peons, so
+# turn off GPU detection until this is fixed
+#try
+#  global ngpus = cudaGetDeviceCount()
+#catch
   global ngpus = 0
-end
+#end
 
 # interface to tilebase
 
