@@ -95,7 +95,7 @@ function get_job_aabbs(bbox)
   if ntiles > max_tiles_per_job
     map(get_job_aabbs, AABBHalveSubdivision(bbox))
   elseif ntiles>0
-    push!(job_aabbs, bbox)
+    push!(job_aabbs, (bbox, ntiles))
   end
   AABBFree(bbox_aabb)
 end
@@ -104,6 +104,7 @@ job_aabbs = []
 tiles_bbox[2][:] = round(Int,tiles_bbox[2][:] + tiles_bbox[3].*region_of_interest[1])
 tiles_bbox[3][:] = round(Int,tiles_bbox[3][:] .* region_of_interest[2])
 get_job_aabbs(tiles_bbox)
+sort!(job_aabbs; lt=(x,y)->x[2]<y[2], rev=true)
 roi_vol = prod(region_of_interest[2])
 info(string(TileBaseCount(tiles)),(roi_vol<1 ? " * "*string(roi_vol): "")," tiles with ",string(nchannels)," channels split into ",string(nchannels*length(job_aabbs))," jobs")
 
@@ -174,7 +175,7 @@ t0=time()
             break
           end
           channel = (idx-1)%2+1
-          shape = job_aabbs[(idx+1)>>1]
+          shape = job_aabbs[(idx+1)>>1][1]
           cmd = "squatter $p dole out job $(ARGS[1]) $channel $(shape[2][1]) $(shape[2][2]) $(shape[2][3]) $(shape[3][1]) $(shape[3][2]) $(shape[3][3]) $hostname $port"
           println("DIRECTOR>SQUATTER: ",string(cmd))
           println(sock, cmd)
