@@ -25,10 +25,10 @@ set -e
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
 export LD_LIBRARY_PATH=/usr/local/cuda-7.0/lib64
-export JULIA=/usr/local/julialang-0.3.8/bin/julia
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric/julia-0.4.5/bin/julia
 
 # get vars from parameters.jl file
-read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',logfile_scratch,' ',delete_scratch,' ',notify_addr,' ',bill_userid,' ',typeof(which_cluster) <: String ? which_cluster : join(map(x->string(\"1/\",x),which_cluster), ','),' ',typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','))")
+read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',logfile_scratch,' ',delete_scratch,' ',notify_addr,' ',bill_userid,' ',typeof(which_cluster) <: ASCIIString ? which_cluster : join(map(x->string(\"1/\",x),which_cluster), ','),' ',typeof(which_cluster) <: ASCIIString ? which_cluster : join(which_cluster, ','))")
 destination=${tmp[0]}
 shared_scratch=${tmp[1]}
 logfile_scratch=${tmp[2]}
@@ -70,8 +70,10 @@ else
 fi
 
 # downsample the octree
-expr="t=time();
-      id=int(ENV[\"SGE_TASK_ID\"]);
+expr="include(\"${destination}/set_parameters.jl\");
+      include(\"${destination}/calculated_parameters.jl\");
+      t=time();
+      id=parse(Int,ENV[\"SGE_TASK_ID\"]);
       ch=(id-1)%2+1;
       oct=(id-1)>>4+1;
       oct2=((id-1)>>1)%8+1;
@@ -79,7 +81,7 @@ expr="t=time();
       if isdir(tmp) 
         merge_output_tiles(shared_scratch, destination, \"default\", \".\"*string(ch-1)*\".tif\",
               string(oct)*\"/\"*string(oct2), true, true, false);
-        info(\"merging took \",string(iround(time()-t)),\" sec\");
+        info(\"merging took \",string(round(Int,time()-t)),\" sec\");
         if delete_scratch==\"as-you-go\"
           info(\"deleting shared_scratch = \",tmp);
           run(\`find \$tmp -name *.\$(string(ch-1)).tif -delete\`);
@@ -87,8 +89,7 @@ expr="t=time();
       end"
 cmd="date;
      hostname;
-     $JULIA -L $destination/set_parameters.jl -L $destination/calculated_parameters.jl
-            -L ${RENDER_PATH}/src/render/admin.jl -e '$expr';
+     $JULIA -L ${RENDER_PATH}/src/render/admin.jl -e '$expr';
      date;"
 echo $cmd
 if [ $which_cluster_octree == 'janelia' ]; then
@@ -106,11 +107,10 @@ expr="include(\"${destination}/set_parameters.jl\");
       ch=(id-129)%2+1;
       merge_output_tiles(nlevels>1 ? destination : shared_scratch, destination, \"default\",
             \".\"*string(ch-1)*\".tif\", \"\", true, true, false);
-      info(\"merging took \",string(iround(time()-t)),\" sec\")"
+      info(\"merging took \",string(round(Int,time()-t)),\" sec\")"
 cmd="date;
      hostname;
-     $JULIA -L $destination/set_parameters.jl -L $destination/calculated_parameters.jl
-            -L ${RENDER_PATH}/src/render/admin.jl -e '$expr';
+     $JULIA -L ${RENDER_PATH}/src/render/admin.jl -e '$expr';
      date;"
 echo $cmd
 if [ $which_cluster_octree == 'janelia' ]; then

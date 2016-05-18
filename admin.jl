@@ -58,7 +58,7 @@ cudaDeviceReset() =  ccall((:cudaDeviceReset, libcudart), Cint, (), )==0 || thro
 
 const libtilebase = ENV["RENDER_PATH"]*"/env/lib/libtilebase.so"
 
-TileBaseOpen(source) = ccall((:TileBaseOpen, libtilebase), Ptr{Void}, (Ptr{Uint8},Ptr{Uint8}), source, C_NULL)
+TileBaseOpen(source) = ccall((:TileBaseOpen, libtilebase), Ptr{Void}, (Ptr{UInt8},Ptr{UInt8}), source, C_NULL)
 TileBaseClose(tiles) = ccall((:TileBaseClose, libtilebase), Void, (Ptr{Void},), tiles)
 TileBaseAABB(tiles) = ccall((:TileBaseAABB, libtilebase), Ptr{Void}, (Ptr{Void},), tiles)
 TileBaseCount(tiles) = ccall((:TileBaseCount, libtilebase), Csize_t, (Ptr{Void},), tiles)
@@ -67,10 +67,10 @@ TileBaseIndex(tiles, idx) = ccall((:TileBaseIndex, libtilebase), Ptr{Void}, (Ptr
 TileAABB(tile) = ccall((:TileAABB, libtilebase), Ptr{Void}, (Ptr{Void},), tile)
 TileShape(tile) = ccall((:TileShape, libtilebase), Ptr{Void}, (Ptr{Void},), tile)
 TileFile(tile) = ccall((:TileFile, libtilebase), Ptr{Void}, (Ptr{Void},), tile)
-TilePath(tile) = ccall((:TilePath, libtilebase), Ptr{Uint8}, (Ptr{Void},), tile)
+TilePath(tile) = ccall((:TilePath, libtilebase), Ptr{UInt8}, (Ptr{Void},), tile)
 TileFree(tile) = ccall((:TileFree, libtilebase), Ptr{Void}, (Ptr{Void},), tile)
 
-AABBMake(ndim) = ccall((:AABBMake, libtilebase), Ptr{Void}, (Ptr{Csize_t},), ndim)
+AABBMake(ndim) = ccall((:AABBMake, libtilebase), Ptr{Void}, (Csize_t,), ndim)
 AABBFree(bbox) = ccall((:AABBFree, libtilebase), Void, (Ptr{Void},), bbox)
 AABBGet(bbox,ndim,ori,shape) = ccall((:AABBGet, libtilebase),
     Ptr{Void}, (Ptr{Void},Ptr{Csize_t},Ptr{Ptr{Int}},Ptr{Ptr{Int}}), bbox,ndim,ori,shape)
@@ -78,7 +78,7 @@ AABBSet(bbox,ndim,ori,shape) = ccall((:AABBSet, libtilebase),
     Ptr{Void}, (Ptr{Void},Csize_t,Ptr{Int},Ptr{Int}), bbox,ndim,ori,shape)
 AABBVolume(bbox) = ccall((:AABBVolume, libtilebase), Cdouble, (Ptr{Void},), bbox)
 AABBNDim(bbox) = ccall((:AABBNDim, libtilebase), Csize_t, (Ptr{Void},), bbox)
-AABBHit(bbox1,bbox2) = ccall((:AABBHit, libtilebase), Cint, (Ptr{Void},Ptr{Void}), bbox1,bbox2)
+AABBHit(bbox1,bbox2) = 1==ccall((:AABBHit, libtilebase), Cint, (Ptr{Void},Ptr{Void}), bbox1,bbox2)
 AABBUnionIP(bbox1,bbox2) =
     ccall((:AABBUnionIP, libtilebase), Ptr{Void}, (Ptr{Void},Ptr{Void}), bbox1,bbox2)
 AABBIntersectIP(bbox1,bbox2) =
@@ -115,13 +115,13 @@ ndndim(nd_t) = ccall((:ndndim, libnd), Cuint, (Ptr{Void},), nd_t)
 ndcopy_ip(nd_t_dst, nd_t_src) =
     ccall((:ndcopy_ip, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), nd_t_dst, nd_t_src)
 ndcast(nd_t,t) = ccall((:ndcast, libnd), Ptr{Void}, (Ptr{Void},Cint), nd_t,t)
-ndfill(nd_t,c) = ccall((:ndfill, libnd), Ptr{Void}, (Ptr{Void},Uint64), nd_t,c)
+ndfill(nd_t,c) = ccall((:ndfill, libnd), Ptr{Void}, (Ptr{Void},UInt64), nd_t,c)
 ndref(nd_t,data,kind) = ccall((:ndref, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void},Cint), nd_t,data,kind)
 ndnbytes(nd_t) = ccall((:ndnbytes, libnd), Csize_t, (Ptr{Void},), nd_t)
 ndShapeSet(nd_t, idim, val) =
     ccall((:ndShapeSet, libnd), Ptr{Void}, (Ptr{Void},Cuint,Csize_t), nd_t, idim-1, val)
 ndioOpen(filename,format,mode) =
-    ccall((:ndioOpen, libnd), Ptr{Void}, (Ptr{Uint8},Ptr{Void},Ptr{Uint8}), filename, format, mode)
+    ccall((:ndioOpen, libnd), Ptr{Void}, (Ptr{UInt8},Ptr{Void},Ptr{UInt8}), filename, format, mode)
 ndioRead(file,dst) = ccall((:ndioRead, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), file, dst)
 ndioReadSubarray(file,dst,origin,shape) =
     ccall((:ndioReadSubarray, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void},Ptr{Csize_t},Ptr{Csize_t}),
@@ -148,10 +148,10 @@ end
 
 # interface to mltk-bary
 
-h=dlopen("libcudart.so",RTLD_LAZY|RTLD_DEEPBIND|RTLD_GLOBAL)
+h=Libdl.dlopen("libcudart.so",Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
 const libengine = ENV["RENDER_PATH"]*"/env/build/mltk-bary/libengine.so"
 
-closelibs() = dlclose(h)
+closelibs() = Libdl.dlclose(h)
 
 type BarycentricException <: Exception end
 
@@ -175,10 +175,10 @@ BarycentricGPUrelease(r) = ccall((:BarycentricGPUrelease, libengine), Void, (Ptr
 
 for f = ("source", "destination", "result")
   @eval $(symbol("BarycentricCPU"*f))(r,src) =
-      ccall(($("BarycentricCPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{Uint16}),
+      ccall(($("BarycentricCPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
           r,src) !=1 && throw(BarycentricException())
   @eval $(symbol("BarycentricGPU"*f))(r,src) =
-      ccall(($("BarycentricGPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{Uint16}),
+      ccall(($("BarycentricGPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
           r,src) !=1 && throw(BarycentricException())
 end
 
@@ -187,19 +187,6 @@ end
 function isleaf(bbox)
   c = AABBVolume(bbox) / (prod(voxelsize_used_um)*um2nm^3)
   c < max_pixels_per_leaf
-end
-
-# port some of julia 4.0 base since we're using julia 3.x
-
-function startswith(a::String, b::String)
-    i = start(a)
-    j = start(b)
-    while !done(a,i) && !done(b,i)
-        c, i = next(a,i)
-        d, j = next(b,j)
-        if c != d return false end
-    end
-    done(b,i)
 end
 
 # below used by director, manager, render, merge, ...
@@ -234,7 +221,7 @@ end
 
 :shape_leaf_px in names(Main) && (save_ws = ndalloc(shape_leaf_px, tile_type, false))
 
-function save_out_tile(filesystem, path, name, data::Array{Uint16,3})
+function save_out_tile(filesystem, path, name, data::Array{UInt16,3})
   ndref(save_ws, pointer(data), convert(Cint,0))   # 0==nd_heap;  need to generalize
   save_out_tile(filesystem, path, name, save_ws)
 end
@@ -271,8 +258,9 @@ function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, pr
     isdir(joinpath(source,out_tile_path)) || continue
     listing = readdir(joinpath(source,out_tile_path))
     idx = map(x->isdir(joinpath(source,out_tile_path,x)), listing)
-    push!(dirs, listing[idx]...)
-    push!(in_tiles, [joinpath(source,out_tile_path,x) for x in listing[!idx & map(x->endswith(x,chantype), listing)]]...)
+    sum(idx)==0 || push!(dirs, listing[idx]...)
+    tmp = [joinpath(source,out_tile_path,x) for x in listing[!idx & map(x->endswith(x,chantype), listing)]]
+    isempty(tmp) || push!(in_tiles, tmp...)
   end
 
   length(dirs)==0 && length(in_tiles)==0 && return
@@ -345,7 +333,7 @@ function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, pr
     if flag
       t0=time()
       info("downsampling output tile ",out_tile_path)
-      i = parseint(out_tile_path[end])
+      i = parse(Int,out_tile_path[end])
       tmp = length(in_tiles)==0 ? out_tiles_jl[level] : merge1_jl
       out_tiles_jl[level-1][ (((i-1)>>0)&1 * shape_leaf_px[1]>>1) + (1:shape_leaf_px[1]>>1),
                              (((i-1)>>1)&1 * shape_leaf_px[2]>>1) + (1:shape_leaf_px[2]>>1),
@@ -361,10 +349,10 @@ function merge_output_tiles(source, destination, prefix, chantype, out_tile_path
 
   if octree
     global out_tiles_ws = Array(Ptr{Void}, nlevels)
-    global out_tiles_jl = Array(Array{Uint16,3}, nlevels)
+    global out_tiles_jl = Array(Array{UInt16,3}, nlevels)
     for i=1:nlevels
       out_tiles_ws[i] = ndalloc(shape_leaf_px, tile_type)
-      out_tiles_jl[i] = pointer_to_array(convert(Ptr{Uint16},nddata(out_tiles_ws[i])), tuple(shape_leaf_px...))
+      out_tiles_jl[i] = pointer_to_array(convert(Ptr{UInt16},nddata(out_tiles_ws[i])), tuple(shape_leaf_px...))
     end
   end
 
@@ -383,9 +371,9 @@ function merge_output_tiles(callback::Function)
 
   global merge1_ws, merge1_jl, merge2_ws, merge2_jl
   merge1_ws = ndalloc(shape_leaf_px, tile_type)
-  merge1_jl = pointer_to_array(convert(Ptr{Uint16},nddata(merge1_ws)), tuple(shape_leaf_px...))
+  merge1_jl = pointer_to_array(convert(Ptr{UInt16},nddata(merge1_ws)), tuple(shape_leaf_px...))
   merge2_ws = ndalloc(shape_leaf_px, tile_type)
-  merge2_jl = pointer_to_array(convert(Ptr{Uint16},nddata(merge2_ws)), tuple(shape_leaf_px...))
+  merge2_jl = pointer_to_array(convert(Ptr{UInt16},nddata(merge2_ws)), tuple(shape_leaf_px...))
 
   callback()
 
@@ -403,7 +391,7 @@ end
 
 function rmcontents(dir, available)
   function get_available(dir,msg)
-    free = int(split(readchomp(ignorestatus(`df $dir`)))[11])
+    free = parse(Int,split(readchomp(ignorestatus(`df $dir`)))[11])
     info(string(signif(free/1024/1024,4,2))," GB available on ",dir," at ",msg)
     free
   end

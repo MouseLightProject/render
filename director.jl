@@ -23,14 +23,14 @@ info("source = ",source)
 info("destination = ",destination)
 mkpath(shared_scratch)
 scratch0 = rmcontents(shared_scratch, "after")
-info("deleting shared_scratch = ",shared_scratch," at start took ",string(iround(time()-t0))," sec")
+info("deleting shared_scratch = ",shared_scratch," at start took ",string(round(Int,time()-t0))," sec")
 
 # get the max output tile size
 tiles_bbox = AABBGetJ(TileBaseAABB(tiles))
 const shape_tiles_nm = tiles_bbox[3]
-const nlevels = iceil(
-    log(8, prod(float64(shape_tiles_nm)) / (prod(voxelsize_um)*um2nm^3) / max_pixels_per_leaf) )
-shape_leaf_tmp = int(round(shape_tiles_nm./um2nm./voxelsize_um./2^nlevels,-1,2))
+const nlevels = ceil(Int,
+    log(8, prod(map(Float64,shape_tiles_nm)) / (prod(voxelsize_um)*um2nm^3) / max_pixels_per_leaf) )
+shape_leaf_tmp = round(Int,round(shape_tiles_nm./um2nm./voxelsize_um./2^nlevels,-1,2))
 # there must be better ways to ensure
 # that prod(shape_leaf_px) is divisible by 32*32*4, and
 # that each element is even
@@ -88,7 +88,7 @@ function get_job_aabbs(bbox)
   ntiles=0
   for i=1:TileBaseCount(tiles)
     tile_aabb = TileAABB(TileBaseIndex(tiles,i))
-    AABBHit(tile_aabb, bbox_aabb)==1 &&
+    AABBHit(tile_aabb, bbox_aabb) &&
         (include_origins_outside_roi || (all(AABBGetJ(tile_aabb)[2] .>= bbox[2]))) &&
         (ntiles+=1)
   end
@@ -100,9 +100,9 @@ function get_job_aabbs(bbox)
   AABBFree(bbox_aabb)
 end
 
-job_aabbs = {}
-tiles_bbox[2][:] = int(tiles_bbox[2][:] + tiles_bbox[3].*region_of_interest[1])
-tiles_bbox[3][:] = int(tiles_bbox[3][:] .* region_of_interest[2])
+job_aabbs = []
+tiles_bbox[2][:] = round(Int,tiles_bbox[2][:] + tiles_bbox[3].*region_of_interest[1])
+tiles_bbox[3][:] = round(Int,tiles_bbox[3][:] .* region_of_interest[2])
 get_job_aabbs(tiles_bbox)
 roi_vol = prod(region_of_interest[2])
 info(string(TileBaseCount(tiles)),(roi_vol<1 ? " * "*string(roi_vol): "")," tiles with ",string(nchannels)," channels split into ",string(nchannels*length(job_aabbs))," jobs")
@@ -132,11 +132,11 @@ nfinished = 0
         flush(STDOUT);  flush(STDERR)
         if ismatch(ready,tmp)
           m=match(ready,tmp)
-          notify(events[int(m.match),1], sock)
+          notify(events[parse(Int,m.match),1], sock)
         elseif ismatch(finished,tmp)
           m=match(finished,tmp)
           global nfinished += 1
-          notify(events[int(m.match),2], nfinished)
+          notify(events[parse(Int,m.match),2], nfinished)
         end
       end
     end
@@ -148,7 +148,7 @@ end
 t0=time()
 @sync begin
   i = 1
-  nextidx() = (idx=i; i+=1; idx)
+  nextidx() = (global i; idx=i; i+=1; idx)
   for p = 1:nnodes
     events[p,1]=Condition()
     events[p,2]=Condition()
@@ -201,7 +201,7 @@ t0=time()
     end
   end
 end
-info("squatters took ",string(iround(time()-t0))," sec")
+info("squatters took ",string(round(Int,time()-t0))," sec")
 
 closelibs()
 

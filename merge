@@ -5,12 +5,13 @@
 set -e
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
-#export RENDER_PATH=/home/arthurb/projects/mouselight
 export LD_LIBRARY_PATH=/usr/local/cuda-7.0/lib64
-export JULIA=/usr/local/julialang-0.3.8/bin/julia
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric/julia-0.4.5/bin/julia
 
 # get vars from parameters.jl file
-bill_userid=$($JULIA -L $1/set_parameters.jl -e "print(bill_userid)")
+read -a tmp <<< $($JULIA -L $1/set_parameters.jl -e "print(bill_userid -L $1/set_parameters.jl -L $1/calculated_parameters.jl)")
+bill_userid=${tmp[0]}
+which_cluster_octree=${tmp[1]}
 
 # create a probably-unique job name
 jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
@@ -40,7 +41,9 @@ df -h ${@: -1}
 # do it
 sources=$(printf "\"%s\", " ${@:1:(($#-1))})
 
-expr="id=int(ENV[\"SGE_TASK_ID\"]);
+expr="include(\"$1/set_parameters.jl\");
+      include(\"$1/calculated_parameters.jl\");
+      id=int(ENV[\"SGE_TASK_ID\"]);
       ch=(id-1)%2+1;
       oct=(id-1)>>4+1;
       oct2=((id-1)>>1)%8+1;
@@ -48,47 +51,67 @@ expr="id=int(ENV[\"SGE_TASK_ID\"]);
             string(oct)*\"/\"*string(oct2), true, false, false)"
 cmd="date;
      hostname;
-     $JULIA -L $1/set_parameters.jl -L $1/calculated_parameters.jl
-            -L ${RENDER_PATH}/src/render/admin.jl -e '$expr';
+     $JULIA -L ${RENDER_PATH}/src/render/admin.jl -e '$expr';
      date"
 echo $cmd
-echo $cmd | qsub -A $bill_userid -N $jobname -t 1:128 -tc 32 -pe batch 9 -j y -b n -V \
-      -l sandy=true -o ${@: -1}/merge/'$TASK_ID'.log
+if [ $which_cluster_octree == 'janelia' ]; then
+  echo $cmd | qsub -A $bill_userid -N $jobname -t 1:128 -tc 32 -pe batch 9 -j y -b n -V \
+        -l sandy=true -o ${@: -1}/merge/'$TASK_ID'.log
+else
+  pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={#}; { $cmd } &> ${@: -1}/merge/{#}.log"
+  parallel -S $which_cluster_octree $pcmd ::: `seq 1 128`
+fi
 
-expr="id=int(ENV[\"SGE_TASK_ID\"]);
+expr="include(\"$1/set_parameters.jl\");
+      include(\"$1/calculated_parameters.jl\");
+      id=int(ENV[\"SGE_TASK_ID\"]);
       ch=(id-129)%2+1;
       oct=(id-129)>>1+1;
       merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".tif\",
             string(oct), false, false, false)"
 cmd="date;
      hostname;
-     $JULIA -L $1/set_parameters.jl -L $1/calculated_parameters.jl
-            -L ${RENDER_PATH}/src/render/admin.jl -e '$expr';
+     $JULIA -L ${RENDER_PATH}/src/render/admin.jl -e '$expr';
      date"
 echo $cmd
-echo $cmd | qsub -A $bill_userid -N $jobname -t 129:144 -pe batch 9 -j y -b n -V \
-      -l sandy=true -o ${@: -1}/merge/'$TASK_ID'.log
+if [ $which_cluster_octree == 'janelia' ]; then
+  echo $cmd | qsub -A $bill_userid -N $jobname -t 129:144 -pe batch 9 -j y -b n -V \
+        -l sandy=true -o ${@: -1}/merge/'$TASK_ID'.log
+else
+  pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={#}; { $cmd } &> ${@: -1}/merge/{#}.log"
+  parallel -S $which_cluster_octree $pcmd ::: `seq 129 144`
+fi
 
-expr="id=int(ENV[\"SGE_TASK_ID\"]);
+expr="include(\"$1/set_parameters.jl\");
+      include(\"$1/calculated_parameters.jl\");
+      id=int(ENV[\"SGE_TASK_ID\"]);
       ch=(id-145)%2+1;
       merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".tif\", \"\",
             false, false, false)"
 cmd="date;
      hostname;
-     $JULIA -L $1/set_parameters.jl -L $1/calculated_parameters.jl
-            -L ${RENDER_PATH}/src/render/admin.jl -e '$expr';
+     $JULIA -L ${RENDER_PATH}/src/render/admin.jl -e '$expr';
      date"
 echo $cmd
-echo $cmd | qsub -A $bill_userid -N $jobname -t 145:146 -pe batch 9 -j y -b n -V \
-      -l sandy=true -o ${@: -1}/merge/'$TASK_ID'.log
+if [ $which_cluster_octree == 'janelia' ]; then
+  echo $cmd | qsub -A $bill_userid -N $jobname -t 145:146 -pe batch 9 -j y -b n -V \
+        -l sandy=true -o ${@: -1}/merge/'$TASK_ID'.log
+else
+  pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={#}; { $cmd } &> ${@: -1}/merge/{#}.log"
+  parallel -S $which_cluster_octree $pcmd ::: `seq 145 146`
+fi
 
 cmd="date;
      hostname;
      chmod -R a-w ${@: -1};
      date"
 echo $cmd
-echo $cmd | qsub -A $bill_userid -N ${jobname}2 -j y -b n -V \
-      -l sandy=true -hold_jid $jobname -o ${@: -1}/merge/write-protect.log
+if [ $which_cluster_octree == 'janelia' ]; then
+  echo $cmd | qsub -A $bill_userid -N ${jobname}2 -j y -b n -V \
+        -l sandy=true -hold_jid $jobname -o ${@: -1}/merge/write-protect.log
+else
+  eval $cmd &> ${@: -1}/merge/write-protect.log
+fi
 
 # copy metadata and log files
 cp $1/*.{jl,yml,txt}  ${@: -1}

@@ -9,8 +9,7 @@
 set -e
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
-#export RENDER_PATH=/home/arthurb/projects/mouselight
-export JULIA=/usr/local/julialang-0.3.8/bin/julia
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric/julia-0.4.5/bin/julia
 
 # get vars from parameters.jl file
 read -a tmp <<< $($JULIA -L $1/set_parameters.jl -e "print(logfile_scratch)")

@@ -8,11 +8,11 @@ generate an octree for viewing with the Janelia Workstation.
 Requirements
 ============
 
-Julia, version 3, plus the YAML package.
+Julia, version 4, plus the YAML package.
 
 Nathan Clack's nd, tilebase, and mltk-bary libraries.
 
-Tested with Julia v0.3.8, YAML v0.1.9, nd master (branch) / de5c54 (commit),
+Tested with Julia v0.4.5, YAML v0.1.10, nd master (branch) / de5c54 (commit),
 ndio-series use-tre/b36bd0, ndio-tiff ndio-format-context/5ae150, tilebase
 master/092be1, and mltk-bary master/0db387.
 
@@ -24,11 +24,11 @@ Install nd, tilebase, and mltk-bary libraries using make.sh.  Be sure
 to edit ```rootdir``` and ```installdir``` therein appropriately.
 
 Install Julia by downloading a precompiled binary of the latest point
-release of version 3.  Install the YAML package by starting Julia on the
+release of version 4.  Install the YAML package by starting Julia on the
 unix command line and executing Pkg.Add("YAML").  If desired, use the
 bash environment variable JULIA_PKGDIR to place it somewhere other than
 your home directory.  For example, somewhere on Julia's LOAD_PATH, like
-<julia-install-dir>/share/julia/site/v0.3, would permit others to use the
+<julia-install-dir>/share/julia/site/v0.4, would permit others to use the
 pipeline without having to install all the packages themselves.
 
 Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, and ```JULIA```

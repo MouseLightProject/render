@@ -15,7 +15,7 @@ const terminate = Regex("squatter "*proc_num*" terminate")
 split(readchomp(`hostname`),".")[1] in bad_nodes && exit(1)
 
 # keep boss informed
-sock = connect(ARGS[2],int(ARGS[3]))
+sock = connect(ARGS[2],parse(Int,ARGS[3]))
 println(sock,"squatter ",proc_num," is ready on ",readchomp(`hostname`))
 
 while isopen(sock) || nb_available(sock)>0

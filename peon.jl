@@ -16,7 +16,7 @@ time_saving=0.0
 time_waiting=0.0
 
 # keep boss informed
-sock = connect(ARGS[7],int(ARGS[8]))
+sock = connect(ARGS[7],parse(Int,ARGS[8]))
 
 type NDException <: Exception end
 
@@ -24,8 +24,8 @@ const write = "manager tells peon for input tile "*ARGS[4]*" to write output til
 const send = "manager tells peon for input tile "*ARGS[4]*" to send output tile"
 const receive = "manager tells peon for input tile "*ARGS[4]*" to receive output tile"
 
-# 2 -> sizeof(Uint16), 20e3 -> .tif metadata size, 15 -> max # possible concurrent saves, need to generalize
-enough_free(path) = int(split(readall(`df $path`))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
+# 2 -> sizeof(UInt16), 20e3 -> .tif metadata size, 15 -> max # possible concurrent saves, need to generalize
+enough_free(path) = parse(Int,split(readall(`df $path`))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
 
 function depth_first_traverse(bbox, out_tile_path, sub_tile_str, sub_transform_nm, orientation, in_subtile_aabb)
   cboxes = AABBBinarySubdivision(bbox)
@@ -33,7 +33,7 @@ function depth_first_traverse(bbox, out_tile_path, sub_tile_str, sub_transform_n
   global out_tiles_ws, out_tiles_jl, time_transforming, time_saving, time_waiting
 
   for i=1:8
-    AABBHit(cboxes[i], in_subtile_aabb)==1 || continue
+    AABBHit(cboxes[i], in_subtile_aabb) || continue
     out_tile_path_next = joinpath(out_tile_path,string(i))
 
     if !isleaf(cboxes[i])
@@ -47,11 +47,11 @@ function depth_first_traverse(bbox, out_tile_path, sub_tile_str, sub_transform_n
 
       if !haskey(out_tiles_ws,out_tile_path_next)
         out_tiles_ws[out_tile_path_next] = ndalloc(shape_leaf_px, data_type)
-        out_tiles_jl[out_tile_path_next] = pointer_to_array(convert(Ptr{Uint16},
+        out_tiles_jl[out_tile_path_next] = pointer_to_array(convert(Ptr{UInt16},
               nddata(out_tiles_ws[out_tile_path_next])), tuple(shape_leaf_px...))
         ndfill(out_tiles_ws[out_tile_path_next], 0x0000)
         tmp = map(x->AABBHit(cboxes[i], x), in_subtiles_aabb)
-        merge_count[out_tile_path_next]=Uint8[ sum(tmp), 0 ]
+        merge_count[out_tile_path_next]=UInt8[ sum(tmp), 0 ]
       end
 
       if !isnan(thisgpu)
@@ -86,8 +86,8 @@ function depth_first_traverse(bbox, out_tile_path, sub_tile_str, sub_transform_n
             println(sock,"peon for input tile ",ARGS[4]," will send output tile ",out_tile_path_next)
             serialize(sock, out_tiles_jl[out_tile_path_next])
           elseif startswith(tmp,receive)
-            out_tiles_jl[out_tile_path_next][:] = max(out_tiles_jl[out_tile_path_next]::Array{Uint16,3},
-                deserialize(sock)::Array{Uint16,3})
+            out_tiles_jl[out_tile_path_next][:] = max(out_tiles_jl[out_tile_path_next]::Array{UInt16,3},
+                deserialize(sock)::Array{UInt16,3})
             save_out_tile(shared_scratch, out_tile_path_next, ARGS[5]*".$(channel-1).tif",
                 out_tiles_ws[out_tile_path_next])
             println(sock,"peon for input tile ",ARGS[4]," saved output tile ",out_tile_path_next)
@@ -137,12 +137,12 @@ function process_tile()
     shape_intile = ndshapeJ(tmp)
     global data_type = ndtype(tmp)
     in_tile_ws = ndalloc(shape_intile, data_type)
-    in_tile_jl = pointer_to_array(convert(Ptr{Uint16},nddata(in_tile_ws)), tuple(shape_intile...))
+    in_tile_jl = pointer_to_array(convert(Ptr{UInt16},nddata(in_tile_ws)), tuple(shape_intile...))
     in_subtile_ws = ndalloc([xlims[2]-xlims[1]+1,ylims[2]-ylims[1]+1,zlims[2]-zlims[1]+1], data_type, false)
     tmp=split(bytestring(TilePath(tile)),"/")
     push!(tmp, tmp[end]*"-$file_infix."*string(channel-1)*".tif")
     ndioClose(ndioRead(ndioOpen("/"*joinpath(tmp...), C_NULL, "r"), in_tile_ws))
-    info("reading input tile ",string(in_tile_idx)," took ",string(iround(time()-t1))," sec")
+    info("reading input tile ",string(in_tile_idx)," took ",string(round(Int,time()-t1))," sec")
     filename = "/"*joinpath(tmp...)
     for ratio in octree_compression_ratios
       spawn(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $(dirname(filename)) $(splitext(basename(filename))[1]) 0`)
@@ -208,32 +208,32 @@ function process_tile()
     error("BarycentricRelease error:  GPU $thisgpu, input tile $in_tile_idx")
   end
 
-  info("initializing input tile ",string(in_tile_idx), " took ",string(iround(time_initing))," sec")
-  info("transforming input tile ",string(in_tile_idx)," took ",string(iround(time_transforming))," sec")
-  info("saving output tiles for input tile ",string(in_tile_idx)," took ",string(iround(time_saving))," sec")
-  info("waiting for manager for input tile ",string(in_tile_idx)," took ",string(iround(time_waiting))," sec")
-  info("input tile ",string(in_tile_idx)," took ",string(iround(time()-t0))," sec overall")
+  info("initializing input tile ",string(in_tile_idx), " took ",string(round(Int,time_initing))," sec")
+  info("transforming input tile ",string(in_tile_idx)," took ",string(round(Int,time_transforming))," sec")
+  info("saving output tiles for input tile ",string(in_tile_idx)," took ",string(round(Int,time_saving))," sec")
+  info("waiting for manager for input tile ",string(in_tile_idx)," took ",string(round(Int,time_waiting))," sec")
+  info("input tile ",string(in_tile_idx)," took ",string(round(Int,time()-t0))," sec overall")
 end
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
-const channel = int(ARGS[3])
+const channel = parse(Int,ARGS[3])
 const solo_out_tiles = eval(parse(ARGS[6]))
-const thisgpu = ARGS[2]=="NaN" ? NaN : int(ARGS[2])
-const in_tile_idx = int(ARGS[4])
+const thisgpu = ARGS[2]=="NaN" ? NaN : parse(Int,ARGS[2])
+const in_tile_idx = parse(Int,ARGS[4])
 idx = 9
-const xlims = int(ARGS[idx+(1:int(ARGS[idx]))])
+const xlims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
 idx += length(xlims)+1
-const ylims = int(ARGS[idx+(1:int(ARGS[idx]))])
+const ylims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
 idx += length(ylims)+1
-const zlims = int(ARGS[idx:idx+1])
+const zlims = map(x->parse(Int,x), ARGS[idx:idx+1])
 idx += length(zlims)
-const dims = -1+int(ARGS[idx:idx+2])
+const dims = -1+map(x->parse(Int,x), ARGS[idx:idx+2])
 idx += length(dims)
-const transform_nm = reshape(int(ARGS[idx:end]),3,length(xlims)*length(ylims)*2)
+const transform_nm = reshape(map(x->parse(Int,x), ARGS[idx:end]),3,length(xlims)*length(ylims)*2)
 
 const out_tiles_ws = Dict{ASCIIString,Ptr{Void}}()
-const out_tiles_jl = Dict{ASCIIString,Array{Uint16,3}}()
-const merge_count = Dict{ASCIIString,Array{Uint8,1}}()
+const out_tiles_jl = Dict{ASCIIString,Array{UInt16,3}}()
+const merge_count = Dict{ASCIIString,Array{UInt8,1}}()
 
 @assert all(diff(diff(xlims)).==0) "xlims not equally spaced for input tile $in_tile_idx"
 @assert all(diff(diff(ylims)).==0) "ylims not equally spaced for input tile $in_tile_idx"
