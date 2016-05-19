@@ -61,6 +61,8 @@ const zlims = [map(x->parse(Int,x), split(x["grid"]["zlims"])) for x in meta["ti
 const transform = [map(x->parse(Int,x), split(x["grid"]["coordinates"])) for x in meta["tiles"]]
 @assert all(diff(diff(xlims)).==0)
 @assert all(diff(diff(ylims)).==0)
+@assert all(zlim->all(diff(zlim).>0), zlims)
+@assert all(diff(map(length,zlims)).==0)
 for x in meta["tiles"]
   @assert xlims == map(x->parse(Int,x), split(x["grid"]["xlims"]))
   @assert ylims == map(x->parse(Int,x), split(x["grid"]["ylims"]))
@@ -69,7 +71,7 @@ end
 # get input tiles assigned to this manager, and
 # precalculate input subtiles' bounding boxes
 in_tiles_idx = Int[]
-in_subtiles_aabb = Array{Ptr{Void},2}[]
+in_subtiles_aabb = Array{Ptr{Void},3}[]
 manager_aabb = C_NULL  # unioned bbox of assigned input tiles
 for i = 1:TileBaseCount(tiles)
   global in_subtiles_aabb, manager_aabb
@@ -78,8 +80,8 @@ for i = 1:TileBaseCount(tiles)
   if AABBHit(tile_aabb, manager_bbox) &&
         (include_origins_outside_roi || (all(AABBGetJ(tile_aabb)[2] .>= AABBGetJ(manager_bbox)[2])))
     push!(in_tiles_idx, i)
-    push!(in_subtiles_aabb,
-        calc_in_subtiles_aabb(tile,xlims,ylims, reshape(transform[i],3,length(xlims)*length(ylims)*2)) )
+    push!(in_subtiles_aabb, calc_in_subtiles_aabb(tile,xlims,ylims,zlims[i],
+        reshape(transform[i],3,length(xlims)*length(ylims)*length(zlims[i]))) )
     #TileFree(tile)  -> causes TileBaseAABB(tiles) below to segfault
     manager_aabb = AABBUnionIP(manager_aabb, AABBCopy(C_NULL, tile_aabb))
   end
@@ -222,6 +224,7 @@ t0=time()
         cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/peon.jl $(ARGS[1]) $(ngpus>0 ? (p-1) % ngpus : NaN)
               $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(join(ARGS[3:5],"-")) $(string(solo_out_tiles))
               $hostname2 $port2 $(length(xlims)) $xlims $(length(ylims)) $ylims
+              $(length(zlims[in_tiles_idx[locality_idx[tile_idx]]]))
               $(zlims[in_tiles_idx[locality_idx[tile_idx]]])
               $(dims[in_tiles_idx[locality_idx[tile_idx]]])
               $(transform[in_tiles_idx[locality_idx[tile_idx]]])`

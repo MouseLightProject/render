@@ -191,18 +191,21 @@ end
 
 # below used by director, manager, render, merge, ...
 
-subtile_corner_indices(ix,iy) =
-    Int[ (1+[ix-1+b&1 iy-1+(b>>1)&1 (b>>2)&1]*[1, length(xlims), length(xlims)*length(ylims)])[1] for b=0:7 ]
+subtile_corner_indices(ix,iy,iz) =
+    Int[ (1+
+          [ix-1+b&1  iy-1+(b>>1)&1  iz-1+(b>>2)&1]*
+          [1, length(xlims), length(xlims)*length(ylims)]
+         )[1] for b=0:7 ]
 
-function calc_in_subtiles_aabb(tile,xlims,ylims,transform_nm)
-  in_subtiles_aabb = Array(Ptr{Void},length(xlims)-1,length(ylims)-1)
+function calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
+  in_subtiles_aabb = Array(Ptr{Void}, length(xlims)-1, length(ylims)-1, length(zlims)-1)
   origin, shape = AABBGetJ(TileAABB(tile))[2:3]
-  for ix=1:length(xlims)-1, iy=1:length(ylims)-1
-    it = subtile_corner_indices(ix,iy)
+  for ix=1:length(xlims)-1, iy=1:length(ylims)-1, iz=1:length(zlims)-1
+    it = subtile_corner_indices(ix,iy,iz)
     sub_origin = minimum(transform_nm[:,it],2)
     sub_shape =  maximum(transform_nm[:,it],2) - sub_origin
-    in_subtiles_aabb[ix,iy] = AABBMake(3)
-    AABBSet(in_subtiles_aabb[ix,iy], 3, sub_origin, sub_shape)
+    in_subtiles_aabb[ix,iy,iz] = AABBMake(3)
+    AABBSet(in_subtiles_aabb[ix,iy,iz], 3, sub_origin, sub_shape)
   end
   in_subtiles_aabb
 end

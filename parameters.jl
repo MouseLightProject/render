@@ -7,15 +7,18 @@ const max_pixels_per_leaf=120e6  # maximum number of pixels in output tiles
 const max_tiles_per_job=1000  # maximum number of input tiles per cluster job
 # size to use all of RAM
 
-const which_cluster = ["h01u12"] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
-const nnodes = 1  # for which_cluster=="janelia", number of non-GPU 32-core compute nodes to use, max is 32
+const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
-const source="/home/arthurb/projects/mouselight/src/render"  # path to tilebase.cache.yml
-const destination="/nobackup2/mouselight/arthurb/twotile4layer"  # path to octree
+const throttle_leaf = 32  # for which_cluster=="janelia", max is 32, otherwise length(which_cluster)
+const throttle_octree = 32 
+const short_queue = false  # rendering leaf nodes MUST take less than 1 hour
 
-const shared_scratch="/nobackup2/mouselight/scratch/arthurb"
-const logfile_scratch="/groups/mousebrainmicro/mousebrainmicro/scratch/arthurb"  # should be on /groups
+const source="/groups/mousebrainmicro/stitch/..."  # path to tilebase.cache.yml
+const destination="/nobackup2/mouselight/..."  # path to octree
+
+const shared_scratch="/nobackup2/mouselight/scratch/<yourId>"
+const logfile_scratch="/groups/mousebrainmicro/mousebrainmicro/scratch/<yourId>"  # should be on /groups
 const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
 
 const nchannels=2  # need to generalize
@@ -31,8 +34,8 @@ const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) =
 #    fill(0.5^length(morton_order),3) )
 const include_origins_outside_roi=false   # set to true to render all of small test ROI
 
-const notify_addr = "arthurb@janelia.hhmi.org"
-const bill_userid = "arthurb"
+const notify_addr = "<yourId>@janelia.hhmi.org"
+const bill_userid = "<yourId>"
 
 const interpolation = "nearest"  # "linear" or "nearest"
 

@@ -113,7 +113,11 @@ include_origins_outside_roi && length(job_aabbs)>1 &&
 
 TileBaseClose(tiles)
 
-# initialze tcp communication with squatters
+# initialize tcp communication with squatters
+nnodes = min( nchannels*length(job_aabbs),
+              throttle_leaf,
+              which_cluster=="janelia" ? 32 : length(which_cluster) )
+info("number of cluster nodes used = $nnodes")
 events = Array(Condition,nnodes,2)
 hostname = readchomp(`hostname`)
 port = 2000
@@ -189,16 +193,17 @@ t0=time()
   #launch_workers
   cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/squatter.jl $(ARGS[1]) $hostname $port`
   if which_cluster=="janelia"
-    pcmd = `qsub -A $bill_userid -t 1-$nnodes -l haswell=true -pe batch 32 -N $jobname
+    queue = short_queue ? `-l short=true -pe batch 16` : `-l haswell-true -pe batch 32`
+    pcmd = `qsub -A $bill_userid -t 1-$nnodes $queue -N $jobname
           -b y -j y -V -shell n -o $logfile_scratch/squatter'$TASK_ID'.log $cmd`
     info(string(pcmd))
     jobid = match(r"(?<=job-array )[0-9]*", readchomp(pcmd)).match
   else
-    proc = Array(Any,length(which_cluster))
-    for i=1:length(which_cluster)
-      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[i]) export RENDER_PATH=$(ENV["RENDER_PATH"]); export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]); export JULIA=$(ENV["JULIA"]); export SGE_TASK_ID=$i; $cmd &> $logfile_scratch/squatter$i.log`
+    proc = Array(Any,nnodes)
+    for n=1:nnodes
+      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n]) export RENDER_PATH=$(ENV["RENDER_PATH"]); export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]); export JULIA=$(ENV["JULIA"]); export SGE_TASK_ID=$n; $cmd &> $logfile_scratch/squatter$n.log`
       info(string(pcmd))
-      proc[i] = spawn(pcmd)
+      proc[n] = spawn(pcmd)
     end
   end
 end
