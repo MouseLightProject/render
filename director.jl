@@ -193,7 +193,7 @@ t0=time()
   #launch_workers
   cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/squatter.jl $(ARGS[1]) $hostname $port`
   if which_cluster=="janelia"
-    queue = short_queue ? `-l short=true -pe batch 16` : `-l haswell-true -pe batch 32`
+    queue = short_queue ? `-l h_rt=3599 -pe batch 16` : `-l haswell-true -pe batch 32`
     pcmd = `qsub -A $bill_userid -t 1-$nnodes $queue -N $jobname
           -b y -j y -V -shell n -o $logfile_scratch/squatter'$TASK_ID'.log $cmd`
     info(string(pcmd))

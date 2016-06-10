@@ -11,7 +11,7 @@ const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostn
 const bad_nodes = []  # e.g. ["h09u20"]
 
 const throttle_leaf = 32  # for which_cluster=="janelia", max is 32, otherwise length(which_cluster)
-const throttle_octree = 32 
+const throttle_octree = 32  # < ~22 per local machine
 const short_queue = false  # rendering leaf nodes MUST take less than 1 hour
 
 const source="/groups/mousebrainmicro/stitch/..."  # path to tilebase.cache.yml

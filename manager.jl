@@ -125,6 +125,8 @@ AABBFree(manager_aabb)
 map(x->map(AABBFree,x), in_subtiles_aabb)
 TileBaseClose(tiles)
 
+isempty(locality_idx) && warn("coordinates of input subtiles aren't within bounding box")
+
 info("assigned ",string(length(in_tiles_idx))," input tiles")
 length(in_tiles_idx)==0 && quit()
 
@@ -220,7 +222,7 @@ t0=time()
     @async begin
       while true
         tile_idx = nextidx()
-        tile_idx>length(in_tiles_idx) && break
+        tile_idx>length(locality_idx) && break
         cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/peon.jl $(ARGS[1]) $(ngpus>0 ? (p-1) % ngpus : NaN)
               $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(join(ARGS[3:5],"-")) $(string(solo_out_tiles))
               $hostname2 $port2 $(length(xlims)) $xlims $(length(ylims)) $ylims

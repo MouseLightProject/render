@@ -243,9 +243,9 @@ const merge_count = Dict{ASCIIString,Array{UInt8,1}}()
 @assert all(diff(diff(xlims)).==0) "xlims not equally spaced for input tile $in_tile_idx"
 @assert all(diff(diff(ylims)).==0) "ylims not equally spaced for input tile $in_tile_idx"
 @assert all(diff(zlims).>0) "zlims not in ascending order for input tile $in_tile_idx"
-@assert xlims[1]>=0 && xlims[end]<dims[1] "xlims out of range for input tile $in_tile_idx"
-@assert ylims[1]>=0 && ylims[end]<dims[2] "ylims out of range for input tile $in_tile_idx"
-@assert zlims[1]>=0 && zlims[end]<dims[3] "zlims out of range for input tile $in_tile_idx"
+@assert xlims[1]>=0 && xlims[end]<=dims[1] "xlims out of range for input tile $in_tile_idx"
+@assert ylims[1]>=0 && ylims[end]<=dims[2] "ylims out of range for input tile $in_tile_idx"
+@assert zlims[1]>=0 && zlims[end]<=dims[3] "zlims out of range for input tile $in_tile_idx"
 
 process_tile()
 
