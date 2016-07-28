@@ -159,6 +159,10 @@ BarycentricCPUinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricCPUinit, li
       Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
+BarycentricAVXinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricAVXinit, libengine),
+      Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
+      r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
+
 BarycentricGPUinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricGPUinit, libengine),
       Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
@@ -167,15 +171,23 @@ BarycentricCPUresample(r,cube,orientation,interpolation) =
       ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint,Cint),
       r,cube,orientation,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
 
+BarycentricAVXresample(r,cube,orientation,interpolation) =
+      ccall((:BarycentricAVXresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint,Cint),
+      r,cube,orientation,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
+
 BarycentricGPUresample(r,cube) = ccall((:BarycentricGPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat}),
       r,cube) !=1 && throw(BarycentricException())
 
 BarycentricCPUrelease(r) = ccall((:BarycentricCPUrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
+BarycentricAVXrelease(r) = ccall((:BarycentricAVXrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
 BarycentricGPUrelease(r) = ccall((:BarycentricGPUrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
 
 for f = ("source", "destination", "result")
   @eval $(symbol("BarycentricCPU"*f))(r,src) =
       ccall(($("BarycentricCPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
+          r,src) !=1 && throw(BarycentricException())
+  @eval $(symbol("BarycentricAVX"*f))(r,src) =
+      ccall(($("BarycentricAVX"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
           r,src) !=1 && throw(BarycentricException())
   @eval $(symbol("BarycentricGPU"*f))(r,src) =
       ccall(($("BarycentricGPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
