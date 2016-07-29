@@ -54,6 +54,8 @@ cudaDeviceReset() =  ccall((:cudaDeviceReset, libcudart), Cint, (), )==0 || thro
   global ngpus = 0
 #end
 
+has_avx2 = contains(readall("/proc/cpuinfo"),"avx2")
+
 # interface to tilebase
 
 const libtilebase = ENV["RENDER_PATH"]*"/env/lib/libtilebase.so"

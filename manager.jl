@@ -34,6 +34,8 @@ else
 end
 info(string(CPU_CORES)," CPUs and ",string(ngpus)," GPUs present which can collectively process ",string(num_procs)," tiles simultaneously")
 
+info("AVX2 = ",has_avx2)
+
 const local_scratch="/scratch/"*readchomp(`whoami`)
 const channel=parse(Int,ARGS[2])
 const manager_bbox = AABBMake(3)  # process all input tiles whose origins are within this bbox

@@ -25,11 +25,11 @@ to edit ```rootdir``` and ```installdir``` therein appropriately.
 
 Install Julia by downloading a precompiled binary of the latest point
 release of version 4.  Install the YAML package by starting Julia on the
-unix command line and executing Pkg.Add("YAML").  If desired, use the
+unix command line and executing Pkg.add("YAML").  If desired, use the
 bash environment variable JULIA_PKGDIR to place it somewhere other than
 your home directory.  For example, somewhere on Julia's LOAD_PATH, like
 <julia-install-dir>/share/julia/site, would permit others to use the
-pipeline without having to install all the packages themselves.
+pipeline without having to install all of the packages themselves.
 
 Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, and ```JULIA```
 in ```render```, ```monitor```, ```savelogs```, and ```merge``` are all
@@ -119,6 +119,29 @@ julia> sock = connect("<node_name>.int.janelia.org",2000)
 TcpSocket(open, 0 bytes waiting)
 
 julia> println(sock,"squatter <squatter_num> is finished")
+```
+
+
+Similarly, if a peon segfaults:
+
+```
+const ready = r"(peon for input tile )([0-9]*)( has output tile )([1-8/]*)( ready)"
+port2=2001
+server2 = listen(port2)
+sock2 = accept(server2)
+tmp = chomp(readline(sock2))
+
+in_tile_num, out_tile_path = match(ready,tmp).captures[[2,4]]
+msg = "manager tells peon for input tile $in_tile_num to write output tile $out_tile_path to local_scratch"
+println(sock2, msg)
+
+while isopen(sock2) || nb_available(sock2)>0
+  tmp = chomp(readline(sock2))
+  tmp = chomp(readline(sock2))
+  in_tile_num, out_tile_path = match(ready,tmp).captures[[2,4]]
+  msg = "manager tells peon for input tile $in_tile_num to write output tile $out_tile_path to local_scratch"
+  println(sock2, msg)
+end
 ```
 
 
