@@ -14,6 +14,18 @@ macro retry(x)
   end
 end
 
+function get_available_port(default_port)
+  port = default_port
+  while true
+    try
+      server = listen(port)
+      return server, port
+    catch
+      port+=1
+    end
+  end
+end
+
 # interface to CUDA
 
 # map(x->(cudaSetDevice(x); [cudaMemGetInfo()...]./1024^3), 0:cudaGetDeviceCount()-1)

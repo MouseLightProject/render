@@ -145,9 +145,9 @@ t0=time()
   # as soon as all output tiles for a given leaf in the octree have been processed,
   #   concurrently merge and save them to shared_scratch
   hostname2 = readchomp(`hostname`)
-  port2 = parse(Int,ARGS[10])+1
+  default_port2 = parse(Int,ARGS[10])+1
   global sock2 = Any[]
-  server2 = listen(port2)
+  server2, port2 = get_available_port(default_port2)
 
   const ready = r"(peon for input tile )([0-9]*)( has output tile )([1-8/]*)( ready)"
   const wrote = r"(peon for input tile )([0-9]*)( wrote output tile )([1-8/]*)( to )"

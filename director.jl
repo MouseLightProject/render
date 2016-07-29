@@ -120,29 +120,27 @@ nnodes = min( nchannels*length(job_aabbs),
 info("number of cluster nodes used = $nnodes")
 events = Array(Condition,nnodes,2)
 hostname = readchomp(`hostname`)
-port = 2000
+default_port = 2000
 ready = r"(?<=squatter )[0-9]*(?= is ready)"
 finished = r"(?<=squatter )[0-9]*(?= is finished)"
 
 nfinished = 0
-@async begin
-  server = listen(port)
-  while true
-    sock = accept(server)
-    @async begin
-      while isopen(sock) || nb_available(sock)>0
-        tmp = chomp(readline(sock))
-        length(tmp)==0 && continue
-        println("DIRECTOR<SQUATTER: ",tmp)
-        flush(STDOUT);  flush(STDERR)
-        if ismatch(ready,tmp)
-          m=match(ready,tmp)
-          notify(events[parse(Int,m.match),1], sock)
-        elseif ismatch(finished,tmp)
-          m=match(finished,tmp)
-          global nfinished += 1
-          notify(events[parse(Int,m.match),2], nfinished)
-        end
+server, port = get_available_port(default_port)
+@async while true
+  sock = accept(server)
+  @async begin
+    while isopen(sock) || nb_available(sock)>0
+      tmp = chomp(readline(sock))
+      length(tmp)==0 && continue
+      println("DIRECTOR<SQUATTER: ",tmp)
+      flush(STDOUT);  flush(STDERR)
+      if ismatch(ready,tmp)
+        m=match(ready,tmp)
+        notify(events[parse(Int,m.match),1], sock)
+      elseif ismatch(finished,tmp)
+        m=match(finished,tmp)
+        global nfinished += 1
+        notify(events[parse(Int,m.match),2], nfinished)
       end
     end
   end
