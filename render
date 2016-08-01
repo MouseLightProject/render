@@ -25,7 +25,7 @@ set -e
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric2
 export LD_LIBRARY_PATH=/usr/local/cuda-7.5/lib64
-export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric2/julia-0.4.5/bin/julia
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric2/julia-0.4.6/bin/julia
 
 # get vars from parameters.jl file
 read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',logfile_scratch,' ',delete_scratch,' ',notify_addr,' ',bill_userid,' ',typeof(which_cluster) <: ASCIIString ? which_cluster : join(which_cluster, ','),' ',throttle_octree)")
