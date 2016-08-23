@@ -207,6 +207,6 @@ t0=time()
 end
 info("squatters took ",string(round(Int,time()-t0))," sec")
 
-closelibs()
+#closelibs()
 
 info(readchomp(`date`))

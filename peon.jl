@@ -57,9 +57,9 @@ function depth_first_traverse(bbox, out_tile_path, sub_tile_str,
       end
 
       if !isnan(thisgpu)
-        BarycentricGPUdestination(resampler, nddata(out_tiles_ws[out_tile_path_next]))
-        BarycentricGPUresample(resampler, convert(Array{Float32}, transform))
-        BarycentricGPUresult(resampler, nddata(out_tiles_ws[out_tile_path_next]))
+        #BarycentricGPUdestination(resampler, nddata(out_tiles_ws[out_tile_path_next]))
+        #BarycentricGPUresample(resampler, convert(Array{Float32}, transform))
+        #BarycentricGPUresult(resampler, nddata(out_tiles_ws[out_tile_path_next]))
       elseif has_avx2
         BarycentricAVXdestination(resampler, nddata(out_tiles_ws[out_tile_path_next]))
         BarycentricAVXresample(resampler, convert(Array{Float32}, transform), orientation, interpolation)
@@ -175,11 +175,11 @@ function process_tile()
     try
       global resampler = Ptr{Void}[0]
       if !isnan(thisgpu)
-        cudaSetDevice(thisgpu)
-        info("initializing GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
-        BarycentricGPUinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr , 3)
-        BarycentricGPUsource(resampler, nddata(in_subtile_ws))
-        info("initialized GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
+        #cudaSetDevice(thisgpu)
+        #info("initializing GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
+        #BarycentricGPUinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr , 3)
+        #BarycentricGPUsource(resampler, nddata(in_subtile_ws))
+        #info("initialized GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
       elseif has_avx2
         BarycentricAVXinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 3)
         BarycentricAVXsource(resampler, nddata(in_subtile_ws))
@@ -210,9 +210,9 @@ function process_tile()
 
   try
     if !isnan(thisgpu)
-      info("releasing GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
-      BarycentricGPUrelease(resampler)
-      info("released GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
+      #info("releasing GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
+      #BarycentricGPUrelease(resampler)
+      #info("released GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
     elseif has_avx2
       BarycentricAVXrelease(resampler)
     else
@@ -266,7 +266,7 @@ end
 map(ndfree,values(out_tiles_ws))
 map(AABBFree,in_subtiles_aabb)
 
-closelibs()
+#closelibs()
 
 # keep boss informed
 println(sock,"peon for input tile ",ARGS[4]," is finished")

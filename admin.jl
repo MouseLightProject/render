@@ -30,6 +30,7 @@ end
 
 # map(x->(cudaSetDevice(x); [cudaMemGetInfo()...]./1024^3), 0:cudaGetDeviceCount()-1)
 
+#=
 const libcudart = ENV["LD_LIBRARY_PATH"]*"/libcudart.so"
 
 function cudaGetDeviceCount()
@@ -57,6 +58,7 @@ function cudaSetDevice(dev)
 end
 
 cudaDeviceReset() =  ccall((:cudaDeviceReset, libcudart), Cint, (), )==0 || throw(Exception)
+=#
 
 # nvidia's unified virtual addressing causes memory swap problems with multiple peons, so
 # turn off GPU detection until this is fixed
@@ -162,10 +164,10 @@ end
 
 # interface to mltk-bary
 
-h=Libdl.dlopen("libcudart.so",Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
+#h=Libdl.dlopen("libcudart.so",Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
 const libengine = ENV["RENDER_PATH"]*"/env/build/mltk-bary/libengine.so"
 
-closelibs() = Libdl.dlclose(h)
+#closelibs() = Libdl.dlclose(h)
 
 type BarycentricException <: Exception end
 
@@ -177,9 +179,9 @@ BarycentricAVXinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricAVXinit, li
       Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
-BarycentricGPUinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricGPUinit, libengine),
-      Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
-      r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
+#BarycentricGPUinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricGPUinit, libengine),
+#      Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
+#      r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
 BarycentricCPUresample(r,cube,orientation,interpolation) =
       ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint,Cint),
@@ -189,12 +191,12 @@ BarycentricAVXresample(r,cube,orientation,interpolation) =
       ccall((:BarycentricAVXresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint,Cint),
       r,cube,orientation,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
 
-BarycentricGPUresample(r,cube) = ccall((:BarycentricGPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat}),
-      r,cube) !=1 && throw(BarycentricException())
+#BarycentricGPUresample(r,cube) = ccall((:BarycentricGPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat}),
+#      r,cube) !=1 && throw(BarycentricException())
 
 BarycentricCPUrelease(r) = ccall((:BarycentricCPUrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
 BarycentricAVXrelease(r) = ccall((:BarycentricAVXrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
-BarycentricGPUrelease(r) = ccall((:BarycentricGPUrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
+#BarycentricGPUrelease(r) = ccall((:BarycentricGPUrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
 
 for f = ("source", "destination", "result")
   @eval $(symbol("BarycentricCPU"*f))(r,src) =
@@ -203,9 +205,9 @@ for f = ("source", "destination", "result")
   @eval $(symbol("BarycentricAVX"*f))(r,src) =
       ccall(($("BarycentricAVX"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
           r,src) !=1 && throw(BarycentricException())
-  @eval $(symbol("BarycentricGPU"*f))(r,src) =
-      ccall(($("BarycentricGPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
-          r,src) !=1 && throw(BarycentricException())
+  #@eval $(symbol("BarycentricGPU"*f))(r,src) =
+  #    ccall(($("BarycentricGPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
+  #        r,src) !=1 && throw(BarycentricException())
 end
 
 # port some of tilebase/app/render

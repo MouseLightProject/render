@@ -254,7 +254,7 @@ t0=time()
 scratch1 = rmcontents(local_scratch, "before")
 info("deleting local_scratch = ",local_scratch," at end took ",string(round(Int,time()-t0))," sec")
 
-closelibs()
+#closelibs()
 
 # keep boss informed
 try

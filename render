@@ -23,8 +23,7 @@
 
 set -e
 
-export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric2
-export LD_LIBRARY_PATH=/usr/local/cuda-7.5/lib64
+export RENDER_PATH=/home/arthurb/projects/mouselight
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric2/julia-0.4.6/bin/julia
 
 # get vars from parameters.jl file
