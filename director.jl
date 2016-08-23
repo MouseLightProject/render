@@ -127,20 +127,21 @@ finished = r"(?<=squatter )[0-9]*(?= is finished)"
 nfinished = 0
 server, port = get_available_port(default_port)
 @async while true
-  sock = accept(server)
-  @async begin
-    while isopen(sock) || nb_available(sock)>0
-      tmp = chomp(readline(sock))
-      length(tmp)==0 && continue
-      println("DIRECTOR<SQUATTER: ",tmp)
-      flush(STDOUT);  flush(STDERR)
-      if ismatch(ready,tmp)
-        m=match(ready,tmp)
-        notify(events[parse(Int,m.match),1], sock)
-      elseif ismatch(finished,tmp)
-        m=match(finished,tmp)
-        global nfinished += 1
-        notify(events[parse(Int,m.match),2], nfinished)
+  let sock = accept(server)
+    @async begin
+      while isopen(sock) || nb_available(sock)>0
+        tmp = chomp(readline(sock))
+        length(tmp)==0 && continue
+        println("DIRECTOR<SQUATTER: ",tmp)
+        flush(STDOUT);  flush(STDERR)
+        if ismatch(ready,tmp)
+          m=match(ready,tmp)
+          notify(events[parse(Int,m.match),1], sock)
+        elseif ismatch(finished,tmp)
+          m=match(finished,tmp)
+          global nfinished += 1
+          notify(events[parse(Int,m.match),2], nfinished)
+        end
       end
     end
   end

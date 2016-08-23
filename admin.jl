@@ -68,7 +68,7 @@ cudaDeviceReset() =  ccall((:cudaDeviceReset, libcudart), Cint, (), )==0 || thro
   global ngpus = 0
 #end
 
-has_avx2 = contains(readall("/proc/cpuinfo"),"avx2")
+has_avx2 = contains(readstring("/proc/cpuinfo"),"avx2")
 
 # interface to tilebase
 
@@ -114,7 +114,7 @@ function AABBGetJ(bbox)
   shape = Ptr{Int}[0]
   ccall((:AABBGet, libtilebase),
     Ptr{Void}, (Ptr{Void},Ptr{Csize_t},Ptr{Ptr{Int}},Ptr{Ptr{Int}}), bbox,ndim,origin,shape)
-  ndim[1], pointer_to_array(origin[1],ndim[1]), pointer_to_array(shape[1],ndim[1])
+  ndim[1], unsafe_wrap(Array,origin[1],ndim[1]), unsafe_wrap(Array,shape[1],ndim[1])
 end
 
 # interface to nd
@@ -149,14 +149,14 @@ ndioShape(file) = ccall((:ndioShape, libnd), Ptr{Void}, (Ptr{Void},), file)
 retain_for_gc = Any[]
 
 for f in ("ndshape", "ndstrides")
-  @eval function $(symbol(f))(nd_t)
-    push!(retain_for_gc, convert(Array{Cuint}, pointer_to_array(  # hack: size_t -> Cuint
+  @eval function $(Symbol(f))(nd_t)
+    push!(retain_for_gc, convert(Array{Cuint}, unsafe_wrap(Array,  # hack: size_t -> Cuint
         ccall(($f, libnd), Ptr{Csize_t}, (Ptr{Void},), nd_t)
         ,ndndim(nd_t))) )
     pointer(retain_for_gc[end])
   end
-  @eval function $(symbol(f*"J"))(nd_t)  # memory leak?
-    pointer_to_array(
+  @eval function $(Symbol(f*"J"))(nd_t)  # memory leak?
+    unsafe_wrap(Array,
         ccall(($f, libnd), Ptr{Csize_t}, (Ptr{Void},), nd_t)
         ,ndndim(nd_t))
   end
@@ -199,13 +199,13 @@ BarycentricAVXrelease(r) = ccall((:BarycentricAVXrelease, libengine), Void, (Ptr
 #BarycentricGPUrelease(r) = ccall((:BarycentricGPUrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
 
 for f = ("source", "destination", "result")
-  @eval $(symbol("BarycentricCPU"*f))(r,src) =
+  @eval $(Symbol("BarycentricCPU"*f))(r,src) =
       ccall(($("BarycentricCPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
           r,src) !=1 && throw(BarycentricException())
-  @eval $(symbol("BarycentricAVX"*f))(r,src) =
+  @eval $(Symbol("BarycentricAVX"*f))(r,src) =
       ccall(($("BarycentricAVX"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
           r,src) !=1 && throw(BarycentricException())
-  #@eval $(symbol("BarycentricGPU"*f))(r,src) =
+  #@eval $(Symbol("BarycentricGPU"*f))(r,src) =
   #    ccall(($("BarycentricGPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
   #        r,src) !=1 && throw(BarycentricException())
 end
@@ -276,15 +276,15 @@ end
 # by manager.jl to handle overflow into local_scratch (recurse=false,  octree=false, delete=true)
 # by merge to combine multiple previous renders       (recurse=either, octree=false, delete=false)
 
-merge_across_filesystems(source::ASCIIString, destination, prefix, chantype, out_tile_path, recurse::Bool, octree::Bool, delete::Bool) =
+merge_across_filesystems(source::String, destination, prefix, chantype, out_tile_path, recurse::Bool, octree::Bool, delete::Bool) =
       merge_across_filesystems([source], destination, prefix, chantype, out_tile_path, recurse, octree, delete)
 
-function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, prefix, chantype, out_tile_path, recurse::Bool, octree::Bool, delete::Bool, flag=false)
+function merge_across_filesystems(sources::Array{String,1}, destination, prefix, chantype, out_tile_path, recurse::Bool, octree::Bool, delete::Bool, flag=false)
   global time_octree_clear, time_octree_down, time_octree_save
   global time_single_file, time_many_files, time_clear_files, time_read_files, time_max_files, time_delete_files, time_write_files
 
-  dirs=ASCIIString[]
-  in_tiles=ASCIIString[]
+  dirs=String[]
+  in_tiles=String[]
   for source in sources
     isdir(joinpath(source,out_tile_path)) || continue
     listing = readdir(joinpath(source,out_tile_path))
@@ -297,7 +297,7 @@ function merge_across_filesystems(sources::Array{ASCIIString,1}, destination, pr
   length(dirs)==0 && length(in_tiles)==0 && return
 
   if octree
-    const level = out_tile_path=="" ? 1 : length(split(out_tile_path,Base.path_separator))+1
+    const level = out_tile_path=="" ? 1 : length(split(out_tile_path,Base.Filesystem.path_separator))+1
     if length(dirs)>0 && length(in_tiles)==0
       t0=time()
       ndfill(out_tiles_ws[level], 0x0000)
@@ -383,7 +383,7 @@ function merge_output_tiles(source, destination, prefix, chantype, out_tile_path
     global out_tiles_jl = Array(Array{UInt16,3}, nlevels)
     for i=1:nlevels
       out_tiles_ws[i] = ndalloc(shape_leaf_px, tile_type)
-      out_tiles_jl[i] = pointer_to_array(convert(Ptr{UInt16},nddata(out_tiles_ws[i])), tuple(shape_leaf_px...))
+      out_tiles_jl[i] = unsafe_wrap(Array,convert(Ptr{UInt16},nddata(out_tiles_ws[i])), tuple(shape_leaf_px...))
     end
   end
 
@@ -402,9 +402,9 @@ function merge_output_tiles(callback::Function)
 
   global merge1_ws, merge1_jl, merge2_ws, merge2_jl
   merge1_ws = ndalloc(shape_leaf_px, tile_type)
-  merge1_jl = pointer_to_array(convert(Ptr{UInt16},nddata(merge1_ws)), tuple(shape_leaf_px...))
+  merge1_jl = unsafe_wrap(Array,convert(Ptr{UInt16},nddata(merge1_ws)), tuple(shape_leaf_px...))
   merge2_ws = ndalloc(shape_leaf_px, tile_type)
-  merge2_jl = pointer_to_array(convert(Ptr{UInt16},nddata(merge2_ws)), tuple(shape_leaf_px...))
+  merge2_jl = unsafe_wrap(Array,convert(Ptr{UInt16},nddata(merge2_ws)), tuple(shape_leaf_px...))
 
   callback()
 

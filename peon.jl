@@ -25,9 +25,9 @@ const send = "manager tells peon for input tile "*ARGS[4]*" to send output tile"
 const receive = "manager tells peon for input tile "*ARGS[4]*" to receive output tile"
 
 # 2 -> sizeof(UInt16), 20e3 -> .tif metadata size, 15 -> max # possible concurrent saves, need to generalize
-enough_free(path) = parse(Int,split(readall(`df $path`))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
+enough_free(path) = parse(Int,split(readstring(`df $path`))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
 
-function depth_first_traverse(bbox, out_tile_path, sub_tile_str,
+function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_str,
         sub_transform_nm, orientation, in_subtile_aabb)
   cboxes = AABBBinarySubdivision(bbox)
 
@@ -38,7 +38,7 @@ function depth_first_traverse(bbox, out_tile_path, sub_tile_str,
     out_tile_path_next = joinpath(out_tile_path,string(i))
 
     if !isleaf(cboxes[i])
-      depth_first_traverse(cboxes[i], out_tile_path_next, sub_tile_str,
+      depth_first_traverse_over_output_tiles(cboxes[i], out_tile_path_next, sub_tile_str,
            sub_transform_nm, orientation, in_subtile_aabb)
     else
       info("processing output tile ",out_tile_path_next)
@@ -49,7 +49,7 @@ function depth_first_traverse(bbox, out_tile_path, sub_tile_str,
 
       if !haskey(out_tiles_ws,out_tile_path_next)
         out_tiles_ws[out_tile_path_next] = ndalloc(shape_leaf_px, data_type)
-        out_tiles_jl[out_tile_path_next] = pointer_to_array(convert(Ptr{UInt16},
+        out_tiles_jl[out_tile_path_next] = unsafe_wrap(Array,convert(Ptr{UInt16},
               nddata(out_tiles_ws[out_tile_path_next])), tuple(shape_leaf_px...))
         ndfill(out_tiles_ws[out_tile_path_next], 0x0000)
         tmp = map(x->AABBHit(cboxes[i], x), in_subtiles_aabb)
@@ -124,7 +124,7 @@ function depth_first_traverse(bbox, out_tile_path, sub_tile_str,
   end
 end
 
-function process_tile()
+function process_input_tile()
   t0=time()
 
   global time_initing
@@ -137,7 +137,7 @@ function process_tile()
     error("in peon/TileBaseOpen-Index")
   end
 
-  info("processing input tile $in_tile_idx: ",bytestring(TilePath(tile)))
+  info("processing input tile $in_tile_idx: ",unsafe_string(TilePath(tile)))
 
   local in_tile_ws, in_tile_jl, in_subtile_ws, in_subtile_jl
   try
@@ -146,10 +146,10 @@ function process_tile()
     shape_intile = ndshapeJ(tmp)[1:3]
     global data_type = ndtype(tmp)
     in_tile_ws = ndalloc(shape_intile, data_type)
-    in_tile_jl = pointer_to_array(convert(Ptr{UInt16},nddata(in_tile_ws)), tuple(shape_intile...))
+    in_tile_jl = unsafe_wrap(Array,convert(Ptr{UInt16},nddata(in_tile_ws)), tuple(shape_intile...))
     in_subtile_ws = ndinit()
     ndcast(in_subtile_ws, data_type)
-    tmp=split(bytestring(TilePath(tile)),"/")
+    tmp=split(unsafe_string(TilePath(tile)),"/")
     push!(tmp, string(tmp[end],'-',file_infix,'.',channel-1,'.',file_format))
     ndioClose(ndioRead(ndioOpen("/"*joinpath(tmp...), C_NULL, "r"), in_tile_ws))
     info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec")
@@ -193,7 +193,7 @@ function process_tile()
     end
     time_initing+=(time()-t1)
 
-    depth_first_traverse(TileBaseAABB(tiles), "", string(ix)*"x"*string(iy)*"x"*string(iz),
+    depth_first_traverse_over_output_tiles(TileBaseAABB(tiles), "", string(ix)*"x"*string(iy)*"x"*string(iz),
         transform_nm[:,subtile_corner_indices(ix,iy,iz)],
         isodd(ix+iy+iz) ? 90 : 0,
         in_subtiles_aabb[ix,iy,iz])
@@ -248,9 +248,9 @@ const dims = -1+map(x->parse(Int,x), ARGS[idx:idx+2])
 idx += length(dims)
 const transform_nm = reshape(map(x->parse(Int,x), ARGS[idx:end]),3,length(xlims)*length(ylims)*length(zlims))
 
-const out_tiles_ws = Dict{ASCIIString,Ptr{Void}}()
-const out_tiles_jl = Dict{ASCIIString,Array{UInt16,3}}()
-const merge_count = Dict{ASCIIString,Array{UInt8,1}}()
+const out_tiles_ws = Dict{String,Ptr{Void}}()
+const out_tiles_jl = Dict{String,Array{UInt16,3}}()
+const merge_count = Dict{String,Array{UInt8,1}}()
 
 @assert all(diff(diff(xlims)).==0) "xlims not equally spaced for input tile $in_tile_idx"
 @assert all(diff(diff(ylims)).==0) "ylims not equally spaced for input tile $in_tile_idx"
@@ -260,7 +260,7 @@ const merge_count = Dict{ASCIIString,Array{UInt8,1}}()
 @assert zlims[1]>=0 && zlims[end]<=dims[3] "zlims out of range for input tile $in_tile_idx"
 
 if !dry_run
-  process_tile()
+  process_input_tile()
 
   for (k,v) in merge_count
     info((k,v))

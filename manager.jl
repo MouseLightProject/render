@@ -30,9 +30,9 @@ elseif ngpus == 4
   num_procs = 15
 else
   nthreads = 8  # must match barycentricCPU.c
-  num_procs = floor(Int,CPU_CORES/nthreads)
+  num_procs = floor(Int,Sys.CPU_CORES/nthreads)
 end
-info(string(CPU_CORES)," CPUs and ",string(ngpus)," GPUs present which can collectively process ",string(num_procs)," tiles simultaneously")
+info(string(Sys.CPU_CORES)," CPUs and ",string(ngpus)," GPUs present which can collectively process ",string(num_procs)," tiles simultaneously")
 
 info("AVX2 = ",has_avx2)
 
@@ -42,10 +42,10 @@ const manager_bbox = AABBMake(3)  # process all input tiles whose origins are wi
 AABBSet(manager_bbox, 3, map(x->parse(Int,x),ARGS[3:5]), map(x->parse(Int,x),ARGS[6:8]))
 const tiles = TileBaseOpen(source)
 
-for i=0:ngpus-1
-  cudaSetDevice(i)
-  cudaDeviceReset()
-end
+#for i=0:ngpus-1
+#  cudaSetDevice(i)
+#  cudaDeviceReset()
+#end
 
 # delete /dev/shm and local_scratch
 t0=time()
@@ -55,7 +55,7 @@ info("deleting /dev/shm and local_scratch = ",local_scratch," at start took ",st
 
 # read in the transform parameters
 using YAML
-const meta = YAML.load(replace(readall(source*"/tilebase.cache.yml"),['[',',',']'],""))
+const meta = YAML.load(replace(readstring(source*"/tilebase.cache.yml"),['[',',',']'],""))
 const dims = [map(x->parse(Int,x), split(x["shape"]["dims"]))[1:3] for x in meta["tiles"]]
 const xlims = map(x->parse(Int,x), split(meta["tiles"][1]["grid"]["xlims"]))
 const ylims = map(x->parse(Int,x), split(meta["tiles"][1]["grid"]["ylims"]))
@@ -96,8 +96,8 @@ function depth_first_traverse(bbox,out_tile_path)
   if isleaf(bbox)
     btile = map(in_tile->any(in_subtile->AABBHit(bbox,in_subtile),in_tile), in_subtiles_aabb)
     sum(btile)>0 || return
-    merge_count[join(out_tile_path, Base.path_separator)] = UInt16[sum(btile), 0, 0, 0]
-    info("output tile ",join(out_tile_path, Base.path_separator),
+    merge_count[join(out_tile_path, Base.Filesystem.path_separator)] = UInt16[sum(btile), 0, 0, 0]
+    info("output tile ",join(out_tile_path, Base.Filesystem.path_separator),
          " overlaps with input tiles ",join(in_tiles_idx[find(btile)],", "))
     dtile = setdiff(find(btile), locality_idx)
     isempty(dtile) || push!(locality_idx, dtile...)
@@ -116,12 +116,12 @@ merge_array = Array(UInt16, shape_leaf_px..., ncache)
 merge_used = falses(ncache)
 # one entry for each output tile
 # [total # input tiles, input tiles processed so far, input tiles sent so far, index to merge_array (0=not assigned yet, Inf=use local_scratch)]
-merge_count = Dict{ASCIIString,Array{UInt16,1}}()  # expected, write cmd, write ack, RAM slot
+merge_count = Dict{String,Array{UInt16,1}}()  # expected, write cmd, write ack, RAM slot
 info("allocated RAM for ",string(ncache)," output tiles")
 
 locality_idx = Int[]
 depth_first_traverse(TileBaseAABB(tiles),Int[])
-solo_out_tiles = setdiff( ASCIIString[x[2][1]==1 ? x[1] : "" for x in merge_count] ,[""])
+solo_out_tiles = setdiff( String[x[2][1]==1 ? x[1] : "" for x in merge_count] ,[""])
 AABBFree(manager_bbox)
 AABBFree(manager_aabb)
 map(x->map(AABBFree,x), in_subtiles_aabb)
@@ -222,23 +222,21 @@ t0=time()
   i = 1
   nextidx() = (global i; idx=i; i+=1; idx)
   for p = 1:num_procs
-    @async begin
-      while true
-        tile_idx = nextidx()
-        tile_idx>length(locality_idx) && break
-        cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/peon.jl $(ARGS[1]) $(ngpus>0 ? (p-1) % ngpus : NaN)
-              $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(join(ARGS[3:5],"-")) $(string(solo_out_tiles))
-              $hostname2 $port2 $(length(xlims)) $xlims $(length(ylims)) $ylims
-              $(length(zlims[in_tiles_idx[locality_idx[tile_idx]]]))
-              $(zlims[in_tiles_idx[locality_idx[tile_idx]]])
-              $(dims[in_tiles_idx[locality_idx[tile_idx]]])
-              $(transform[in_tiles_idx[locality_idx[tile_idx]]])`
-        info(string(cmd))
-        try
-          run(cmd)
-        catch
-          warn("peon for input tile $(in_tiles_idx[locality_idx[tile_idx]]) might have failed")
-        end
+    @async while true
+      tile_idx = nextidx()
+      tile_idx>length(locality_idx) && break
+      cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/peon.jl $(ARGS[1]) $(ngpus>0 ? (p-1) % ngpus : NaN)
+            $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(join(ARGS[3:5],"-")) $(string(solo_out_tiles))
+            $hostname2 $port2 $(length(xlims)) $xlims $(length(ylims)) $ylims
+            $(length(zlims[in_tiles_idx[locality_idx[tile_idx]]]))
+            $(zlims[in_tiles_idx[locality_idx[tile_idx]]])
+            $(dims[in_tiles_idx[locality_idx[tile_idx]]])
+            $(transform[in_tiles_idx[locality_idx[tile_idx]]])`
+      info(string(cmd))
+      try
+        run(cmd)
+      catch
+        warn("peon for input tile $(in_tiles_idx[locality_idx[tile_idx]]) might have failed")
       end
     end
   end

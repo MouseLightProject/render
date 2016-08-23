@@ -22,5 +22,5 @@ tar czf $1/logs.tar.gz *log
 echo deleting logfile_scratch = $logfile_scratch
 rm -rf $logfile_scratch
 
-echo write protecting destination = $1
-chmod -R a-w $1
+#echo write protecting destination = $1
+#chmod -R a-w $1
