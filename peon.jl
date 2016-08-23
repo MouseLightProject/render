@@ -142,7 +142,7 @@ function process_tile()
   try
     t1=time()
     tmp = TileShape(tile)
-    shape_intile = ndshapeJ(tmp)
+    shape_intile = ndshapeJ(tmp)[1:3]
     global data_type = ndtype(tmp)
     in_tile_ws = ndalloc(shape_intile, data_type)
     in_tile_jl = pointer_to_array(convert(Ptr{UInt16},nddata(in_tile_ws)), tuple(shape_intile...))
