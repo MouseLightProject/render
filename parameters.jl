@@ -42,6 +42,8 @@ const interpolation = "nearest"  # "linear" or "nearest"
 const raw_compression_ratios = [] # or e.g. [10,80]
 const octree_compression_ratios = []
 
+const dry_run = false
+
 # build the octree with a function below.  should return uint16
 
 # the simplest and fastest

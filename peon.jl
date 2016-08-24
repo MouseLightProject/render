@@ -227,6 +227,8 @@ function process_tile()
   info("saving output tiles for input tile ",in_tile_idx," took ",round(Int,time_saving)," sec")
   info("waiting for manager for input tile ",in_tile_idx," took ",round(Int,time_waiting)," sec")
   info("input tile ",in_tile_idx," took ",round(Int,time()-t0)," sec overall")
+
+  map(AABBFree,in_subtiles_aabb)
 end
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
@@ -256,15 +258,16 @@ const merge_count = Dict{ASCIIString,Array{UInt8,1}}()
 @assert ylims[1]>=0 && ylims[end]<=dims[2] "ylims out of range for input tile $in_tile_idx"
 @assert zlims[1]>=0 && zlims[end]<=dims[3] "zlims out of range for input tile $in_tile_idx"
 
-process_tile()
+if !dry_run
+  process_tile()
 
-for (k,v) in merge_count
-  info((k,v))
-  v[1]>1 && v[1]!=v[2] && warn("not all input subtiles processed for output tile ",k," : ",v)
+  for (k,v) in merge_count
+    info((k,v))
+    v[1]>1 && v[1]!=v[2] && warn("not all input subtiles processed for output tile ",k," : ",v)
+  end
+
+  map(ndfree,values(out_tiles_ws))
 end
-
-map(ndfree,values(out_tiles_ws))
-map(AABBFree,in_subtiles_aabb)
 
 #closelibs()
 
