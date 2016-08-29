@@ -75,7 +75,7 @@ function depth_first_traverse(bbox, out_tile_path, sub_tile_str,
       if merge_count[out_tile_path_next][2]==merge_count[out_tile_path_next][1]
         t0=time()
         if out_tile_path_next in solo_out_tiles
-          save_out_tile(shared_scratch, out_tile_path_next, ARGS[5]*".$(channel-1).tif",
+          save_out_tile(shared_scratch, out_tile_path_next, string(ARGS[5],'.',channel-1,'.',file_format),
               out_tiles_ws[out_tile_path_next])
           info("peon transfered output tile ",out_tile_path_next," from RAM to shared_scratch")
         else
@@ -94,19 +94,20 @@ function depth_first_traverse(bbox, out_tile_path, sub_tile_str,
           elseif startswith(tmp,receive)
             out_tiles_jl[out_tile_path_next][:] = max(out_tiles_jl[out_tile_path_next]::Array{UInt16,3},
                 deserialize(sock)::Array{UInt16,3})
-            save_out_tile(shared_scratch, out_tile_path_next, ARGS[5]*".$(channel-1).tif",
+            save_out_tile(shared_scratch, out_tile_path_next, string(ARGS[5],'.',channel-1,'.',file_format),
                 out_tiles_ws[out_tile_path_next])
             println(sock,"peon for input tile ",ARGS[4]," saved output tile ",out_tile_path_next)
             info("peon transfered output tile ",out_tile_path_next," from RAM to shared_scratch")
           elseif startswith(tmp,write)
             if enough_free(local_scratch)
               save_out_tile(local_scratch, out_tile_path_next,
-                  string(in_tile_idx)*"."*sub_tile_str*".$(channel-1).tif", out_tiles_ws[out_tile_path_next])
+                  string(in_tile_idx,'.',sub_tile_str,'.',channel-1,'.',file_format),
+                  out_tiles_ws[out_tile_path_next])
               println(sock,"peon for input tile ",ARGS[4],
                   " wrote output tile ",out_tile_path_next," to local_scratch")
             else
               save_out_tile(shared_scratch, out_tile_path_next,
-                  ARGS[5]*"."*string(in_tile_idx)*"."*sub_tile_str*".$(channel-1).tif",
+                  string(ARGS[5],'.',in_tile_idx,'.',sub_tile_str,'.',channel-1,'.',file_format),
                   out_tiles_ws[out_tile_path_next])
               msg = "peon for input tile "*string(ARGS[4])*
                   " wrote output tile "*out_tile_path_next*" to shared_scratch"
@@ -149,7 +150,7 @@ function process_tile()
     in_subtile_ws = ndinit()
     ndcast(in_subtile_ws, data_type)
     tmp=split(bytestring(TilePath(tile)),"/")
-    push!(tmp, tmp[end]*"-$file_infix."*string(channel-1)*".tif")
+    push!(tmp, string(tmp[end],'-',file_infix,'.',channel-1,'.',file_format))
     ndioClose(ndioRead(ndioOpen("/"*joinpath(tmp...), C_NULL, "r"), in_tile_ws))
     info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec")
     filename = "/"*joinpath(tmp...)

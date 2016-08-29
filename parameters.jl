@@ -23,6 +23,7 @@ const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
 
 const nchannels=2  # need to generalize
 const file_infix="ngc"  # need to generalize
+const file_format="tif"  # or, e.g., h5
 
 # normalized origin and shape of sub-bounding box to render
 const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three

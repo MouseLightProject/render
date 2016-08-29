@@ -195,7 +195,8 @@ t0=time()
           out_tile_path = match(wrote,tmp).captures[4]
           merge_count[out_tile_path][3]+=1
           if merge_count[out_tile_path][1] == merge_count[out_tile_path][3]
-            merge_across_filesystems(local_scratch, shared_scratch, join(ARGS[3:5],"-"), "."*string(channel-1)*".tif", out_tile_path, false, false, true)
+            merge_across_filesystems(local_scratch, shared_scratch, join(ARGS[3:5],"-"),
+                string('.',channel-1,'.',file_format), out_tile_path, false, false, true)
             info("saved output tile ",out_tile_path," from local_scratch to shared_scratch")
           end
         elseif ismatch(sent,tmp)
