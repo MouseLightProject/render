@@ -41,7 +41,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
       depth_first_traverse_over_output_tiles(cboxes[i], out_tile_path_next, sub_tile_str,
            sub_transform_nm, orientation, in_subtile_aabb)
     else
-      info("processing output tile ",out_tile_path_next)
+      info("processing output tile ",out_tile_path_next, prefix="PEON: ")
 
       t0=time()
       const origin_nm = AABBGetJ(cboxes[i])[2]
@@ -77,9 +77,11 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
         if out_tile_path_next in solo_out_tiles
           save_out_tile(shared_scratch, out_tile_path_next, string(ARGS[5],'.',channel-1,'.',file_format),
               out_tiles_ws[out_tile_path_next])
-          info("peon transfered output tile ",out_tile_path_next," from RAM to shared_scratch")
+          info("transfered output tile ",out_tile_path_next," from RAM to shared_scratch", prefix="PEON: ")
         else
-          println(sock, "peon for input tile ",ARGS[4]," has output tile ",out_tile_path_next," ready")
+          msg = string("peon for input tile ",ARGS[4]," has output tile ",out_tile_path_next," ready")
+          println(sock, msg)
+          info(msg, prefix="PEON: ")
           t1=time()
           local tmp
           while true
@@ -87,30 +89,36 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
             length(tmp)==0 || break
           end
           time_waiting+=(time()-t1)
-          println(STDERR,"PEON<MANAGER: ",tmp)
+          info(tmp, prefix="PEON<MANAGER: ")
           if startswith(tmp,send)
-            println(sock,"peon for input tile ",ARGS[4]," will send output tile ",out_tile_path_next)
+            msg = string("peon for input tile ",ARGS[4]," will send output tile ",out_tile_path_next)
+            println(sock,msg)
+            info(msg, prefix="PEON: ")
             serialize(sock, out_tiles_jl[out_tile_path_next])
           elseif startswith(tmp,receive)
             out_tiles_jl[out_tile_path_next][:] = max(out_tiles_jl[out_tile_path_next]::Array{UInt16,3},
                 deserialize(sock)::Array{UInt16,3})
             save_out_tile(shared_scratch, out_tile_path_next, string(ARGS[5],'.',channel-1,'.',file_format),
                 out_tiles_ws[out_tile_path_next])
-            println(sock,"peon for input tile ",ARGS[4]," saved output tile ",out_tile_path_next)
-            info("peon transfered output tile ",out_tile_path_next," from RAM to shared_scratch")
+            msg = string("peon for input tile ",ARGS[4]," saved output tile ",out_tile_path_next)
+            println(sock,msg)
+            info(msg, prefix="PEON: ")
+            #info("peon transfered output tile ",out_tile_path_next," from RAM to shared_scratch")
           elseif startswith(tmp,write)
             if enough_free(local_scratch)
               save_out_tile(local_scratch, out_tile_path_next,
                   string(in_tile_idx,'.',sub_tile_str,'.',channel-1,'.',file_format),
                   out_tiles_ws[out_tile_path_next])
-              println(sock,"peon for input tile ",ARGS[4],
+              msg = string("peon for input tile ",ARGS[4],
                   " wrote output tile ",out_tile_path_next," to local_scratch")
+              println(sock,msg)
+              info(msg, prefix="PEON: ")
             else
               save_out_tile(shared_scratch, out_tile_path_next,
                   string(ARGS[5],'.',in_tile_idx,'.',sub_tile_str,'.',channel-1,'.',file_format),
                   out_tiles_ws[out_tile_path_next])
-              msg = "peon for input tile "*string(ARGS[4])*
-                  " wrote output tile "*out_tile_path_next*" to shared_scratch"
+              msg = string("peon for input tile ",string(ARGS[4]),
+                  " wrote output tile ",out_tile_path_next," to shared_scratch")
               println(sock,msg)
               warn(msg)
             end
@@ -137,7 +145,7 @@ function process_input_tile()
     error("in peon/TileBaseOpen-Index")
   end
 
-  info("processing input tile $in_tile_idx: ",unsafe_string(TilePath(tile)))
+  info("processing input tile $in_tile_idx: ",unsafe_string(TilePath(tile)), prefix="PEON: ")
 
   local in_tile_ws, in_tile_jl, in_subtile_ws, in_subtile_jl
   try
@@ -152,7 +160,7 @@ function process_input_tile()
     tmp=split(unsafe_string(TilePath(tile)),"/")
     push!(tmp, string(tmp[end],'-',file_infix,'.',channel-1,'.',file_format))
     ndioClose(ndioRead(ndioOpen("/"*joinpath(tmp...), C_NULL, "r"), in_tile_ws))
-    info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec")
+    info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec", prefix="PEON: ")
     filename = "/"*joinpath(tmp...)
     for ratio in octree_compression_ratios
       spawn(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $(dirname(filename)) $(splitext(basename(filename))[1]) 0`)
@@ -168,7 +176,7 @@ function process_input_tile()
   shape_leaf_ptr = pointer(convert(Array{Cuint,1},shape_leaf_px))
   for ix=1:length(xlims)-1, iy=1:length(ylims)-1, iz=1:length(zlims)-1
     info("processing transform ",xlims[ix:ix+1],"-",ylims[iy:iy+1],"-",zlims[iz:iz+1],
-          " for input tile ",in_tile_idx)
+          " for input tile ",in_tile_idx, prefix="PEON: ")
     t1=time()
     in_subtile_jl = in_tile_jl[1+(xlims[ix]:xlims[ix+1]),1+(ylims[iy]:ylims[iy+1]),1+(zlims[iz]:zlims[iz+1])]
     map((i,x)->ndShapeSet(in_subtile_ws, i, x), 1:3, size(in_subtile_jl))
@@ -223,11 +231,11 @@ function process_input_tile()
     error("BarycentricRelease error:  GPU $thisgpu, input tile $in_tile_idx")
   end
 
-  info("initializing input tile ",in_tile_idx, " took ",round(Int,time_initing)," sec")
-  info("transforming input tile ",in_tile_idx," took ",round(Int,time_transforming)," sec")
-  info("saving output tiles for input tile ",in_tile_idx," took ",round(Int,time_saving)," sec")
-  info("waiting for manager for input tile ",in_tile_idx," took ",round(Int,time_waiting)," sec")
-  info("input tile ",in_tile_idx," took ",round(Int,time()-t0)," sec overall")
+  info("initializing input tile ",in_tile_idx, " took ",round(Int,time_initing)," sec", prefix="PEON: ")
+  info("transforming input tile ",in_tile_idx," took ",round(Int,time_transforming)," sec", prefix="PEON: ")
+  info("saving output tiles for input tile ",in_tile_idx," took ",round(Int,time_saving)," sec", prefix="PEON: ")
+  info("waiting for manager for input tile ",in_tile_idx," took ",round(Int,time_waiting)," sec", prefix="PEON: ")
+  info("input tile ",in_tile_idx," took ",round(Int,time()-t0)," sec overall", prefix="PEON: ")
 
   map(AABBFree,in_subtiles_aabb)
 end
@@ -263,7 +271,7 @@ if !dry_run
   process_input_tile()
 
   for (k,v) in merge_count
-    info((k,v))
+    info((k,v), prefix="PEON: ")
     v[1]>1 && v[1]!=v[2] && warn("not all input subtiles processed for output tile ",k," : ",v)
   end
 
@@ -273,5 +281,7 @@ end
 #closelibs()
 
 # keep boss informed
-println(sock,"peon for input tile ",ARGS[4]," is finished")
+msg = string("peon for input tile ",ARGS[4]," is finished")
+println(sock,msg)
+info(msg, prefix="PEON: ")
 close(sock)

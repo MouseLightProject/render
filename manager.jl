@@ -10,8 +10,8 @@
 const reserve_ram = 32e9  # how much RAM to *not* use for output tile scratch space
 const tile_ram = 0.85e9  # generalize
 
-info(readchomp(`hostname`))
-info(readchomp(`date`))
+info(readchomp(`hostname`), prefix="MANAGER: ")
+info(readchomp(`date`), prefix="MANAGER: ")
 
 proc_num = nothing
 try;  global proc_num = ENV["SGE_TASK_ID"];  end
@@ -32,9 +32,9 @@ else
   nthreads = 8  # must match barycentricCPU.c
   num_procs = floor(Int,Sys.CPU_CORES/nthreads)
 end
-info(string(Sys.CPU_CORES)," CPUs and ",string(ngpus)," GPUs present which can collectively process ",string(num_procs)," tiles simultaneously")
+info(string(Sys.CPU_CORES)," CPUs and ",string(ngpus)," GPUs present which can collectively process ",string(num_procs)," tiles simultaneously", prefix="MANAGER: ")
 
-info("AVX2 = ",has_avx2)
+info("AVX2 = ",has_avx2, prefix="MANAGER: ")
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
 const channel=parse(Int,ARGS[2])
@@ -49,9 +49,9 @@ const tiles = TileBaseOpen(source)
 
 # delete /dev/shm and local_scratch
 t0=time()
-rmcontents("/dev/shm", "after")
-scratch0 = rmcontents(local_scratch, "after")
-info("deleting /dev/shm and local_scratch = ",local_scratch," at start took ",string(round(Int,time()-t0))," sec")
+rmcontents("/dev/shm", "after", "MANAGER: ")
+scratch0 = rmcontents(local_scratch, "after", "MANAGER: ")
+info("deleting /dev/shm and local_scratch = ",local_scratch," at start took ",string(round(Int,time()-t0))," sec", prefix="MANAGER: ")
 
 # read in the transform parameters
 using YAML
@@ -98,7 +98,7 @@ function depth_first_traverse(bbox,out_tile_path)
     sum(btile)>0 || return
     merge_count[join(out_tile_path, Base.Filesystem.path_separator)] = UInt16[sum(btile), 0, 0, 0]
     info("output tile ",join(out_tile_path, Base.Filesystem.path_separator),
-         " overlaps with input tiles ",join(in_tiles_idx[find(btile)],", "))
+         " overlaps with input tiles ",join(in_tiles_idx[find(btile)],", "), prefix="MANAGER: ")
     dtile = setdiff(find(btile), locality_idx)
     isempty(dtile) || push!(locality_idx, dtile...)
   else
@@ -117,7 +117,7 @@ merge_used = falses(ncache)
 # one entry for each output tile
 # [total # input tiles, input tiles processed so far, input tiles sent so far, index to merge_array (0=not assigned yet, Inf=use local_scratch)]
 merge_count = Dict{String,Array{UInt16,1}}()  # expected, write cmd, write ack, RAM slot
-info("allocated RAM for ",string(ncache)," output tiles")
+info("allocated RAM for ",string(ncache)," output tiles", prefix="MANAGER: ")
 
 locality_idx = Int[]
 depth_first_traverse(TileBaseAABB(tiles),Int[])
@@ -129,7 +129,7 @@ TileBaseClose(tiles)
 
 isempty(locality_idx) && warn("coordinates of input subtiles aren't within bounding box")
 
-info("assigned ",string(length(in_tiles_idx))," input tiles")
+info("assigned ",string(length(in_tiles_idx))," input tiles", prefix="MANAGER: ")
 length(in_tiles_idx)==0 && quit()
 
 # keep boss informed
@@ -155,13 +155,13 @@ t0=time()
   const saved = r"(peon for input tile )([0-9]*)( saved output tile )([1-8/]*)"
   const finished = r"(?<=peon for input tile )[0-9]*(?= is finished)"
 
-  @async merge_output_tiles(() -> while length(sock2)<length(in_tiles_idx)
+  @async while length(sock2)<length(in_tiles_idx)
     push!(sock2, accept(server2))
     @async let sock2=sock2[end]
       while isopen(sock2) || nb_available(sock2)>0
         tmp = chomp(readline(sock2))
         length(tmp)==0 && continue
-        println(STDERR,"MANAGER<PEON: ",tmp)
+        info(tmp, prefix="MANAGER<PEON: ")
         local in_tile_num, out_tile_path
         if ismatch(ready,tmp)
           in_tile_num, out_tile_path = match(ready,tmp).captures[[2,4]]
@@ -171,7 +171,7 @@ t0=time()
             if idx!=0
               merge_used[idx] = true
               merge_count[out_tile_path][4] = idx
-              info("using RAM slot ",string(idx)," for output tile ",out_tile_path)
+              info("using RAM slot ",string(idx)," for output tile ",out_tile_path, prefix="MANAGER: ")
             else
               merge_count[out_tile_path][4] = 0xffff
             end
@@ -179,35 +179,35 @@ t0=time()
           if merge_count[out_tile_path][4]==0xffff
             msg = "manager tells peon for input tile $in_tile_num to write output tile $out_tile_path to local_scratch"
             println(sock2, msg)
-            println(STDERR,"MANAGER>PEON: ",msg)
+            info(msg, prefix="MANAGER>PEON: ")
           elseif merge_count[out_tile_path][2] < merge_count[out_tile_path][1]
             msg = "manager tells peon for input tile $in_tile_num to send output tile $out_tile_path via tcp"
             println(sock2, msg)
-            println(STDERR,"MANAGER>PEON: ",msg)
+            info(msg, prefix="MANAGER>PEON: ")
           else
             while merge_count[out_tile_path][3] < merge_count[out_tile_path][1]-1;  yield();  end
             msg = "manager tells peon for input tile $in_tile_num to receive output tile $out_tile_path via tcp"
             println(sock2, msg)
             serialize(sock2, merge_array[:,:,:,merge_count[out_tile_path][4]])
-            println(STDERR,"MANAGER>PEON: ",msg)
+            info(msg, prefix="MANAGER>PEON: ")
           end
         elseif ismatch(wrote,tmp)
           out_tile_path = match(wrote,tmp).captures[4]
           merge_count[out_tile_path][3]+=1
           if merge_count[out_tile_path][1] == merge_count[out_tile_path][3]
-            merge_across_filesystems(local_scratch, shared_scratch, join(ARGS[3:5],"-"),
+            merge_output_tiles(local_scratch, shared_scratch, join(ARGS[3:5],"-"),
                 string('.',channel-1,'.',file_format), out_tile_path, false, false, true)
-            info("saved output tile ",out_tile_path," from local_scratch to shared_scratch")
+            info("saved output tile ",out_tile_path," from local_scratch to shared_scratch", prefix="MANAGER: ")
           end
         elseif ismatch(sent,tmp)
-          global time_max_files
           out_tile_path = match(sent,tmp).captures[4]
           out_tile::Array{UInt16,3} = deserialize(sock2)
           merge_count[out_tile_path][3]+=1
           t1=time()
           merge_array[:,:,:,merge_count[out_tile_path][4]] = merge_count[out_tile_path][3]==1 ? out_tile :
                 max(out_tile, merge_array[:,:,:,merge_count[out_tile_path][4]]::Array{UInt16,3})
-          time_max_files+=(time()-t1)
+          time_max_files=time()-t1
+          info("max'ing multiple files took ",string(signif(time_max_files,4,2))," sec")
         elseif ismatch(saved,tmp)
           out_tile_path = match(saved,tmp).captures[4]
           merge_used[merge_count[out_tile_path][4]] = false
@@ -216,7 +216,7 @@ t0=time()
         end
       end
     end
-  end )
+  end
 
   # dispatch input tiles to peons
   i = 1
@@ -232,7 +232,7 @@ t0=time()
             $(zlims[in_tiles_idx[locality_idx[tile_idx]]])
             $(dims[in_tiles_idx[locality_idx[tile_idx]]])
             $(transform[in_tiles_idx[locality_idx[tile_idx]]])`
-      info(string(cmd))
+      info(string(cmd), prefix="MANAGER: ")
       try
         run(cmd)
       catch
@@ -241,25 +241,25 @@ t0=time()
     end
   end
 end
-info("peons took ",string(round(Int,time()-t0))," sec")
+info("peons took ",string(round(Int,time()-t0))," sec", prefix="MANAGER: ")
 
 for (k,v) in merge_count
-  info(string((k,v)))
+  info(string((k,v)), prefix="MANAGER: ")
   v[1]>1 && v[1]!=v[2] && warn("not all input tiles processed for output tile ",string(k)," : ",string(v))
 end
 
 # delete local_scratch
 t0=time()
-scratch1 = rmcontents(local_scratch, "before")
-info("deleting local_scratch = ",local_scratch," at end took ",string(round(Int,time()-t0))," sec")
+scratch1 = rmcontents(local_scratch, "before", "MANAGER: ")
+info("deleting local_scratch = ",local_scratch," at end took ",string(round(Int,time()-t0))," sec", prefix="MANAGER: ")
 
 #closelibs()
 
 # keep boss informed
 try
-  println(sock,"manager ",proc_num," has finished job ",join(ARGS[[3 4 5 2]],".")," on ",readchomp(`hostname`),
-        " using ",signif((scratch0-scratch1)/1024/1024,4,2)," GB of local_scratch")
+  println(sock,"manager ",proc_num," has finished job ",join(ARGS[[3 4 5 2]],".")," on ",
+        readchomp(`hostname`), " using ",signif((scratch0-scratch1)/1024/1024,4,2)," GB of local_scratch")
   close(sock)
 end
 
-info(readchomp(`date`))
+info(readchomp(`date`), prefix="MANAGER: ")

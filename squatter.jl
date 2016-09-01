@@ -21,22 +21,22 @@ println(sock,"squatter ",proc_num," is ready on ",readchomp(`hostname`))
 while isopen(sock) || nb_available(sock)>0
   tmp = chomp(readline(sock))
   length(tmp)==0 && continue
-  println("SQUATTER<DIRECTOR: ",tmp)
+  info(tmp, prefix="SQUATTER<DIRECTOR: ")
   if ismatch(dole_out,tmp)
     cmd=`$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/manager.jl $(split(tmp)[6:end])`
-    info(string(cmd))
+    info(string(cmd), prefix="SQUATTER: ")
     try
       run(cmd)
     catch
       warn("manager $proc_num might have failed")
     end
     msg = "squatter $proc_num is finished"
-    println("SQUATTER>DIRECTOR: ",msg)
     println(sock,msg)
+    info(msg, prefix="SQUATTER>DIRECTOR: ")
   elseif ismatch(terminate,tmp)
     msg = "squatter $proc_num is terminating"
-    println("SQUATTER>DIRECTOR: ",msg)
     println(sock,msg)
+    info(msg, prefix="SQUATTER>DIRECTOR: ")
     close(sock)
     quit()
   end
