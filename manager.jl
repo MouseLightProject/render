@@ -207,7 +207,7 @@ t0=time()
           merge_array[:,:,:,merge_count[out_tile_path][4]] = merge_count[out_tile_path][3]==1 ? out_tile :
                 max(out_tile, merge_array[:,:,:,merge_count[out_tile_path][4]]::Array{UInt16,3})
           time_max_files=time()-t1
-          info("max'ing multiple files took ",string(signif(time_max_files,4,2))," sec")
+          info("max'ing multiple files took ",string(signif(time_max_files,4))," sec")
         elseif ismatch(saved,tmp)
           out_tile_path = match(saved,tmp).captures[4]
           merge_used[merge_count[out_tile_path][4]] = false
@@ -258,7 +258,7 @@ info("deleting local_scratch = ",local_scratch," at end took ",string(round(Int,
 # keep boss informed
 try
   println(sock,"manager ",proc_num," has finished job ",join(ARGS[[3 4 5 2]],".")," on ",
-        readchomp(`hostname`), " using ",signif((scratch0-scratch1)/1024/1024,4,2)," GB of local_scratch")
+        readchomp(`hostname`), " using ",signif((scratch0-scratch1)/1024/1024,4)," GB of local_scratch")
   close(sock)
 end
 

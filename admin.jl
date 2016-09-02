@@ -291,10 +291,11 @@ function merge_across_filesystems(sources::Array{String,1}, destination, prefix,
   for source in sources
     isdir(joinpath(source,out_tile_path)) || continue
     listing = readdir(joinpath(source,out_tile_path))
-    idx = map(x->isdir(joinpath(source,out_tile_path,x)), listing)
-    sum(idx)==0 || push!(dirs, listing[idx]...)
-    tmp = [joinpath(source,out_tile_path,x) for x in listing[!idx & map(x->endswith(x,chantype), listing)]]
-    isempty(tmp) || push!(in_tiles, tmp...)
+    dir2 = map(x->isdir(joinpath(source,out_tile_path,x)), listing)
+    sum(dir2)==0 || push!(dirs, listing[dir2]...)
+    in_tiles2 = [joinpath(source,out_tile_path,x)
+          for x in listing[!dir2 & map(x->endswith(x,chantype), listing)]]
+    isempty(in_tiles2) || push!(in_tiles, in_tiles2...)
   end
 
   length(dirs)==0 && length(in_tiles)==0 && return
@@ -368,13 +369,26 @@ function merge_across_filesystems(sources::Array{String,1}, destination, prefix,
     if flag
       t0=time()
       info("downsampling output tile ",out_tile_path)
-      i = parse(Int,out_tile_path[end])
-      tmp = length(in_tiles)==0 ? out_tiles_jl[level] : merge1_jl
-      out_tiles_jl[level-1][ (((i-1)>>0)&1 * shape_leaf_px[1]>>1) + (1:shape_leaf_px[1]>>1),
-                             (((i-1)>>1)&1 * shape_leaf_px[2]>>1) + (1:shape_leaf_px[2]>>1),
-                             (((i-1)>>2)&1 * shape_leaf_px[3]>>1) + (1:shape_leaf_px[3]>>1) ] =
-          [ downsampling_function(tmp[x:x+1,y:y+1,z:z+1]) for x=1:2:shape_leaf_px[1]-1, y=1:2:shape_leaf_px[2]-1, z=1:2:shape_leaf_px[3]-1 ]
+      last_morton_coord = parse(Int,out_tile_path[end])
+      scratch::Array{UInt16,3} = length(in_tiles)==0 ? out_tiles_jl[level] : merge1_jl
+      downsample(out_tiles_jl[level-1], last_morton_coord, shape_leaf_px, scratch)
       time_octree_down+=(time()-t0)
+    end
+  end
+end
+
+function downsample(out_tile_jl, coord, shape_leaf_px, scratch)
+  ix = (((coord-1)>>0)&1 * shape_leaf_px[1]>>1)
+  iy = (((coord-1)>>1)&1 * shape_leaf_px[2]>>1)
+  iz = (((coord-1)>>2)&1 * shape_leaf_px[3]>>1)
+  for z=1:2:shape_leaf_px[3]-1
+    tmpz = iz + (z+1)>>1
+    for y=1:2:shape_leaf_px[2]-1
+      tmpy = iy + (y+1)>>1
+      for x=1:2:shape_leaf_px[1]-1
+        tmpx = ix + (x+1)>>1
+        @inbounds out_tile_jl[tmpx, tmpy, tmpz] = downsampling_function(scratch[x:x+1, y:y+1, z:z+1])
+      end
     end
   end
 end
@@ -406,26 +420,26 @@ function merge_output_tiles(source, destination, prefix, chantype, out_tile_path
   ndfree(merge1_ws)
   ndfree(merge2_ws)
 
-  info("copying single files took ",string(signif(time_single_file,4,2))," sec")
-  info("merging multiple files took ",string(signif(time_many_files,4,2))," sec")
-  info("  clearing multiple files took ",string(signif(time_clear_files,4,2))," sec")
-  info("  reading multiple files took ",string(signif(time_read_files,4,2))," sec")
-  info("  max'ing multiple files took ",string(signif(time_max_files,4,2))," sec")
-  info("  deleting multiple files took ",string(signif(time_delete_files,4,2))," sec")
-  info("  writing multiple files took ",string(signif(time_write_files,4,2))," sec")
+  info("copying single files took ",string(signif(time_single_file,4))," sec")
+  info("merging multiple files took ",string(signif(time_many_files,4))," sec")
+  info("  clearing multiple files took ",string(signif(time_clear_files,4))," sec")
+  info("  reading multiple files took ",string(signif(time_read_files,4))," sec")
+  info("  max'ing multiple files took ",string(signif(time_max_files,4))," sec")
+  info("  deleting multiple files took ",string(signif(time_delete_files,4))," sec")
+  info("  writing multiple files took ",string(signif(time_write_files,4))," sec")
 
   if octree
     map(ndfree,out_tiles_ws)
-    info("clearing octree took ",string(signif(time_octree_clear,4,2))," sec")
-    info("downsampling octree took ",string(signif(time_octree_down,4,2))," sec")
-    info("saving octree took ",string(signif(time_octree_save,4,2))," sec")
+    info("clearing octree took ",string(signif(time_octree_clear,4))," sec")
+    info("downsampling octree took ",string(signif(time_octree_down,4))," sec")
+    info("saving octree took ",string(signif(time_octree_save,4))," sec")
   end
 end
 
 function rmcontents(dir, available, prefix)
   function get_available(dir,msg)
     free = parse(Int,split(readchomp(ignorestatus(`df $dir`)))[11])
-    info(string(signif(free/1024/1024,4,2))," GB available on ",dir," at ",msg, prefix=prefix)
+    info(string(signif(free/1024/1024,4))," GB available on ",dir," at ",msg, prefix=prefix)
     free
   end
   available=="before" && (free=get_available(dir,"end"))

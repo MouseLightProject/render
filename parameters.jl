@@ -48,7 +48,7 @@ const dry_run = false
 # build the octree with a function below.  should return uint16
 
 # the simplest and fastest
-downsampling_function(arg::Array{UInt16,3}) = arg[1,1,1]
+downsampling_function(arg::Array{UInt16,3}) = (@inbounds return arg[1,1,1])
 
 # equivalent to mean(arg) but 30x faster and half the memory
 #downsampling_function(arg::Array{UInt16,3}) = UInt16(sum(arg)>>3)

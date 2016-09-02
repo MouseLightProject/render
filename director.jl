@@ -183,7 +183,7 @@ t0=time()
           println(sock, cmd)
           info(string(cmd), prefix="DIRECTOR>SQUATTER: ")
           nfinished = wait(events[p,2])
-          info("director has finished ",string(nfinished)," of ",string(nchannels*length(job_aabbs))," jobs.  ",string(signif(nfinished / (nchannels*length(job_aabbs)) * 100,7,2)),"% done", prefix="DIRECTOR: ")
+          info("director has finished ",string(nfinished)," of ",string(nchannels*length(job_aabbs))," jobs.  ",string(signif(nfinished / (nchannels*length(job_aabbs)) * 100,4)),"% done", prefix="DIRECTOR: ")
         end
       end
     end
