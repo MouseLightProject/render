@@ -23,12 +23,14 @@
 
 set -e
 
-export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3
+#export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3
+export RENDER_PATH=/home/arthurb/projects/mouselight
 export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
-export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3/julia-0.5.0/bin/julia
+#export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3/julia-0.5.0/bin/julia
+export JULIA=/home/arthurb/bin/julia-0.5.0/bin/julia
 
 # get vars from parameters.jl file
-read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',logfile_scratch,' ',delete_scratch,' ',notify_addr,' ',bill_userid,' ',typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),' ',throttle_octree,' ',file_format)")
+read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',logfile_scratch,' ',delete_scratch,' ',notify_addr,' ',bill_userid,' ',typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),' ',throttle_octree,' ',file_format,' ',nchannels)")
 destination=${tmp[0]}
 shared_scratch=${tmp[1]}
 logfile_scratch=${tmp[2]}
@@ -38,6 +40,7 @@ bill_userid=${tmp[5]}
 which_cluster=${tmp[6]}
 throttle_octree=${tmp[7]}
 file_format=${tmp[8]}
+nchannels=${tmp[9]}
 
 # delete <logfile_scratch> and <destination> if they exist
 if [ -d $logfile_scratch ] ; then
@@ -62,7 +65,7 @@ jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
 echo jobname = $jobname >> $logfile_scratch/render.log
 
 # create the leaf nodes
-cmd="$JULIA ${RENDER_PATH}/src/render/director.jl $destination/set_parameters.jl $jobname"
+cmd="$JULIA ${RENDER_PATH}/src/render/src/director.jl $destination/set_parameters.jl $jobname"
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
   qsub -A $bill_userid -N $jobname -j y -b y -V -shell n -l sandy=true -o $logfile_scratch/director.log $cmd
@@ -71,15 +74,17 @@ else
 fi
 
 # downsample the octree
+noctree_jobs=$((64*$nchannels))
+
 expr="p=addprocs(8);
       @everywhere include(\"${destination}/set_parameters.jl\");
       @everywhere include(\"${destination}/calculated_parameters.jl\");
-      @everywhere include(\"${RENDER_PATH}/src/render/admin.jl\");
+      @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       t=time();
       id=parse(Int,ENV[\"SGE_TASK_ID\"]);
-      ch=(id-1)%2+1;
-      oct=(id-1)>>4+1;
-      oct2=((id-1)>>1)%8+1;
+      ch=(id-1)%nchannels+1;
+      oct=div((id-1)>>3,nchannels)+1;
+      oct2=div(id-1,nchannels)%8+1;
       tmp=joinpath(shared_scratch,string(oct),string(oct2));
       if isdir(tmp) 
         merge_output_tiles(shared_scratch, destination, \"default\", \".\"*string(ch-1)*\".\"*file_format,
@@ -95,21 +100,23 @@ cmd="date;
      $JULIA -e '$expr';
      date;"
 echo $cmd &>> $logfile_scratch/render.log
+taskid1=1
+taskid2=$noctree_jobs
 if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t 1:128 -tc $throttle_octree -pe batch 9 -j y -b n -V \
+  echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t $taskid1-$taskid2 -tc $throttle_octree -pe batch 9 -j y -b n -V \
         -hold_jid $jobname -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
-  parallel -S $which_cluster -j $throttle_octree $pcmd ::: `seq 1 128` &>> $logfile_scratch/render.log
+  parallel -S $which_cluster -j $throttle_octree $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
 fi
 
 expr="p=addprocs(8);
       @everywhere include(\"${destination}/set_parameters.jl\");
       @everywhere include(\"${destination}/calculated_parameters.jl\");
-      @everywhere include(\"${RENDER_PATH}/src/render/admin.jl\");
+      @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       t=time();
       id=parse(Int,ENV[\"SGE_TASK_ID\"]);
-      ch=(id-129)%2+1;
+      ch=(id-64*nchannels-1)%nchannels+1;
       merge_output_tiles(nlevels>1 ? destination : shared_scratch, destination, \"default\",
             \".\"*string(ch-1)*\".\"*file_format, \"\", true, true, false);
       info(\"merging took \",string(round(Int,time()-t)),\" sec\")"
@@ -118,12 +125,14 @@ cmd="date;
      $JULIA -e '$expr';
      date;"
 echo $cmd &>> $logfile_scratch/render.log
+taskid1=$(($noctree_jobs+1))
+taskid2=$(($noctree_jobs+$nchannels))
 if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N ${jobname}3 -t 129:130 -pe batch 9 -j y -b n -V \
+  echo $cmd | qsub -A $bill_userid -N ${jobname}3 -t $taskid1-$taskid2 -pe batch 9 -j y -b n -V \
         -hold_jid ${jobname}2 -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
-  parallel -S $which_cluster -j $throttle_octree $pcmd ::: `seq 129 130` &>> $logfile_scratch/render.log
+  parallel -S $which_cluster -j $throttle_octree $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
 fi
 
 # delete shared_scratch
@@ -147,6 +156,6 @@ fi
 echo watch -n 60 tail -n '$((LINES-2))' $logfile_scratch/monitor.log | mail -s "job $jobname started" $notify_addr
 
 # start the monitor process
-nohup sh -c "sleep 10; ${RENDER_PATH}/src/render/monitor $jobname $destination/set_parameters.jl &> ${logfile_scratch}/monitor.log" 2>/dev/null &
+nohup sh -c "sleep 10; ${RENDER_PATH}/src/render/src/monitor $jobname $destination/set_parameters.jl &> ${logfile_scratch}/monitor.log" 2>/dev/null &
 
 date >> $logfile_scratch/render.log
