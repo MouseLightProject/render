@@ -75,6 +75,13 @@ need to execute to transfer and compress the log files:
 Don't forget to do this, as otherwise it will be difficult to subsequently
 diagnose any errors.
 
+You might also want to quantify the time spent in each section of the rendering
+algorithm:
+
+```
+julia ./beancounter.jl <destination>
+```
+
 To kill the render before it completes, use the qdel command:
 
 ```
