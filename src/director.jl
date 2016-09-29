@@ -177,8 +177,8 @@ t0=time()
             map((x)->notify(events[x,1], nothing), 1:nnodes)
             break
           end
-          channel = (idx-1)%2+1
-          shape = job_aabbs[(idx+1)>>1][1]
+          jobidx, channel = [divrem(idx-1, nchannels)...]+1
+          shape = job_aabbs[jobidx][1]
           cmd = "squatter $p dole out job $(ARGS[1]) $channel $(shape[2][1]) $(shape[2][2]) $(shape[2][3]) $(shape[3][1]) $(shape[3][2]) $(shape[3][3]) $hostname $port"
           println(sock, cmd)
           info(string(cmd), prefix="DIRECTOR>SQUATTER: ")

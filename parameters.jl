@@ -10,8 +10,12 @@ const max_tiles_per_job=1000  # maximum number of input tiles per cluster job
 const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
-const throttle_leaf = 32  # for which_cluster=="janelia", max is 32, otherwise length(which_cluster)
-const throttle_octree = 32  # < ~22 per local machine
+const throttle_leaf = 16  # number of compute nodes to render leaf tiles
+# for which_cluster=="janelia", max is 16, otherwise length(which_cluster)
+
+const throttle_octree = 32  # number of compute nodes to downsample octree
+# for which_cluster!="janelia", set to ncores_per_machine / 8
+
 const short_queue = false  # rendering leaf nodes MUST take less than 1 hour
 
 const source="/groups/mousebrainmicro/stitch/..."  # path to tilebase.cache.yml
