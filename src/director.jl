@@ -115,7 +115,7 @@ TileBaseClose(tiles)
 
 # initialize tcp communication with squatters
 nnodes = min( nchannels*length(job_aabbs),
-              throttle_leaf,
+              throttle_leaf_nmachines,
               which_cluster=="janelia" ? 32 : length(which_cluster) )
 info("number of cluster nodes used = $nnodes", prefix="DIRECTOR: ")
 events = Array(Condition,nnodes,2)

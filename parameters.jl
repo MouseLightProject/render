@@ -10,11 +10,21 @@ const max_tiles_per_job=1000  # maximum number of input tiles per cluster job
 const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
-const throttle_leaf = 16  # number of compute nodes to render leaf tiles
-# for which_cluster=="janelia", max is 16, otherwise length(which_cluster)
+const throttle_leaf_nmachines = 16  # number of compute nodes to use to render leafs
+# for which_cluster=="janelia" set to 16 (max is 32)
+# otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree = 32  # number of compute nodes to downsample octree
-# for which_cluster!="janelia", set to ncores_per_machine / 8
+const throttle_octree_nmachines = 32  # number of compute nodes to use to downsample octree
+# for which_cluster=="janelia" set to 32
+# otherwise this parameter is ignored, and is taken to be length(which_cluster)
+
+const throttle_octree_njobs_per_machine = 1
+# for which_cluster=="janelia" set to 1
+# otherwise set to ncores per machine for small data sets
+
+const throttle_octree_ncores_per_job = 9
+# for which_cluster=="janelia" set to 9 (max is 16)
+# otherwise set to 1 for small data sets
 
 const short_queue = false  # rendering leaf nodes MUST take less than 1 hour
 

@@ -9,9 +9,13 @@ export LD_LIBRARY_PATH=/usr/local/cuda-7.0/lib64:/usr/local/gcc-6.1.0/lib64
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric/julia-0.5.0/bin/julia
 
 # get vars from parameters.jl file
-read -a tmp <<< $($JULIA -L $1/set_parameters.jl -e "print(bill_userid -L $1/set_parameters.jl -L $1/calculated_parameters.jl)")
+read -a tmp <<< $($JULIA -L $1/set_parameters.jl -e "print(bill_userid,' ',typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),' ',throttle_octree_nmachines,' ',throttle_octree_njobs_per_machine,' ',throttle_octree_ncores_per_job,' ',nchannels)")
 bill_userid=${tmp[0]}
-which_cluster_octree=${tmp[1]}
+which_cluster=${tmp[1]}
+throttle_octree_nmachines=${tmp[2]}
+throttle_octree_njobs_per_machine=${tmp[3]}
+throttle_octree_ncores_per_job=${tmp[4]}
+nchannels=${tmp[5]}
 
 # create a probably-unique job name
 jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
@@ -43,7 +47,7 @@ sources=$(printf "\"%s\", " ${@:1:(($#-1))})
 
 noctree_jobs=$((64*$nchannels))
 
-expr="p=addprocs(8);
+expr="p=addprocs(${throttle_octree_ncores_per_job});
       @everywhere include(\"$1/set_parameters.jl\");
       @everywhere include(\"$1/calculated_parameters.jl\");
       @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
@@ -51,7 +55,7 @@ expr="p=addprocs(8);
       ch=(id-1)%nchannels+1;
       oct=div((id-1)>>3,nchannels)+1;
       oct2=div(id-1,nchannels)%8+1;
-      merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".tif\",
+      merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".\"file_format,
             string(oct)*\"/\"*string(oct2), true, false, false)"
 cmd="date;
      hostname;
@@ -60,22 +64,22 @@ cmd="date;
 echo $cmd
 taskid1=1
 taskid2=$noctree_jobs
-if [ $which_cluster_octree == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N $jobname -t $taskid1-$taskid2 -tc $throttle_octree -pe batch 9 -j y -b n -V \
+if [ $which_cluster == 'janelia' ]; then
+  echo $cmd | qsub -A $bill_userid -N $jobname -t $taskid1-$taskid2 -tc $throttle_octree_nmachines -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
         -l sandy=true -o ${@: -1}/merge/'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={#}; { $cmd } &> ${@: -1}/merge/{#}.log"
-  parallel -S $which_cluster_octree -j $throttle_octree $pcmd ::: `seq taskid1 $taskid2`
+  parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq taskid1 $taskid2`
 fi
 
-expr="p=addprocs(8);
+expr="p=addprocs(${throttle_octree_ncores_per_job});
       @everywhere include(\"$1/set_parameters.jl\");
       @everywhere include(\"$1/calculated_parameters.jl\");
       @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       id=int(ENV[\"SGE_TASK_ID\"]);
       ch=(id-64*nchannels-1)%nchannels+1;
       oct=div(id-64*nchannels-1,nchannels)+1;
-      merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".tif\",
+      merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".\"file_format,
             string(oct), false, false, false)"
 cmd="date;
      hostname;
@@ -84,21 +88,21 @@ cmd="date;
 echo $cmd
 taskid1=$(($noctree_jobs+1))
 taskid2=$(($noctree_jobs+8*$nchannels))
-if [ $which_cluster_octree == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N $jobname -t $taskid1-$taskid2 -pe batch 9 -j y -b n -V \
+if [ $which_cluster == 'janelia' ]; then
+  echo $cmd | qsub -A $bill_userid -N $jobname -t $taskid1-$taskid2 -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
         -l sandy=true -o ${@: -1}/merge/'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={#}; { $cmd } &> ${@: -1}/merge/{#}.log"
-  parallel -S $which_cluster_octree $pcmd ::: `seq $taskid1 $taskid2`
+  parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq $taskid1 $taskid2`
 fi
 
-expr="p=addprocs(8);
+expr="p=addprocs(${throttle_octree_ncores_per_job});
       @everywhere include(\"$1/set_parameters.jl\");
       @everywhere include(\"$1/calculated_parameters.jl\");
       @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       id=int(ENV[\"SGE_TASK_ID\"]);
       ch=(id-(64+8)*nchannels-1)%nchannels+1;
-      merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".tif\", \"\",
+      merge_output_tiles([${sources%%, }], \"${@: -1}\", \"default\", \".\"*string(ch-1)*\".\"*file_format, \"\",
             false, false, false)"
 cmd="date;
      hostname;
@@ -106,13 +110,13 @@ cmd="date;
      date"
 echo $cmd
 taskid1=$(($noctree_jobs+8*$nchannels+1))
-taskid2=$(($noctree_jobs+8*$nchannels+2))
-if [ $which_cluster_octree == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N $jobname -t $taskid1-$taskid2 -pe batch 9 -j y -b n -V \
+taskid2=$(($noctree_jobs+8*$nchannels+$nchannels))
+if [ $which_cluster == 'janelia' ]; then
+  echo $cmd | qsub -A $bill_userid -N $jobname -t $taskid1-$taskid2 -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
         -l sandy=true -o ${@: -1}/merge/'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={#}; { $cmd } &> ${@: -1}/merge/{#}.log"
-  parallel -S $which_cluster_octree $pcmd ::: `seq $taskid1 $taskid2`
+  parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq $taskid1 $taskid2`
 fi
 
 #cmd="date;

@@ -7,9 +7,9 @@
 # to monitor progress:
 #   watch -n 120 tail -n 40 <destination>/monitor.log
 
-# data are temporarily logged in <logfile_scratch>/{director,monitor,squatter1-N,merge1-130}.log,
-# where N=throttle_leaf from parameters.jl, and then tar'd into <destination>/logs.tar.gz.
-# manual queries into these log files are informative:
+# data are temporarily logged in <logfile_scratch>/{director,monitor,squatter1-N,merge1-M}.log,
+# where N=throttle_leaf_nmachines from parameters.jl, and M~throttle_octree_nmachines, and then
+# tar'd into <destination>/logs.tar.gz.  manual queries into these log files are informative:
 #   tar xzfO <destination>/logs.tar.gz render.log 
 #   tar xzfO <destination>/logs.tar.gz | grep "ERROR"
 #   tar xzfO <destination>/logs.tar.gz | grep "reading input tile" | wc
@@ -30,7 +30,7 @@ export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
 export JULIA=/home/arthurb/bin/julia-0.5.0/bin/julia
 
 # get vars from parameters.jl file
-read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',logfile_scratch,' ',delete_scratch,' ',notify_addr,' ',bill_userid,' ',typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),' ',throttle_octree,' ',file_format,' ',nchannels)")
+read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',logfile_scratch,' ',delete_scratch,' ',notify_addr,' ',bill_userid,' ',typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),' ',throttle_octree_nmachines,' ',throttle_octree_njobs_per_machine,' ',throttle_octree_ncores_per_job,' ',nchannels)")
 destination=${tmp[0]}
 shared_scratch=${tmp[1]}
 logfile_scratch=${tmp[2]}
@@ -38,9 +38,10 @@ delete_scratch=${tmp[3]}
 notify_addr=${tmp[4]}
 bill_userid=${tmp[5]}
 which_cluster=${tmp[6]}
-throttle_octree=${tmp[7]}
-file_format=${tmp[8]}
-nchannels=${tmp[9]}
+throttle_octree_nmachines=${tmp[7]}
+throttle_octree_njobs_per_machine=${tmp[8]}
+throttle_octree_ncores_per_job=${tmp[9]}
+nchannels=${tmp[10]}
 
 # delete <logfile_scratch> and <destination> if they exist
 if [ -d $logfile_scratch ] ; then
@@ -76,7 +77,7 @@ fi
 # downsample the octree
 noctree_jobs=$((64*$nchannels))
 
-expr="p=addprocs(8);
+expr="p=addprocs(${throttle_octree_ncores_per_job});
       @everywhere include(\"${destination}/set_parameters.jl\");
       @everywhere include(\"${destination}/calculated_parameters.jl\");
       @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
@@ -103,14 +104,14 @@ echo $cmd &>> $logfile_scratch/render.log
 taskid1=1
 taskid2=$noctree_jobs
 if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t $taskid1-$taskid2 -tc $throttle_octree -pe batch 9 -j y -b n -V \
+  echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t $taskid1-$taskid2 -tc $throttle_octree_nmachines -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
         -hold_jid $jobname -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
-  parallel -S $which_cluster -j $throttle_octree $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
+  parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
 fi
 
-expr="p=addprocs(8);
+expr="p=addprocs(${throttle_octree_ncores_per_job});
       @everywhere include(\"${destination}/set_parameters.jl\");
       @everywhere include(\"${destination}/calculated_parameters.jl\");
       @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
@@ -128,11 +129,11 @@ echo $cmd &>> $logfile_scratch/render.log
 taskid1=$(($noctree_jobs+1))
 taskid2=$(($noctree_jobs+$nchannels))
 if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N ${jobname}3 -t $taskid1-$taskid2 -pe batch 9 -j y -b n -V \
+  echo $cmd | qsub -A $bill_userid -N ${jobname}3 -t $taskid1-$taskid2 -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
         -hold_jid ${jobname}2 -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
-  parallel -S $which_cluster -j $throttle_octree $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
+  parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
 fi
 
 # delete shared_scratch
