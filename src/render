@@ -23,11 +23,9 @@
 
 set -e
 
-#export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3
-export RENDER_PATH=/home/arthurb/projects/mouselight
+export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3
 export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
-#export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3/julia-0.5.0/bin/julia
-export JULIA=/home/arthurb/bin/julia-0.5.0/bin/julia
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3/julia-0.5.0/bin/julia
 
 # get vars from parameters.jl file
 read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',logfile_scratch,' ',delete_scratch,' ',notify_addr,' ',bill_userid,' ',typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),' ',throttle_octree_nmachines,' ',throttle_octree_njobs_per_machine,' ',throttle_octree_ncores_per_job,' ',nchannels)")
