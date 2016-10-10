@@ -47,6 +47,7 @@ const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) =
 #    squeeze(sum(
 #        [(((morton_order[depth]-1)>>xyz)&1)/2^depth for xyz=0:2, depth=1:length(morton_order)] ,2),2),
 #    fill(0.5^length(morton_order),3) )
+
 const include_origins_outside_roi=false   # set to true to render all of small test ROI
 
 const notify_addr = "<yourId>@janelia.hhmi.org"

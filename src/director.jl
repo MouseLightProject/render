@@ -192,8 +192,8 @@ t0=time()
   #launch_workers
   cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/squatter.jl $(ARGS[1]) $hostname $port`
   if which_cluster=="janelia"
-    queue = short_queue ? `-l h_rt=3599 -pe batch 16` : `-l haswell=true -pe batch 32`
-    pcmd = `qsub -A $bill_userid -t 1-$nnodes $queue -N $(jobname)1
+    queue = short_queue ? `-l h_rt=3599 -pe batch 16` : `-l h_rt=604800 -pe batch 32`
+    pcmd = `qsub -A $bill_userid -t 1-$nnodes $queue -N $(jobname)1 -l haswell=true
           -R yes -b y -j y -V -shell n -o $logfile_scratch/squatter'$TASK_ID'.log $cmd`
     info(string(pcmd), prefix="DIRECTOR: ")
     jobid = match(r"(?<=job-array )[0-9]*", readchomp(pcmd)).match
