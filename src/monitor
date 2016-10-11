@@ -14,6 +14,10 @@ destination=${tmp[0]}
 shared_scratch=${tmp[1]}
 logfile_scratch=${tmp[2]}
 
+outofString=$(grep "channels split into" ${logfile_scratch}/director.log)
+outofArray=($outofString)
+outof=$(( ${outofArray[1]} * ${outofArray[4]} ))
+
 display_it() {
   if [ -n "$2" ] ; then
     echo $1
@@ -75,7 +79,7 @@ while true ; do
   echo started on ${started%%.*}
   printf "\n"
 
-  echo $ntiles input tile-colors read
+  echo $ntiles input tile-channels read out of $outof
   echo $sharedscratch1 output tiles saved to shared_scratch = $shared_scratch , ${sharedscratch2[10]} available
   echo $destination1 output tiles saved to destination = $destination , ${destination2[10]} available
   printf "\n"
@@ -104,7 +108,7 @@ while true ; do
     printf "%4s%8s" " ${logs[i]%.log}" ${nodes[i]}
     printf "%9s%8s" ${memoryArray[@]:30:4} ${localscratchArray[@]:8:2}
     printf "%8sM%7sM" $rXMBps $tXMBps
-    printf "%9s%9s" ${loadArray[22]} ${tiles[i]}
+    printf "%9s%9s" ${loadArray[23]} ${tiles[i]}
     printf "\n"
   done
 
