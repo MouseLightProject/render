@@ -324,13 +324,13 @@ function _merge_across_filesystems(
       info("  reading ",in_tile)
       t1=time()
       ndioClose(ndioRead(ndioOpen( in_tile, C_NULL, "r" ),merge2_ws))
-      time_read_files=(time()-t1)
+      time_read_files+=(time()-t1)
       t1=time()
       merge1_jl[:,:,:] = max(merge1_jl,merge2_jl)
-      time_max_files=(time()-t1)
+      time_max_files+=(time()-t1)
       t1=time()
       delete && (info("  deleting ",in_tile); rm(in_tile))
-      time_delete_files=(time()-t1)
+      time_delete_files+=(time()-t1)
     end
     info("  copying to ",destination2)
     t1=time()
@@ -342,7 +342,9 @@ function _merge_across_filesystems(
 
   if octree
     if length(in_tiles)==1
+      t0=time()
       ndioClose(ndioRead(ndioOpen( in_tiles[1], C_NULL, "r" ),merge1_ws))
+      time_read_files+=(time()-t0)
     elseif length(in_tiles)==0
       t0=time()
       info("saving output tile ",out_tile_path," to ",destination2)
