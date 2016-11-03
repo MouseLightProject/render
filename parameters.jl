@@ -26,7 +26,7 @@ const throttle_octree_ncores_per_job = 9
 # for which_cluster=="janelia" set to 9 (max is 16)
 # otherwise set to 1 for small data sets
 
-const short_queue = false  # rendering leaf nodes MUST take less than 1 hour
+const short_queue = false  # rendering MUST take less than 1 hour
 
 const source="/groups/mousebrainmicro/stitch/..."  # path to tilebase.cache.yml
 const destination="/nobackup2/mouselight/..."  # path to octree

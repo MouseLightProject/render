@@ -28,7 +28,7 @@ export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3/julia-0.5.0/bin/julia
 
 # get vars from parameters.jl file
-read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',logfile_scratch,' ',delete_scratch,' ',notify_addr,' ',bill_userid,' ',typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),' ',throttle_octree_nmachines,' ',throttle_octree_njobs_per_machine,' ',throttle_octree_ncores_per_job,' ',nchannels)")
+read -a tmp <<< $($JULIA -L $1 -e "print(destination,' ',shared_scratch,' ',logfile_scratch,' ',delete_scratch,' ',notify_addr,' ',bill_userid,' ',typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),' ',throttle_octree_nmachines,' ',throttle_octree_njobs_per_machine,' ',throttle_octree_ncores_per_job,' ',nchannels,' ',short_queue)")
 destination=${tmp[0]}
 shared_scratch=${tmp[1]}
 logfile_scratch=${tmp[2]}
@@ -40,6 +40,13 @@ throttle_octree_nmachines=${tmp[7]}
 throttle_octree_njobs_per_machine=${tmp[8]}
 throttle_octree_ncores_per_job=${tmp[9]}
 nchannels=${tmp[10]}
+short_queue=${tmp[11]}
+
+if [ "$short_queue" = "true" ] ; then
+  time_limit=3599   # an hour
+else
+  time_limit=604800  # a week
+fi
 
 # delete <logfile_scratch> and <destination> if they exist
 if [ -d $logfile_scratch ] ; then
@@ -67,7 +74,7 @@ echo jobname = $jobname >> $logfile_scratch/render.log
 cmd="$JULIA ${RENDER_PATH}/src/render/src/director.jl $destination/set_parameters.jl $jobname"
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
-  qsub -A $bill_userid -N $jobname -j y -b y -V -shell n -l h_rt=604800 -l sandy=true -o $logfile_scratch/director.log $cmd
+  qsub -A $bill_userid -N $jobname -j y -b y -V -shell n -l h_rt=$time_limit -l sandy=true -o $logfile_scratch/director.log $cmd
 else
   eval $cmd &> $logfile_scratch/director.log
 fi
@@ -103,7 +110,7 @@ taskid1=1
 taskid2=$noctree_jobs
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t $taskid1-$taskid2 -tc $throttle_octree_nmachines -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
-        -hold_jid $jobname -R yes -l h_rt=604800 -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
+        -hold_jid $jobname -R yes -l h_rt=$time_limit -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export HOSTNAME=$HOSTNAME; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
   parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
@@ -128,7 +135,7 @@ taskid1=$(($noctree_jobs+1))
 taskid2=$(($noctree_jobs+$nchannels))
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | qsub -A $bill_userid -N ${jobname}3 -t $taskid1-$taskid2 -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
-        -hold_jid ${jobname}2 -R yes -l h_rt=604800 -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
+        -hold_jid ${jobname}2 -R yes -l h_rt=$time_limit -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export HOSTNAME=$HOSTNAME; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
   parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
@@ -145,7 +152,7 @@ cmd="date;
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | qsub -A $bill_userid -N ${jobname}4 -j y -b n -V \
-        -hold_jid ${jobname}3 -l sandy=true \
+        -hold_jid ${jobname}3 -l h_rt=$time_limit -l sandy=true \
         -o $logfile_scratch/render.log -m e -M $notify_addr
 else
   eval $cmd &>> $logfile_scratch/render.log

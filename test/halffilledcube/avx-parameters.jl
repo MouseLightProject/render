@@ -26,7 +26,7 @@ const throttle_octree_ncores_per_job = 1
 # for which_cluster=="janelia" set to 9 (max is 16)
 # otherwise set to 1 for small data sets
 
-const short_queue = true  # rendering leaf nodes MUST take less than 1 hour
+const short_queue = true  # rendering MUST take less than 1 hour
 
 const source=joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube") # path to tilebase.cache.yml
 const destination=joinpath(source,"scratch","avx","results")  # path to octree
