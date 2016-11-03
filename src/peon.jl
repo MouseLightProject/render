@@ -60,7 +60,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
         #BarycentricGPUdestination(resampler, nddata(out_tiles_ws[out_tile_path_next]))
         #BarycentricGPUresample(resampler, convert(Array{Float32}, transform))
         #BarycentricGPUresult(resampler, nddata(out_tiles_ws[out_tile_path_next]))
-      elseif has_avx2
+      elseif has_avx2 && use_avx
         BarycentricAVXdestination(resampler, nddata(out_tiles_ws[out_tile_path_next]))
         BarycentricAVXresample(resampler, convert(Array{Float32}, transform), orientation, interpolation)
         BarycentricAVXresult(resampler, nddata(out_tiles_ws[out_tile_path_next]))
@@ -189,7 +189,7 @@ function process_input_tile()
         #BarycentricGPUinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr , 3)
         #BarycentricGPUsource(resampler, nddata(in_subtile_ws))
         #info("initialized GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
-      elseif has_avx2
+      elseif has_avx2 && use_avx
         BarycentricAVXinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 3)
         BarycentricAVXsource(resampler, nddata(in_subtile_ws))
       else
@@ -222,7 +222,7 @@ function process_input_tile()
       #info("releasing GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
       #BarycentricGPUrelease(resampler)
       #info("released GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
-    elseif has_avx2
+    elseif has_avx2 && use_avx
       BarycentricAVXrelease(resampler)
     else
       BarycentricCPUrelease(resampler)

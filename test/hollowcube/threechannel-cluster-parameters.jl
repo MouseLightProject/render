@@ -41,7 +41,8 @@ const file_format="tif"  # or, e.g., h5
 
 # normalized origin and shape of sub-bounding box to render
 const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
-# use the following code to convert morton order to origin & shape
+
+# or use the following code to convert morton order to origin & shape
 #morton_order = [8,1,7,3]
 #const region_of_interest = (
 #    squeeze(sum(
@@ -59,6 +60,7 @@ const raw_compression_ratios = [] # or e.g. [10,80]
 const octree_compression_ratios = []
 
 const dry_run = false
+const use_avx = true
 
 # build the octree with a function below.  should return uint16
 

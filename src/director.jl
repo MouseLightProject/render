@@ -28,8 +28,8 @@ info("deleting shared_scratch = ",shared_scratch," at start took ",string(round(
 # get the max output tile size
 tiles_bbox = AABBGetJ(TileBaseAABB(tiles))
 const shape_tiles_nm = tiles_bbox[3]
-const nlevels = ceil(Int,
-    log(8, prod(map(Float64,shape_tiles_nm)) / (prod(voxelsize_um)*um2nm^3) / max_pixels_per_leaf) )
+const nlevels = max(0, ceil(Int,
+    log(8, prod(map(Float64,shape_tiles_nm)) / (prod(voxelsize_um)*um2nm^3) / max_pixels_per_leaf) ))
 shape_leaf_tmp = round(Int,round(shape_tiles_nm./um2nm./voxelsize_um./2^nlevels,-1,2))
 # there must be better ways to ensure
 # that prod(shape_leaf_px) is divisible by 32*32*4, and
@@ -200,7 +200,7 @@ t0=time()
   else
     proc = Array(Any,nnodes)
     for n=1:nnodes
-      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n]) export RENDER_PATH=$(ENV["RENDER_PATH"]); export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]); export JULIA=$(ENV["JULIA"]); export SGE_TASK_ID=$n; $cmd &> $logfile_scratch/squatter$n.log`
+      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n]) export RENDER_PATH=$(ENV["RENDER_PATH"]); export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]); export JULIA=$(ENV["JULIA"]); export HOSTNAME=$(ENV["HOSTNAME"]); export SGE_TASK_ID=$n; $cmd &> $logfile_scratch/squatter$n.log`
       info(string(pcmd), prefix="DIRECTOR: ")
       proc[n] = spawn(pcmd)
     end

@@ -7,7 +7,7 @@ const max_pixels_per_leaf=50^3  # maximum number of pixels in output tiles
 const max_tiles_per_job=1000  # maximum number of input tiles per cluster job
 # size to use all of RAM
 
-const which_cluster = ["legrose-ws1"] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
+const which_cluster = [ENV["HOSTNAME"]] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
 const throttle_leaf_nmachines = 16  # number of compute nodes to use to render leafs
@@ -18,7 +18,7 @@ const throttle_octree_nmachines = 32  # number of compute nodes to use to downsa
 # for which_cluster=="janelia" set to 32
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_njobs_per_machine = 6
+const throttle_octree_njobs_per_machine = Sys.CPU_CORES
 # for which_cluster=="janelia" set to 1
 # otherwise set to ncores per machine for small data sets
 
@@ -41,7 +41,8 @@ const file_format="tif"  # or, e.g., h5
 
 # normalized origin and shape of sub-bounding box to render
 const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
-# use the following code to convert morton order to origin & shape
+
+# or use the following code to convert morton order to origin & shape
 #morton_order = [8,1,7,3]
 #const region_of_interest = (
 #    squeeze(sum(
@@ -59,6 +60,7 @@ const raw_compression_ratios = [] # or e.g. [10,80]
 const octree_compression_ratios = []
 
 const dry_run = false
+const use_avx = true
 
 # build the octree with a function below.  should return uint16
 

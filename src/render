@@ -105,7 +105,7 @@ if [ $which_cluster == 'janelia' ]; then
   echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t $taskid1-$taskid2 -tc $throttle_octree_nmachines -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
         -hold_jid $jobname -R yes -l h_rt=604800 -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
 else
-  pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
+  pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export HOSTNAME=$HOSTNAME; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
   parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
 fi
 
@@ -130,7 +130,7 @@ if [ $which_cluster == 'janelia' ]; then
   echo $cmd | qsub -A $bill_userid -N ${jobname}3 -t $taskid1-$taskid2 -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
         -hold_jid ${jobname}2 -R yes -l h_rt=604800 -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
 else
-  pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
+  pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export HOSTNAME=$HOSTNAME; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
   parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
 fi
 

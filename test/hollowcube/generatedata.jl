@@ -4,11 +4,10 @@ const raw_compression_ratios = []
 
 const testpath = joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/data")
 
-include("../../src/admin.jl")
+include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 
 using Base.Test
 
-#overlap = 8
 inset = 4
 in_tile_1_jl = zeros(UInt16,shape_leaf_px...)
 
