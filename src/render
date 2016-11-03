@@ -74,7 +74,7 @@ echo jobname = $jobname >> $logfile_scratch/render.log
 cmd="$JULIA ${RENDER_PATH}/src/render/src/director.jl $destination/set_parameters.jl $jobname"
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
-  qsub -A $bill_userid -N $jobname -j y -b y -V -shell n -l h_rt=$time_limit -l sandy=true -o $logfile_scratch/director.log $cmd
+  qsub -A $bill_userid -N $jobname -j y -b y -V -shell n -l h_rt=$time_limit -o $logfile_scratch/director.log $cmd
 else
   eval $cmd &> $logfile_scratch/director.log
 fi
@@ -110,7 +110,7 @@ taskid1=1
 taskid2=$noctree_jobs
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t $taskid1-$taskid2 -tc $throttle_octree_nmachines -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
-        -hold_jid $jobname -R yes -l h_rt=$time_limit -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
+        -hold_jid $jobname -R yes -l h_rt=$time_limit -o $logfile_scratch/merge'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export HOSTNAME=$HOSTNAME; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
   parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
@@ -135,7 +135,7 @@ taskid1=$(($noctree_jobs+1))
 taskid2=$(($noctree_jobs+$nchannels))
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | qsub -A $bill_userid -N ${jobname}3 -t $taskid1-$taskid2 -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
-        -hold_jid ${jobname}2 -R yes -l h_rt=$time_limit -l sandy=true -o $logfile_scratch/merge'$TASK_ID'.log
+        -hold_jid ${jobname}2 -R yes -l h_rt=$time_limit -o $logfile_scratch/merge'$TASK_ID'.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export HOSTNAME=$HOSTNAME; export SGE_TASK_ID={}; { $cmd } &> $logfile_scratch/merge{}.log"
   parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq $taskid1 $taskid2` &>> $logfile_scratch/render.log
@@ -152,7 +152,7 @@ cmd="date;
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | qsub -A $bill_userid -N ${jobname}4 -j y -b n -V \
-        -hold_jid ${jobname}3 -l h_rt=$time_limit -l sandy=true \
+        -hold_jid ${jobname}3 -l h_rt=$time_limit \
         -o $logfile_scratch/render.log -m e -M $notify_addr
 else
   eval $cmd &>> $logfile_scratch/render.log
