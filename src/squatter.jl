@@ -24,7 +24,7 @@ while isopen(sock) || nb_available(sock)>0
   info(tmp, prefix="SQUATTER<DIRECTOR: ")
   if ismatch(dole_out,tmp)
     cmd=`$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/manager.jl $(split(tmp)[6:end])`
-    info(string(cmd), prefix="SQUATTER: ")
+    info(cmd, prefix="SQUATTER: ")
     try
       run(cmd)
     catch

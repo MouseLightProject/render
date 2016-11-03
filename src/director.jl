@@ -23,7 +23,7 @@ info("source = ",source, prefix="DIRECTOR: ")
 info("destination = ",destination, prefix="DIRECTOR: ")
 mkpath(shared_scratch)
 scratch0 = rmcontents(shared_scratch, "after", "DIRECTOR: ")
-info("deleting shared_scratch = ",shared_scratch," at start took ",string(round(Int,time()-t0))," sec", prefix="DIRECTOR: ")
+info("deleting shared_scratch = ",shared_scratch," at start took ",round(Int,time()-t0)," sec", prefix="DIRECTOR: ")
 
 # get the max output tile size
 tiles_bbox = AABBGetJ(TileBaseAABB(tiles))
@@ -67,7 +67,7 @@ open("$destination/transform.txt","w") do f  # for large volume viewer
   println(f,"nl: ",nlevels+1)
 end
 cp(joinpath(source,"tilebase.cache.yml"), joinpath(destination,"tilebase.cache.yml"))
-info("number of levels = ",string(nlevels), prefix="DIRECTOR: ")
+info("number of levels = ",nlevels, prefix="DIRECTOR: ")
 info("shape of output tiles is [",join(map(string,shape_leaf_px),","),"] pixels", prefix="DIRECTOR: ")
 info("voxel dimensions used to make output tile shape even and volume divisible by 32*32*4: [",
     join(map(string,voxelsize_used_um),",")," microns", prefix="DIRECTOR: ")
@@ -106,7 +106,7 @@ tiles_bbox[3][:] = round(Int,tiles_bbox[3][:] .* region_of_interest[2])
 get_job_aabbs(tiles_bbox)
 sort!(job_aabbs; lt=(x,y)->x[2]<y[2], rev=true)
 roi_vol = prod(region_of_interest[2])
-info(string(TileBaseCount(tiles)),(roi_vol<1 ? " * "*string(roi_vol): "")," tiles with ",string(nchannels)," channels split into ",string(nchannels*length(job_aabbs))," jobs", prefix="DIRECTOR: ")
+info(TileBaseCount(tiles),(roi_vol<1 ? " * "*string(roi_vol): "")," tiles with ",nchannels," channels split into ",nchannels*length(job_aabbs)," jobs", prefix="DIRECTOR: ")
 
 include_origins_outside_roi && length(job_aabbs)>1 &&
       warn("include_origins_outside_roi should be true only when number of jobs == number of channels")
@@ -160,7 +160,7 @@ t0=time()
     @async begin
       sock = wait(events[p,1])
       if sock==nothing
-        info("deleting squatter ",string(p), prefix="DIRECTOR: ")
+        info("deleting squatter ",p, prefix="DIRECTOR: ")
         if which_cluster=="janelia"
           cmd = `qdel $(jobid).$p`
           try;  run(cmd);  end
@@ -173,7 +173,7 @@ t0=time()
           if idx > nchannels*length(job_aabbs)
             cmd = "squatter $p terminate"
             println(sock, cmd)
-            info(string(cmd), prefix="DIRECTOR>SQUATTER: ")
+            info(cmd, prefix="DIRECTOR>SQUATTER: ")
             map((x)->notify(events[x,1], nothing), 1:nnodes)
             break
           end
@@ -181,9 +181,9 @@ t0=time()
           shape = job_aabbs[jobidx][1]
           cmd = "squatter $p dole out job $(ARGS[1]) $channel $(shape[2][1]) $(shape[2][2]) $(shape[2][3]) $(shape[3][1]) $(shape[3][2]) $(shape[3][3]) $hostname $port"
           println(sock, cmd)
-          info(string(cmd), prefix="DIRECTOR>SQUATTER: ")
+          info(cmd, prefix="DIRECTOR>SQUATTER: ")
           nfinished = wait(events[p,2])
-          info("director has finished ",string(nfinished)," of ",string(nchannels*length(job_aabbs))," jobs.  ",string(signif(nfinished / (nchannels*length(job_aabbs)) * 100,4)),"% done", prefix="DIRECTOR: ")
+          info("director has finished ",nfinished," of ",nchannels*length(job_aabbs)," jobs.  ",signif(nfinished / (nchannels*length(job_aabbs)) * 100,4),"% done", prefix="DIRECTOR: ")
         end
       end
     end
@@ -195,18 +195,18 @@ t0=time()
     queue = short_queue ? `-l h_rt=3599 -pe batch 16` : `-l h_rt=604800 -pe batch 32`
     pcmd = `qsub -A $bill_userid -t 1-$nnodes $queue -N $(jobname)1 -l haswell=true
           -R yes -b y -j y -V -shell n -o $logfile_scratch/squatter'$TASK_ID'.log $cmd`
-    info(string(pcmd), prefix="DIRECTOR: ")
+    info(pcmd, prefix="DIRECTOR: ")
     jobid = match(r"(?<=job-array )[0-9]*", readchomp(pcmd)).match
   else
     proc = Array(Any,nnodes)
     for n=1:nnodes
       pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n]) export RENDER_PATH=$(ENV["RENDER_PATH"]); export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]); export JULIA=$(ENV["JULIA"]); export HOSTNAME=$(ENV["HOSTNAME"]); export SGE_TASK_ID=$n; $cmd &> $logfile_scratch/squatter$n.log`
-      info(string(pcmd), prefix="DIRECTOR: ")
+      info(pcmd, prefix="DIRECTOR: ")
       proc[n] = spawn(pcmd)
     end
   end
 end
-info("squatters took ",string(round(Int,time()-t0))," sec", prefix="DIRECTOR: ")
+info("squatters took ",round(Int,time()-t0)," sec", prefix="DIRECTOR: ")
 
 #closelibs()
 

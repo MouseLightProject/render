@@ -8,7 +8,7 @@
 # julia manager.jl parameters.jl channel originX originY originZ shapeX shapeY shapeZ hostname port
 
 const reserve_ram = 32e9  # how much RAM to *not* use for output tile scratch space
-const tile_ram = 0.85e9  # generalize
+#const tile_ram = 0.85e9  # generalize
 
 info(readchomp(`hostname`), prefix="MANAGER: ")
 info(readchomp(`date`), prefix="MANAGER: ")
@@ -30,9 +30,10 @@ elseif ngpus == 4
   num_procs = 15
 else
   nthreads = 8  # must match barycentricCPU.c
-  num_procs = floor(Int,Sys.CPU_CORES/nthreads)
+  ncores = haskey(ENV,"NSLOTS") ? parse(Int,ENV["NSLOTS"]) : Sys.CPU_CORES
+  num_procs = div(ncores,nthreads)
 end
-info(string(Sys.CPU_CORES)," CPUs and ",string(ngpus)," GPUs present which can collectively process ",string(num_procs)," tiles simultaneously", prefix="MANAGER: ")
+info(ncores," CPUs and ",ngpus," GPUs present which can collectively process ",num_procs," tiles simultaneously", prefix="MANAGER: ")
 
 info("AVX2 = ",has_avx2, prefix="MANAGER: ")
 
@@ -51,7 +52,7 @@ const tiles = TileBaseOpen(source)
 t0=time()
 rmcontents("/dev/shm", "after", "MANAGER: ")
 scratch0 = rmcontents(local_scratch, "after", "MANAGER: ")
-info("deleting /dev/shm and local_scratch = ",local_scratch," at start took ",string(round(Int,time()-t0))," sec", prefix="MANAGER: ")
+info("deleting /dev/shm and local_scratch = ",local_scratch," at start took ",round(Int,time()-t0)," sec", prefix="MANAGER: ")
 
 # read in the transform parameters
 using YAML
@@ -111,13 +112,14 @@ function depth_first_traverse(bbox,out_tile_path)
 end
 
 const total_ram = parse(Int,split(readchomp(pipeline(`cat /proc/meminfo`,`head -1`)))[2])*1024
-ncache = floor(Int,(total_ram - reserve_ram)/2/prod(shape_leaf_px))   # reserve some RAM for system, scripts, etc.
+ram_fraction = haskey(ENV,"NSLOTS") ? ncores/Sys.CPU_CORES : 1
+ncache = floor(Int,(total_ram - reserve_ram)*ram_fraction/2/prod(shape_leaf_px))   # reserve RAM for system
 merge_array = Array(UInt16, shape_leaf_px..., ncache)
 merge_used = falses(ncache)
 # one entry for each output tile
 # [total # input tiles, input tiles processed so far, input tiles sent so far, index to merge_array (0=not assigned yet, Inf=use local_scratch)]
 merge_count = Dict{String,Array{UInt16,1}}()  # expected, write cmd, write ack, RAM slot
-info("allocated RAM for ",string(ncache)," output tiles", prefix="MANAGER: ")
+info("allocated RAM for ",ncache," output tiles", prefix="MANAGER: ")
 
 locality_idx = Int[]
 depth_first_traverse(TileBaseAABB(tiles),Int[])
@@ -129,7 +131,7 @@ TileBaseClose(tiles)
 
 isempty(locality_idx) && warn("coordinates of input subtiles aren't within bounding box")
 
-info("assigned ",string(length(in_tiles_idx))," input tiles", prefix="MANAGER: ")
+info("assigned ",length(in_tiles_idx)," input tiles", prefix="MANAGER: ")
 length(in_tiles_idx)==0 && quit()
 
 # keep boss informed
@@ -171,7 +173,7 @@ t0=time()
             if idx!=0
               merge_used[idx] = true
               merge_count[out_tile_path][4] = idx
-              info("using RAM slot ",string(idx)," for output tile ",out_tile_path, prefix="MANAGER: ")
+              info("using RAM slot ",idx," for output tile ",out_tile_path, prefix="MANAGER: ")
             else
               merge_count[out_tile_path][4] = 0xffff
             end
@@ -207,7 +209,7 @@ t0=time()
           merge_array[:,:,:,merge_count[out_tile_path][4]] = merge_count[out_tile_path][3]==1 ? out_tile :
                 max(out_tile, merge_array[:,:,:,merge_count[out_tile_path][4]]::Array{UInt16,3})
           time_max_files=time()-t1
-          info("max'ing multiple files took ",string(signif(time_max_files,4))," sec")
+          info("max'ing multiple files took ",signif(time_max_files,4)," sec")
         elseif ismatch(saved,tmp)
           out_tile_path = match(saved,tmp).captures[4]
           merge_used[merge_count[out_tile_path][4]] = false
@@ -232,7 +234,7 @@ t0=time()
             $(zlims[in_tiles_idx[locality_idx[tile_idx]]])
             $(dims[in_tiles_idx[locality_idx[tile_idx]]])
             $(transform[in_tiles_idx[locality_idx[tile_idx]]])`
-      info(string(cmd), prefix="MANAGER: ")
+      info(cmd, prefix="MANAGER: ")
       try
         run(cmd)
       catch
@@ -241,17 +243,17 @@ t0=time()
     end
   end
 end
-info("peons took ",string(round(Int,time()-t0))," sec", prefix="MANAGER: ")
+info("peons took ",round(Int,time()-t0)," sec", prefix="MANAGER: ")
 
 for (k,v) in merge_count
-  info(string((k,v)), prefix="MANAGER: ")
-  v[1]>1 && v[1]!=v[2] && warn("not all input tiles processed for output tile ",string(k)," : ",string(v))
+  info((k,v), prefix="MANAGER: ")
+  v[1]>1 && v[1]!=v[2] && warn("not all input tiles processed for output tile ",k," : ",v)
 end
 
 # delete local_scratch
 t0=time()
 scratch1 = rmcontents(local_scratch, "before", "MANAGER: ")
-info("deleting local_scratch = ",local_scratch," at end took ",string(round(Int,time()-t0))," sec", prefix="MANAGER: ")
+info("deleting local_scratch = ",local_scratch," at end took ",round(Int,time()-t0)," sec", prefix="MANAGER: ")
 
 #closelibs()
 

@@ -23,13 +23,13 @@ for var in ["reading input tile", "initializing", "transforming", "saving output
   @eval $(Symbol(var2*"_max")) = maximum($(Symbol(var2*"_data")))
   @eval $(Symbol(var2*"_min")) = minimum($(Symbol(var2*"_data")))
   @eval $(Symbol(var2*"_sum")) = sum($(Symbol(var2*"_data")))
-  @eval println($var2*" took ",string(signif($(Symbol(var2*"_sum")),4))," sec, n=",string($(Symbol(var2*"_n"))))
-  #@eval println($var*" took ",string($(Symbol(var*"_min"))),", ",string($(Symbol(var*"_q"))),", ",string($(Symbol(var*"_max")))," sec, n=",string($(Symbol(var*"_n"))))
+  @eval println($var2*" took ",signif($(Symbol(var2*"_sum")),4)," sec, n=",$(Symbol(var2*"_n")))
+  #@eval println($var*" took ",$(Symbol(var*"_min")),", ",$(Symbol(var*"_q")),", ",$(Symbol(var*"_max"))," sec, n=",$(Symbol(var*"_n")))
 end
 
-println("read took: ",string(reading_input_tile_sum / overall_sum * peons_sum / 60/60),"h")
-println("xform took: ",string((initializing_sum +transforming_sum) / overall_sum * peons_sum / 60/60),"h")
-println("write took: ",string(saving_output_tiles_sum / overall_sum * peons_sum / 60/60),"h")
+println("read took: ",reading_input_tile_sum / overall_sum * peons_sum / 60/60,"h")
+println("xform took: ",(initializing_sum +transforming_sum) / overall_sum * peons_sum / 60/60,"h")
+println("write took: ",saving_output_tiles_sum / overall_sum * peons_sum / 60/60,"h")
 
 using Gadfly
 x = ["reading input tile", "initializing", "transforming", "saving output tiles", "waiting",

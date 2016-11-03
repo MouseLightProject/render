@@ -438,25 +438,25 @@ function merge_output_tiles(source, destination, prefix, chantype, out_tile_path
   accumulate_times(fetch(merge_across_filesystems(
         source, destination, prefix, chantype, out_tile_path, recurse, octree, delete)))
 
-  info("copying single files took ",string(signif(time_single_file,4))," sec")
-  info("merging multiple files took ",string(signif(time_many_files,4))," sec")
-  info("  clearing multiple files took ",string(signif(time_clear_files,4))," sec")
-  info("  reading multiple files took ",string(signif(time_read_files,4))," sec")
-  info("  max'ing multiple files took ",string(signif(time_max_files,4))," sec")
-  info("  deleting multiple files took ",string(signif(time_delete_files,4))," sec")
-  info("  writing multiple files took ",string(signif(time_write_files,4))," sec")
+  info("copying single files took ",signif(time_single_file,4)," sec")
+  info("merging multiple files took ",signif(time_many_files,4)," sec")
+  info("  clearing multiple files took ",signif(time_clear_files,4)," sec")
+  info("  reading multiple files took ",signif(time_read_files,4)," sec")
+  info("  max'ing multiple files took ",signif(time_max_files,4)," sec")
+  info("  deleting multiple files took ",signif(time_delete_files,4)," sec")
+  info("  writing multiple files took ",signif(time_write_files,4)," sec")
 
   if octree
-    info("clearing octree took ",string(signif(time_octree_clear,4))," sec")
-    info("downsampling octree took ",string(signif(time_octree_down,4))," sec")
-    info("saving octree took ",string(signif(time_octree_save,4))," sec")
+    info("clearing octree took ",signif(time_octree_clear,4)," sec")
+    info("downsampling octree took ",signif(time_octree_down,4)," sec")
+    info("saving octree took ",signif(time_octree_save,4)," sec")
   end
 end
 
 function rmcontents(dir, available, prefix)
   function get_available(dir,msg)
     free = parse(Int,split(readchomp(ignorestatus(`df $dir`)))[11])
-    info(string(signif(free/1024/1024,4))," GB available on ",dir," at ",msg, prefix=prefix)
+    info(signif(free/1024/1024,4)," GB available on ",dir," at ",msg, prefix=prefix)
     free
   end
   available=="before" && (free=get_available(dir,"end"))
