@@ -1,23 +1,10 @@
 using Base.Test
 using Images
 
-function basictests(scratchpath, correct_nchannels, correct_nmergelogs, correct_ntiffs, black_and_white)
+include("../check_logfiles.jl")
+
+function check_images(scratchpath, correct_nchannels, correct_ntiffs, black_and_white)
   logfiles = readdir(joinpath(scratchpath,"logfile_scratch"))
-
-  # all log files exist?
-  @test any(logfiles.=="render.log")
-  @test any(logfiles.=="director.log")
-  @test any(logfiles.=="monitor.log")
-  @test any(file->startswith(file,"squatter"), logfiles)
-  @test sum(map(x->startswith(x, "merge"), logfiles)) == correct_nmergelogs
-
-  # any errors reported in the log files?
-  for logfile in logfiles
-    log = read(joinpath(scratchpath,"logfile_scratch",logfile))
-    @test !contains(String(log), "ERR")
-    @test !contains(String(log), "WAR")
-    @test !contains(String(log), "Segmentation")
-  end
 
   # correct number of images, and are they black & white or not?
   ntiffs=0
@@ -52,24 +39,32 @@ end
 @testset "hollowcube" begin
 
 @testset "onechannel-$v" for v in ["local", "cluster"]
-  basictests( joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/onechannel-$v"),
-      1, 64+1, 64+8+1, true)
+  check_logfiles( joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/onechannel-$v"),
+      64+1)
+  check_images( joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/onechannel-$v"),
+      1, 64+8+1, true)
 end
 
 @testset "threechannel-$v" for v in ["local", "cluster"]
-  shades = basictests(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/threechannel-$v"),
-      3, 3*(64+1), 3*(64+8+1), true)
+  check_logfiles(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/threechannel-$v"),
+      3*(64+1))
+  shades = check_images(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/threechannel-$v"),
+      3, 3*(64+8+1), true)
   @test max(map(maximum, shades[1])...) > max(map(maximum, shades[2])...) > max(map(maximum, shades[3])...)
 end
 
 @testset "linearinterp" begin
-  basictests(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/linearinterp"),
-      1, 64+1, 64+8+1, false)
+  check_logfiles(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/linearinterp"),
+      64+1)
+  check_images(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/linearinterp"),
+      1, 64+8+1, false)
 end
 
 @testset "nslots" begin
-  basictests(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/nslots"),
-      1, 64+1, 64+8+1, true)
+  check_logfiles(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/nslots"),
+      64+1)
+  check_images(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/nslots"),
+      1, 64+8+1, true)
 
   function nslots(scratchpath, rightanswer)
     r = "MANAGER: $rightanswer CPUs"

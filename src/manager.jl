@@ -7,9 +7,6 @@
 
 # julia manager.jl parameters.jl channel originX originY originZ shapeX shapeY shapeZ hostname port
 
-const reserve_ram = 32e9  # how much RAM to *not* use for output tile scratch space
-#const tile_ram = 0.85e9  # generalize
-
 info(readchomp(`hostname`), prefix="MANAGER: ")
 info(readchomp(`date`), prefix="MANAGER: ")
 
@@ -23,6 +20,7 @@ include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
 # how many peons
 #if ngpus>0
 #  gpu_ram = cudaMemGetInfo()[2]
+#  const tile_ram = 0.85e9  # generalize
 #  num_procs = min(15,ngpus*floor(Int,gpu_ram/tile_ram))  # >4 hits swap
 if ngpus == 7
   num_procs = 7
@@ -113,7 +111,7 @@ end
 
 const total_ram = parse(Int,split(readchomp(pipeline(`cat /proc/meminfo`,`head -1`)))[2])*1024
 ram_fraction = haskey(ENV,"NSLOTS") ? ncores/Sys.CPU_CORES : 1
-ncache = floor(Int,(total_ram - reserve_ram)*ram_fraction/2/prod(shape_leaf_px))   # reserve RAM for system
+ncache = max(1, floor(Int,(total_ram - system_ram)*ram_fraction/2/prod(shape_leaf_px)))
 merge_array = Array(UInt16, shape_leaf_px..., ncache)
 merge_used = falses(ncache)
 # one entry for each output tile

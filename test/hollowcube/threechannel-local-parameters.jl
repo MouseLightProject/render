@@ -10,12 +10,12 @@ const max_tiles_per_job=1000  # maximum number of input tiles per cluster job
 const which_cluster = [ENV["HOSTNAME"]] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
-const throttle_leaf_nmachines = 16  # number of compute nodes to use to render leafs
-# for which_cluster=="janelia" set to 16 (max is 32)
+const throttle_leaf_nmachines = 32  # number of compute nodes to use to render leafs
+# for which_cluster=="janelia" set to 32 (max is 96)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_nmachines = 32  # number of compute nodes to use to downsample octree
-# for which_cluster=="janelia" set to 32
+const throttle_octree_nmachines = 64  # number of compute nodes to use to downsample octree
+# for which_cluster=="janelia" set to 64
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
 const throttle_octree_njobs_per_machine = Sys.CPU_CORES
@@ -37,7 +37,7 @@ const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
 
 const nchannels=3
 const file_infix="hollowcube"
-const file_format="tif"  # or, e.g., h5
+const file_format="tif"  # "tif" or "h5"
 
 # normalized origin and shape of sub-bounding box to render
 const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
@@ -58,9 +58,6 @@ const interpolation = "nearest"  # "nearest" or "linear"
 
 const raw_compression_ratios = [] # or e.g. [10,80]
 const octree_compression_ratios = []
-
-const dry_run = false
-const use_avx = true
 
 # build the octree with a function below.  should return uint16
 
@@ -86,3 +83,8 @@ downsampling_function(arg::Array{UInt16,3}) = (@inbounds return arg[1,1,1])
 #  end
 #  m1
 #end
+
+# the below are for testing purposes.  users shouldn't need to change.
+const dry_run = false
+const use_avx = true
+const system_ram = 32e9

@@ -29,10 +29,10 @@ const throttle_octree_ncores_per_job = 1
 const short_queue = true  # rendering MUST take less than 1 hour
 
 const source=joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube") # path to tilebase.cache.yml
-const destination=joinpath(source,"scratch","avx","results")  # path to octree
+const destination=joinpath(source,"scratch","localscratch","results")  # path to octree
 
-const shared_scratch=joinpath(source,"scratch","avx","shared_scratch")
-const logfile_scratch=joinpath(source,"scratch","avx","logfile_scratch")  # should be on /groups
+const shared_scratch=joinpath(source,"scratch","localscratch","shared_scratch")
+const logfile_scratch=joinpath(source,"scratch","localscratch","logfile_scratch")  # should be on /groups
 const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
 
 const nchannels=1
@@ -87,4 +87,4 @@ downsampling_function(arg::Array{UInt16,3}) = (@inbounds return arg[1,1,1])
 # the below are for testing purposes.  users shouldn't need to change.
 const dry_run = false
 const use_avx = true
-const system_ram = 32e9
+const system_ram = 34e9
