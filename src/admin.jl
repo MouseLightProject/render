@@ -26,48 +26,6 @@ function get_available_port(default_port)
   end
 end
 
-# interface to CUDA
-
-# map(x->(cudaSetDevice(x); [cudaMemGetInfo()...]./1024^3), 0:cudaGetDeviceCount()-1)
-
-#=
-const libcudart = ENV["LD_LIBRARY_PATH"]*"/libcudart.so"
-
-function cudaGetDeviceCount()
-  count = Cint[0]
-  ccall((:cudaGetDeviceCount, libcudart), Cint, (Ptr{Cint},), count)==0 || throw(Exception)
-  count[1]
-end
-
-function cudaMemGetInfo()
-  free = Csize_t[0]
-  total = Csize_t[0]
-  ccall((:cudaMemGetInfo, libcudart), Cint, (Ptr{Csize_t},Ptr{Csize_t}), free,total)==0 || throw(Exception)
-  free[1], total[1]
-end
-
-function cudaGetDevice()
-  dev = Cint[0]
-  ccall((:cudaGetDevice, libcudart), Cint, (Ptr{Cint},), dev)==0 || throw(Exception)
-  dev[1]
-end
-
-function cudaSetDevice(dev)
-  ccall((:cudaSetDevice, libcudart), Cint, (Cint,), dev)==0 || throw(Exception)
-  nothing
-end
-
-cudaDeviceReset() =  ccall((:cudaDeviceReset, libcudart), Cint, (), )==0 || throw(Exception)
-=#
-
-# nvidia's unified virtual addressing causes memory swap problems with multiple peons, so
-# turn off GPU detection until this is fixed
-#try
-#  global ngpus = cudaGetDeviceCount()
-#catch
-  global ngpus = 0
-#end
-
 has_avx2 = contains(readstring("/proc/cpuinfo"),"avx2")
 
 # interface to tilebase
@@ -164,7 +122,6 @@ end
 
 # interface to mltk-bary
 
-#h=Libdl.dlopen("libcudart.so",Libdl.RTLD_LAZY|Libdl.RTLD_DEEPBIND|Libdl.RTLD_GLOBAL)
 const libengine = ENV["RENDER_PATH"]*"/env/build/mltk-bary/libengine.so"
 
 #closelibs() = Libdl.dlclose(h)
@@ -179,10 +136,6 @@ BarycentricAVXinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricAVXinit, li
       Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
-#BarycentricGPUinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricGPUinit, libengine),
-#      Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
-#      r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
-
 BarycentricCPUresample(r,cube,orientation,interpolation) =
       ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint,Cint),
       r,cube,orientation,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
@@ -191,12 +144,8 @@ BarycentricAVXresample(r,cube,orientation,interpolation) =
       ccall((:BarycentricAVXresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint,Cint),
       r,cube,orientation,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
 
-#BarycentricGPUresample(r,cube) = ccall((:BarycentricGPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat}),
-#      r,cube) !=1 && throw(BarycentricException())
-
 BarycentricCPUrelease(r) = ccall((:BarycentricCPUrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
 BarycentricAVXrelease(r) = ccall((:BarycentricAVXrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
-#BarycentricGPUrelease(r) = ccall((:BarycentricGPUrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
 
 for f = ("source", "destination", "result")
   @eval $(Symbol("BarycentricCPU"*f))(r,src) =
@@ -205,9 +154,6 @@ for f = ("source", "destination", "result")
   @eval $(Symbol("BarycentricAVX"*f))(r,src) =
       ccall(($("BarycentricAVX"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
           r,src) !=1 && throw(BarycentricException())
-  #@eval $(Symbol("BarycentricGPU"*f))(r,src) =
-  #    ccall(($("BarycentricGPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
-  #        r,src) !=1 && throw(BarycentricException())
 end
 
 # port some of tilebase/app/render

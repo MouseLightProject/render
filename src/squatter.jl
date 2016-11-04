@@ -1,6 +1,6 @@
 # qsub'ed by director
 # sequentially spawns a local manager for each sub-bounding box, and
-# saves stdout/err to <destination>/[0-9]*.log
+# saves stdout/err to <destination>/squatter[0-9]*.log
 
 # julia squatter.jl parameters.jl hostname port
 

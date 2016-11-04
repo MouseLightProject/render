@@ -2,27 +2,54 @@
 # processes all leaf output tiles from a given input tile
 # for outputs with more than one input, sends results back to manager vi tcp
 #    (or saves to local_scratch if needed), otherwise saves to shared_scratch
-# saves stdout/err to <destination>/[0-9]*.log
+# saves stdout/err to <destination>/squatter[0-9]*.log
 
-# julia peon.jl parameters.jl gpu channel in_tile origin_str solo_out_tiles hostname port nxlims xlims nylims ylims nzlims zlims dims[1:3] transform[1-3*2*(n+1)^2]
+# julia peon.jl parameters.jl channel in_tile origin_str solo_out_tiles hostname port nxlims xlims nylims ylims nzlims zlims dims[1:3] transform[1-3*2*(n+1)^2]
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
 include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
+
+const local_scratch="/scratch/"*readchomp(`whoami`)
+const channel = parse(Int,ARGS[2])
+const origin_str = ARGS[4]
+const in_tile_idx = parse(Int,ARGS[3])
+const solo_out_tiles = eval(parse(ARGS[5]))
+idx = 8
+const xlims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
+idx += length(xlims)+1
+const ylims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
+idx += length(ylims)+1
+const zlims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
+idx += length(zlims)+1
+const dims = -1+map(x->parse(Int,x), ARGS[idx:idx+2])
+idx += length(dims)
+const transform_nm = reshape(map(x->parse(Int,x), ARGS[idx:end]),3,length(xlims)*length(ylims)*length(zlims))
+
+@assert all(diff(diff(xlims)).==0) "xlims not equally spaced for input tile $in_tile_idx"
+@assert all(diff(diff(ylims)).==0) "ylims not equally spaced for input tile $in_tile_idx"
+@assert all(diff(zlims).>0) "zlims not in ascending order for input tile $in_tile_idx"
+@assert xlims[1]>=0 && xlims[end]<=dims[1] "xlims out of range for input tile $in_tile_idx"
+@assert ylims[1]>=0 && ylims[end]<=dims[2] "ylims out of range for input tile $in_tile_idx"
+@assert zlims[1]>=0 && zlims[end]<=dims[3] "zlims out of range for input tile $in_tile_idx"
+
+# keep boss informed
+sock = connect(ARGS[6],parse(Int,ARGS[7]))
 
 time_initing=0.0
 time_transforming=0.0
 time_saving=0.0
 time_waiting=0.0
 
-# keep boss informed
-sock = connect(ARGS[7],parse(Int,ARGS[8]))
-
 type NDException <: Exception end
 
-const write = "manager tells peon for input tile "*ARGS[4]*" to write output tile"
-const send = "manager tells peon for input tile "*ARGS[4]*" to send output tile"
-const receive = "manager tells peon for input tile "*ARGS[4]*" to receive output tile"
+const write = string("manager tells peon for input tile ",in_tile_idx," to write output tile")
+const send = string("manager tells peon for input tile ",in_tile_idx," to send output tile")
+const receive = string("manager tells peon for input tile ",in_tile_idx," to receive output tile")
+
+const out_tiles_ws = Dict{String,Ptr{Void}}()
+const out_tiles_jl = Dict{String,Array{UInt16,3}}()
+const merge_count = Dict{String,Array{UInt8,1}}()
 
 # 2 -> sizeof(UInt16), 20e3 -> .tif metadata size, 15 -> max # possible concurrent saves, need to generalize
 enough_free(path) = parse(Int,split(readstring(`df $path`))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
@@ -56,11 +83,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
         merge_count[out_tile_path_next]=UInt8[ sum(tmp), 0 ]
       end
 
-      if !isnan(thisgpu)
-        #BarycentricGPUdestination(resampler, nddata(out_tiles_ws[out_tile_path_next]))
-        #BarycentricGPUresample(resampler, convert(Array{Float32}, transform))
-        #BarycentricGPUresult(resampler, nddata(out_tiles_ws[out_tile_path_next]))
-      elseif has_avx2 && use_avx
+      if has_avx2 && use_avx
         BarycentricAVXdestination(resampler, nddata(out_tiles_ws[out_tile_path_next]))
         BarycentricAVXresample(resampler, convert(Array{Float32}, transform), orientation, interpolation)
         BarycentricAVXresult(resampler, nddata(out_tiles_ws[out_tile_path_next]))
@@ -75,11 +98,11 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
       if merge_count[out_tile_path_next][2]==merge_count[out_tile_path_next][1]
         t0=time()
         if out_tile_path_next in solo_out_tiles
-          save_out_tile(shared_scratch, out_tile_path_next, string(ARGS[5],'.',channel-1,'.',file_format),
+          save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,'.',channel-1,'.',file_format),
               out_tiles_ws[out_tile_path_next])
           info("transfered output tile ",out_tile_path_next," from RAM to shared_scratch", prefix="PEON: ")
         else
-          msg = string("peon for input tile ",ARGS[4]," has output tile ",out_tile_path_next," ready")
+          msg = string("peon for input tile ",in_tile_idx," has output tile ",out_tile_path_next," ready")
           println(sock, msg)
           info(msg, prefix="PEON: ")
           t1=time()
@@ -91,16 +114,16 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
           time_waiting+=(time()-t1)
           info(tmp, prefix="PEON<MANAGER: ")
           if startswith(tmp,send)
-            msg = string("peon for input tile ",ARGS[4]," will send output tile ",out_tile_path_next)
+            msg = string("peon for input tile ",in_tile_idx," will send output tile ",out_tile_path_next)
             println(sock,msg)
             info(msg, prefix="PEON: ")
             serialize(sock, out_tiles_jl[out_tile_path_next])
           elseif startswith(tmp,receive)
             out_tiles_jl[out_tile_path_next][:] = max(out_tiles_jl[out_tile_path_next]::Array{UInt16,3},
                 deserialize(sock)::Array{UInt16,3})
-            save_out_tile(shared_scratch, out_tile_path_next, string(ARGS[5],'.',channel-1,'.',file_format),
+            save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,'.',channel-1,'.',file_format),
                 out_tiles_ws[out_tile_path_next])
-            msg = string("peon for input tile ",ARGS[4]," saved output tile ",out_tile_path_next)
+            msg = string("peon for input tile ",in_tile_idx," saved output tile ",out_tile_path_next)
             println(sock,msg)
             info(msg, prefix="PEON: ")
             #info("peon transfered output tile ",out_tile_path_next," from RAM to shared_scratch")
@@ -109,15 +132,15 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
               save_out_tile(local_scratch, out_tile_path_next,
                   string(in_tile_idx,'.',sub_tile_str,'.',channel-1,'.',file_format),
                   out_tiles_ws[out_tile_path_next])
-              msg = string("peon for input tile ",ARGS[4],
+              msg = string("peon for input tile ",in_tile_idx,
                   " wrote output tile ",out_tile_path_next," to local_scratch")
               println(sock,msg)
               info(msg, prefix="PEON: ")
             else
               save_out_tile(shared_scratch, out_tile_path_next,
-                  string(ARGS[5],'.',in_tile_idx,'.',sub_tile_str,'.',channel-1,'.',file_format),
+                  string(origin_str,'.',in_tile_idx,'.',sub_tile_str,'.',channel-1,'.',file_format),
                   out_tiles_ws[out_tile_path_next])
-              msg = string("peon for input tile ",string(ARGS[4]),
+              msg = string("peon for input tile ",string(in_tile_idx),
                   " wrote output tile ",out_tile_path_next," to shared_scratch")
               println(sock,msg)
               warn(msg)
@@ -183,13 +206,7 @@ function process_input_tile()
     ndref(in_subtile_ws, pointer(in_subtile_jl), convert(Cint,0))
     try
       global resampler = Ptr{Void}[0]
-      if !isnan(thisgpu)
-        #cudaSetDevice(thisgpu)
-        #info("initializing GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
-        #BarycentricGPUinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr , 3)
-        #BarycentricGPUsource(resampler, nddata(in_subtile_ws))
-        #info("initialized GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
-      elseif has_avx2 && use_avx
+      if has_avx2 && use_avx
         BarycentricAVXinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 3)
         BarycentricAVXsource(resampler, nddata(in_subtile_ws))
       else
@@ -197,7 +214,7 @@ function process_input_tile()
         BarycentricCPUsource(resampler, nddata(in_subtile_ws))
       end
     catch
-      error("BarycentricInit error:  GPU $thisgpu, input tile $in_tile_idx")
+      error("BarycentricInit error:  input tile $in_tile_idx")
     end
     time_initing+=(time()-t1)
 
@@ -218,17 +235,13 @@ function process_input_tile()
   end
 
   try
-    if !isnan(thisgpu)
-      #info("releasing GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
-      #BarycentricGPUrelease(resampler)
-      #info("released GPU ",thisgpu,", ",signif(cudaMemGetInfo()[1]/1024/1024/1024,4,2)," GB free")
-    elseif has_avx2 && use_avx
+    if has_avx2 && use_avx
       BarycentricAVXrelease(resampler)
     else
       BarycentricCPUrelease(resampler)
     end
   catch
-    error("BarycentricRelease error:  GPU $thisgpu, input tile $in_tile_idx")
+    error("BarycentricRelease error:  input tile $in_tile_idx")
   end
 
   info("initializing input tile ",in_tile_idx, " took ",round(Int,time_initing)," sec", prefix="PEON: ")
@@ -239,33 +252,6 @@ function process_input_tile()
 
   map(AABBFree,in_subtiles_aabb)
 end
-
-const local_scratch="/scratch/"*readchomp(`whoami`)
-const channel = parse(Int,ARGS[3])
-const solo_out_tiles = eval(parse(ARGS[6]))
-const thisgpu = ARGS[2]=="NaN" ? NaN : parse(Int,ARGS[2])
-const in_tile_idx = parse(Int,ARGS[4])
-idx = 9
-const xlims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
-idx += length(xlims)+1
-const ylims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
-idx += length(ylims)+1
-const zlims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
-idx += length(zlims)+1
-const dims = -1+map(x->parse(Int,x), ARGS[idx:idx+2])
-idx += length(dims)
-const transform_nm = reshape(map(x->parse(Int,x), ARGS[idx:end]),3,length(xlims)*length(ylims)*length(zlims))
-
-const out_tiles_ws = Dict{String,Ptr{Void}}()
-const out_tiles_jl = Dict{String,Array{UInt16,3}}()
-const merge_count = Dict{String,Array{UInt8,1}}()
-
-@assert all(diff(diff(xlims)).==0) "xlims not equally spaced for input tile $in_tile_idx"
-@assert all(diff(diff(ylims)).==0) "ylims not equally spaced for input tile $in_tile_idx"
-@assert all(diff(zlims).>0) "zlims not in ascending order for input tile $in_tile_idx"
-@assert xlims[1]>=0 && xlims[end]<=dims[1] "xlims out of range for input tile $in_tile_idx"
-@assert ylims[1]>=0 && ylims[end]<=dims[2] "ylims out of range for input tile $in_tile_idx"
-@assert zlims[1]>=0 && zlims[end]<=dims[3] "zlims out of range for input tile $in_tile_idx"
 
 if !dry_run
   process_input_tile()
@@ -281,7 +267,7 @@ end
 #closelibs()
 
 # keep boss informed
-msg = string("peon for input tile ",ARGS[4]," is finished")
+msg = string("peon for input tile ",in_tile_idx," is finished")
 println(sock,msg)
 info(msg, prefix="PEON: ")
 close(sock)

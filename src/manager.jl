@@ -3,7 +3,7 @@
 # merges output tiles with more than one input in memory (and local_scratch if needed),
 #   otherwise instructs peons to save to shared_scratch
 # if used, copies local_scratch to shared_scratch
-# saves stdout/err to <destination>/[0-9]*.log
+# saves stdout/err to <destination>/squatter[0-9]*.log
 
 # julia manager.jl parameters.jl channel originX originY originZ shapeX shapeY shapeZ hostname port
 
@@ -17,34 +17,23 @@ include(ARGS[1])
 include("$destination/calculated_parameters.jl")
 include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
 
+const channel_str = ARGS[2]
+const origin_strs = ARGS[3:5]
+const shape_strs = ARGS[6:8]
+
 # how many peons
-#if ngpus>0
-#  gpu_ram = cudaMemGetInfo()[2]
-#  const tile_ram = 0.85e9  # generalize
-#  num_procs = min(15,ngpus*floor(Int,gpu_ram/tile_ram))  # >4 hits swap
-if ngpus == 7
-  num_procs = 7
-elseif ngpus == 4
-  num_procs = 15
-else
-  nthreads = 8  # must match barycentricCPU.c
-  ncores = haskey(ENV,"NSLOTS") ? parse(Int,ENV["NSLOTS"]) : Sys.CPU_CORES
-  num_procs = div(ncores,nthreads)
-end
-info(ncores," CPUs and ",ngpus," GPUs present which can collectively process ",num_procs," tiles simultaneously", prefix="MANAGER: ")
+nthreads = 8  # should match barycentricCPU.c
+ncores = haskey(ENV,"NSLOTS") ? parse(Int,ENV["NSLOTS"]) : Sys.CPU_CORES
+num_procs = div(ncores,nthreads)
+info(ncores," CPUs present which can collectively process ",num_procs," tiles simultaneously", prefix="MANAGER: ")
 
 info("AVX2 = ",has_avx2, prefix="MANAGER: ")
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
-const channel=parse(Int,ARGS[2])
+const channel=parse(Int,channel_str)
 const manager_bbox = AABBMake(3)  # process all input tiles whose origins are within this bbox
-AABBSet(manager_bbox, 3, map(x->parse(Int,x),ARGS[3:5]), map(x->parse(Int,x),ARGS[6:8]))
+AABBSet(manager_bbox, 3, map(x->parse(Int,x),origin_strs), map(x->parse(Int,x),shape_strs))
 const tiles = TileBaseOpen(source)
-
-#for i=0:ngpus-1
-#  cudaSetDevice(i)
-#  cudaDeviceReset()
-#end
 
 # delete /dev/shm and local_scratch
 t0=time()
@@ -135,8 +124,8 @@ length(in_tiles_idx)==0 && quit()
 # keep boss informed
 try
   global sock = connect(ARGS[9],parse(Int,ARGS[10]))
-  println(sock,"manager ",proc_num," is starting job ",join(ARGS[[3 4 5 2]],".")," on ",readchomp(`hostname`),
-        " for ",length(in_tiles_idx)," input tiles")
+  println(sock,"manager ",proc_num," is starting job ",join(vcat(origin_strs,channel_str),"."),
+        " on ",readchomp(`hostname`), " for ",length(in_tiles_idx)," input tiles")
 end
 
 t0=time()
@@ -195,7 +184,7 @@ t0=time()
           out_tile_path = match(wrote,tmp).captures[4]
           merge_count[out_tile_path][3]+=1
           if merge_count[out_tile_path][1] == merge_count[out_tile_path][3]
-            merge_output_tiles(local_scratch, shared_scratch, join(ARGS[3:5],"-"),
+            merge_output_tiles(local_scratch, shared_scratch, join(origin_strs,"-"),
                 string('.',channel-1,'.',file_format), out_tile_path, false, false, true)
             info("saved output tile ",out_tile_path," from local_scratch to shared_scratch", prefix="MANAGER: ")
           end
@@ -225,8 +214,8 @@ t0=time()
     @async while true
       tile_idx = nextidx()
       tile_idx>length(locality_idx) && break
-      cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/peon.jl $(ARGS[1]) $(ngpus>0 ? (p-1) % ngpus : NaN)
-            $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(join(ARGS[3:5],"-")) $(string(solo_out_tiles))
+      cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/peon.jl $(ARGS[1])
+            $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(join(origin_strs,"-")) $(string(solo_out_tiles))
             $hostname2 $port2 $(length(xlims)) $xlims $(length(ylims)) $ylims
             $(length(zlims[in_tiles_idx[locality_idx[tile_idx]]]))
             $(zlims[in_tiles_idx[locality_idx[tile_idx]]])
@@ -257,7 +246,7 @@ info("deleting local_scratch = ",local_scratch," at end took ",round(Int,time()-
 
 # keep boss informed
 try
-  println(sock,"manager ",proc_num," has finished job ",join(ARGS[[3 4 5 2]],".")," on ",
+  println(sock,"manager ",proc_num," has finished job ",join(vcat(origin_strs,channel_str),".")," on ",
         readchomp(`hostname`), " using ",signif((scratch0-scratch1)/1024/1024,4)," GB of local_scratch")
   close(sock)
 end

@@ -2,7 +2,6 @@
 # qsubs a bunch of squatters to gpu and/or cpu nodes
 # partitions the bounding box of the tilespace into countof_job sized sub bounding boxes
 # parcels out multiple sub bounding boxes to each squatter
-# parcels out inter-node merge threads to squatters
 # saves stdout/err to <destination>/render.log
 
 # julia director.jl parameters.jl jobname

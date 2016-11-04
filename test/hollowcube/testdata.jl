@@ -1,70 +1,53 @@
 using Base.Test
 using Images
 
-include("../check_logfiles.jl")
-
-function check_images(scratchpath, correct_nchannels, correct_ntiffs, black_and_white)
-  logfiles = readdir(joinpath(scratchpath,"logfile_scratch"))
-
-  # correct number of images, and are they black & white or not?
-  ntiffs=0
-  shades=Vector{Vector{Float32}}[]
-  for (root, dirs, files) in walkdir(joinpath(scratchpath,"results"))
-    for file in files
-      if endswith(file,".tif")
-        ntiffs+=1
-        channel = parse(Int, split(file,'.')[end-1])
-        while length(shades)<channel+1
-          push!(shades,[])
-        end
-        img = load(joinpath(root,file))
-        push!(shades[1+channel], unique(img))
-      end
-    end
-  end
-  @test ntiffs == correct_ntiffs
-  @test length(shades) == correct_nchannels
-  if black_and_white
-    for shade in shades
-      @test all(x->length(x).<=2, shade)
-    end
-  else
-    for shade in shades
-      @test any(x->length(x).>2, shade)
-    end
-  end
-  shades
-end
+include("../basic_tests.jl")
 
 @testset "hollowcube" begin
 
+scratchpath = joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch")
+
+function check_toplevel_images(basepath, nchannels)
+  for nchannel=0:(nchannels-1)
+    img = load(joinpath(basepath,"default.$(nchannel).tif"))
+    # ImageMagic returns UInt8 instead of UInt16
+    rightanswer = zeros(UInt8,48);  rightanswer[3:end-1]=0xff>>nchannel
+    @test squeeze(maximum(raw(img),(1,2)),(1,2)) == rightanswer
+    rightanswer = zeros(UInt8,48);  rightanswer[4:end-2]=0xff>>nchannel
+    @test squeeze(maximum(raw(img),(1,3)),(1,3)) == rightanswer
+    rightanswer = zeros(UInt8,48);  rightanswer[6:end-4]=0xff>>nchannel
+    @test squeeze(maximum(raw(img),(2,3)),(2,3)) == rightanswer
+  end
+end
+
 @testset "onechannel-$v" for v in ["local", "cluster"]
-  check_logfiles( joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/onechannel-$v"),
-      64+1)
-  check_images( joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/onechannel-$v"),
-      1, 64+8+1, true)
+  check_logfiles(joinpath(scratchpath,"onechannel-$v"), 64+1)
+  check_toplevel_images(joinpath(scratchpath,"onechannel-$v","results"),1)
+end
+
+@testset "onechannel local-vs-cluster" begin
+  check_images(scratchpath, ["onechannel-local", "onechannel-cluster"], 1, 64+8+1, true)
 end
 
 @testset "threechannel-$v" for v in ["local", "cluster"]
-  check_logfiles(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/threechannel-$v"),
-      3*(64+1))
-  shades = check_images(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/threechannel-$v"),
-      3, 3*(64+8+1), true)
+  check_logfiles(joinpath(scratchpath,"threechannel-$v"), 3*(64+1))
+  check_toplevel_images(joinpath(scratchpath,"threechannel-$v","results"),2)
+end
+
+@testset "threechannel local-vs-cluster" begin
+  shades = check_images(scratchpath, ["threechannel-local", "threechannel-cluster"], 3, 3*(64+8+1), true)
   @test max(map(maximum, shades[1])...) > max(map(maximum, shades[2])...) > max(map(maximum, shades[3])...)
 end
 
 @testset "linearinterp" begin
-  check_logfiles(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/linearinterp"),
-      64+1)
-  check_images(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/linearinterp"),
-      1, 64+8+1, false)
+  check_logfiles(joinpath(scratchpath,"linearinterp"), 64+1)
+  check_images(scratchpath, ["linearinterp"], 1, 64+8+1, false)
 end
 
 @testset "nslots" begin
-  check_logfiles(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/nslots"),
-      64+1)
-  check_images(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/nslots"),
-      1, 64+8+1, true)
+  check_logfiles(joinpath(scratchpath,"nslots"), 64+1)
+  check_images(scratchpath, ["onechannel-cluster", "nslots"], 1, 64+8+1, true)
+  check_toplevel_images(joinpath(scratchpath,"nslots","results"),1)
 
   function nslots(scratchpath, rightanswer)
     r = "MANAGER: $rightanswer CPUs"
@@ -79,11 +62,10 @@ end
     @test length(unique(ncache))==1
     ncache[1]
   end
-  ncache16a = nslots(
-      joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/onechannel-cluster"), 16)
-  ncache16b = nslots(
-      joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/threechannel-cluster"), 16)
-  ncache32 = nslots(joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/nslots"), 32)
+
+  ncache16a = nslots(joinpath(scratchpath,"onechannel-cluster"), 16)
+  ncache16b = nslots(joinpath(scratchpath,"threechannel-cluster"), 16)
+  ncache32 = nslots(joinpath(scratchpath,"nslots"), 32)
   @test ncache16a == ncache16b == div(ncache32,2)
 end
 
