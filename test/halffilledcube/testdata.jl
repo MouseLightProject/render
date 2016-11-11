@@ -1,7 +1,6 @@
-using Base.Test
-using Images
+using Base.Test, Images
 
-include("../basic_tests.jl")
+include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
 
 @testset "halffilledcube" begin
 

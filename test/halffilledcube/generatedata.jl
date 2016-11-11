@@ -1,4 +1,5 @@
-const shape_leaf_px = [1024, 1536, 251, 1]
+const shape_leaf_px = [1024, 1536, 251]
+const nchannels = 1
 const tile_type = convert(Cint,1)
 const raw_compression_ratios = []
 

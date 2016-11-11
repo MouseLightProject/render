@@ -4,18 +4,17 @@
 #    (or saves to local_scratch if needed), otherwise saves to shared_scratch
 # saves stdout/err to <destination>/squatter[0-9]*.log
 
-# julia peon.jl parameters.jl channel in_tile origin_str solo_out_tiles hostname port nxlims xlims nylims ylims nzlims zlims dims[1:3] transform[1-3*2*(n+1)^2]
+# julia peon.jl parameters.jl in_tile origin_str solo_out_tiles hostname port nxlims xlims nylims ylims nzlims zlims dims[1:3] transform[1-3*2*(n+1)^2]
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
 include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
-const channel = parse(Int,ARGS[2])
-const origin_str = ARGS[4]
-const in_tile_idx = parse(Int,ARGS[3])
-const solo_out_tiles = eval(parse(ARGS[5]))
-idx = 8
+const origin_str = ARGS[3]
+const in_tile_idx = parse(Int,ARGS[2])
+const solo_out_tiles = eval(parse(ARGS[4]))
+idx = 7
 const xlims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
 idx += length(xlims)+1
 const ylims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
@@ -34,7 +33,7 @@ const transform_nm = reshape(map(x->parse(Int,x), ARGS[idx:end]),3,length(xlims)
 @assert zlims[1]>=0 && zlims[end]<=dims[3] "zlims out of range for input tile $in_tile_idx"
 
 # keep boss informed
-sock = connect(ARGS[6],parse(Int,ARGS[7]))
+sock = connect(ARGS[5],parse(Int,ARGS[6]))
 
 time_initing=0.0
 time_transforming=0.0
@@ -48,7 +47,7 @@ const send = string("manager tells peon for input tile ",in_tile_idx," to send o
 const receive = string("manager tells peon for input tile ",in_tile_idx," to receive output tile")
 
 const out_tiles_ws = Dict{String,Ptr{Void}}()
-const out_tiles_jl = Dict{String,Array{UInt16,3}}()
+const out_tiles_jl = Dict{String,Array{UInt16,4}}()
 const merge_count = Dict{String,Array{UInt8,1}}()
 
 # 2 -> sizeof(UInt16), 20e3 -> .tif metadata size, 15 -> max # possible concurrent saves, need to generalize
@@ -75,9 +74,9 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
       const transform = (sub_transform_nm .- origin_nm) ./ (voxelsize_used_um*um2nm)
 
       if !haskey(out_tiles_ws,out_tile_path_next)
-        out_tiles_ws[out_tile_path_next] = ndalloc(shape_leaf_px, data_type)
+        out_tiles_ws[out_tile_path_next] = ndalloc(vcat(shape_leaf_px,nchannels), data_type)
         out_tiles_jl[out_tile_path_next] = unsafe_wrap(Array,convert(Ptr{UInt16},
-              nddata(out_tiles_ws[out_tile_path_next])), tuple(shape_leaf_px...))
+              nddata(out_tiles_ws[out_tile_path_next])), tuple(shape_leaf_px...,nchannels))
         ndfill(out_tiles_ws[out_tile_path_next], 0x0000)
         tmp = map(x->AABBHit(cboxes[i], x), in_subtiles_aabb)
         merge_count[out_tile_path_next]=UInt8[ sum(tmp), 0 ]
@@ -98,7 +97,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
       if merge_count[out_tile_path_next][2]==merge_count[out_tile_path_next][1]
         t0=time()
         if out_tile_path_next in solo_out_tiles
-          save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,'.',channel-1,'.',file_format),
+          save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,".%.",file_format),
               out_tiles_ws[out_tile_path_next])
           info("transfered output tile ",out_tile_path_next," from RAM to shared_scratch", prefix="PEON: ")
         else
@@ -119,9 +118,9 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
             info(msg, prefix="PEON: ")
             serialize(sock, out_tiles_jl[out_tile_path_next])
           elseif startswith(tmp,receive)
-            out_tiles_jl[out_tile_path_next][:] = max(out_tiles_jl[out_tile_path_next]::Array{UInt16,3},
-                deserialize(sock)::Array{UInt16,3})
-            save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,'.',channel-1,'.',file_format),
+            out_tiles_jl[out_tile_path_next][:] = max(out_tiles_jl[out_tile_path_next]::Array{UInt16,4},
+                deserialize(sock)::Array{UInt16,4})
+            save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,".%.",file_format),
                 out_tiles_ws[out_tile_path_next])
             msg = string("peon for input tile ",in_tile_idx," saved output tile ",out_tile_path_next)
             println(sock,msg)
@@ -130,7 +129,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
           elseif startswith(tmp,write)
             if enough_free(local_scratch)
               save_out_tile(local_scratch, out_tile_path_next,
-                  string(in_tile_idx,'.',sub_tile_str,'.',channel-1,'.',file_format),
+                  string(in_tile_idx,'.',sub_tile_str,".%.",file_format),
                   out_tiles_ws[out_tile_path_next])
               msg = string("peon for input tile ",in_tile_idx,
                   " wrote output tile ",out_tile_path_next," to local_scratch")
@@ -138,7 +137,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
               info(msg, prefix="PEON: ")
             else
               save_out_tile(shared_scratch, out_tile_path_next,
-                  string(origin_str,'.',in_tile_idx,'.',sub_tile_str,'.',channel-1,'.',file_format),
+                  string(origin_str,'.',in_tile_idx,'.',sub_tile_str,".%.",file_format),
                   out_tiles_ws[out_tile_path_next])
               msg = string("peon for input tile ",string(in_tile_idx),
                   " wrote output tile ",out_tile_path_next," to shared_scratch")
@@ -174,14 +173,14 @@ function process_input_tile()
   try
     t1=time()
     tmp = TileShape(tile)
-    shape_intile = ndshapeJ(tmp)[1:3]
+    shape_intile = ndshapeJ(tmp)
     global data_type = ndtype(tmp)
     in_tile_ws = ndalloc(shape_intile, data_type)
     in_tile_jl = unsafe_wrap(Array,convert(Ptr{UInt16},nddata(in_tile_ws)), tuple(shape_intile...))
     in_subtile_ws = ndinit()
     ndcast(in_subtile_ws, data_type)
     tmp=split(unsafe_string(TilePath(tile)),"/")
-    push!(tmp, string(tmp[end],'-',file_infix,'.',channel-1,'.',file_format))
+    push!(tmp, string(tmp[end],'-',file_infix,".%.",file_format))
     ndioClose(ndioRead(ndioOpen("/"*joinpath(tmp...), C_NULL, "r"), in_tile_ws))
     info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec", prefix="PEON: ")
     filename = "/"*joinpath(tmp...)
@@ -196,21 +195,21 @@ function process_input_tile()
   global in_subtiles_aabb = calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
 
   # for each input subtile, recursively traverse the output tiles
-  shape_leaf_ptr = pointer(convert(Array{Cuint,1},shape_leaf_px))
+  shape_leaf_ptr = pointer(convert(Array{Cuint,1},vcat(shape_leaf_px,nchannels)))
   for ix=1:length(xlims)-1, iy=1:length(ylims)-1, iz=1:length(zlims)-1
     info("processing transform ",xlims[ix:ix+1],"-",ylims[iy:iy+1],"-",zlims[iz:iz+1],
           " for input tile ",in_tile_idx, prefix="PEON: ")
     t1=time()
-    in_subtile_jl = in_tile_jl[1+(xlims[ix]:xlims[ix+1]),1+(ylims[iy]:ylims[iy+1]),1+(zlims[iz]:zlims[iz+1])]
-    map((i,x)->ndShapeSet(in_subtile_ws, i, x), 1:3, size(in_subtile_jl))
+    in_subtile_jl = in_tile_jl[1+(xlims[ix]:xlims[ix+1]),1+(ylims[iy]:ylims[iy+1]),1+(zlims[iz]:zlims[iz+1]),:]
+    map((i,x)->ndShapeSet(in_subtile_ws, i, x), 1:4, size(in_subtile_jl))
     ndref(in_subtile_ws, pointer(in_subtile_jl), convert(Cint,0))
     try
       global resampler = Ptr{Void}[0]
       if has_avx2 && use_avx
-        BarycentricAVXinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 3)
+        BarycentricAVXinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 4)
         BarycentricAVXsource(resampler, nddata(in_subtile_ws))
       else
-        BarycentricCPUinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 3)
+        BarycentricCPUinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 4)
         BarycentricCPUsource(resampler, nddata(in_subtile_ws))
       end
     catch
@@ -218,7 +217,7 @@ function process_input_tile()
     end
     time_initing+=(time()-t1)
 
-    depth_first_traverse_over_output_tiles(TileBaseAABB(tiles), "", string(ix)*"x"*string(iy)*"x"*string(iz),
+    depth_first_traverse_over_output_tiles(TileBaseAABB(tiles), "", string(ix,'x',iy,'x',iz),
         transform_nm[:,subtile_corner_indices(ix,iy,iz)],
         isodd(ix+iy+iz) ? 90 : 0,
         in_subtiles_aabb[ix,iy,iz])

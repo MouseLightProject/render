@@ -196,7 +196,7 @@ function ndalloc(tileshape, tiletype, heap=true)
   tile_ws
 end
 
-:shape_leaf_px in names(Main) && (save_ws = ndalloc(shape_leaf_px, tile_type, false))
+:shape_leaf_px in names(Main) && (save_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type, false))
 
 function save_out_tile(filesystem, path, name, data::AbstractArray{UInt16})
   ndref(save_ws, pointer(data), convert(Cint,0))   # 0==nd_heap;  need to generalize
@@ -218,69 +218,81 @@ function save_out_tile(filesystem, path, name, data::Ptr{Void})
 end
 
 # the merge API could perhaps be simplified. complexity arises because it is called:
-# by render to build the octree                       (recurse=n/a,    octree=true,  delete=false)
+# by render to build the octree                       (recurse=n/a,    octree=true,  delete=either)
 # by manager.jl to handle overflow into local_scratch (recurse=false,  octree=false, delete=true)
 # by merge to combine multiple previous renders       (recurse=either, octree=false, delete=false)
 
-function downsample(out_tile_jl, coord, shape_leaf_px, scratch)
+function downsample(out_tile_jl, coord, shape_leaf_px, nchannels, scratch)
   ix = (((coord-1)>>0)&1 * shape_leaf_px[1]>>1)
   iy = (((coord-1)>>1)&1 * shape_leaf_px[2]>>1)
   iz = (((coord-1)>>2)&1 * shape_leaf_px[3]>>1)
-  for z=1:2:shape_leaf_px[3]-1
-    tmpz = iz + (z+1)>>1
-    for y=1:2:shape_leaf_px[2]-1
-      tmpy = iy + (y+1)>>1
-      for x=1:2:shape_leaf_px[1]-1
-        tmpx = ix + (x+1)>>1
-        @inbounds out_tile_jl[tmpx, tmpy, tmpz] = downsampling_function(scratch[x:x+1, y:y+1, z:z+1])
+  for c=1:nchannels
+    for z=1:2:shape_leaf_px[3]-1
+      tmpz = iz + (z+1)>>1
+      for y=1:2:shape_leaf_px[2]-1
+        tmpy = iy + (y+1)>>1
+        for x=1:2:shape_leaf_px[1]-1
+          tmpx = ix + (x+1)>>1
+          @inbounds out_tile_jl[tmpx, tmpy, tmpz, c] = downsampling_function(scratch[x:x+1, y:y+1, z:z+1, c])
+        end
       end
     end
   end
 end
 
 function _merge_across_filesystems(
-      destination, prefix, chantype, out_tile_path, recurse, octree, delete, flag,
+      destination, prefix, suffix, out_tile_path, recurse, octree, delete, flag,
       in_tiles, out_tile_img, out_tile_img_down)
-  merge1_ws = ndalloc(shape_leaf_px, tile_type)
-  merge1_jl = unsafe_wrap(Array{UInt16,3},convert(Ptr{UInt16},nddata(merge1_ws)), tuple(shape_leaf_px...))
+  merge1_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type)
+  merge1_jl = unsafe_wrap(Array{UInt16,4},convert(Ptr{UInt16},nddata(merge1_ws)), tuple(shape_leaf_px...,nchannels))
 
   time_octree_down=0.0; time_octree_save=0.0
   time_single_file=0.0; time_many_files=0.0; time_clear_files=0.0
   time_read_files=0.0;   time_max_files=0.0; time_delete_files=0.0; time_write_files=0.0
 
   @retry mkpath(joinpath(destination,out_tile_path))
-  destination2 = joinpath(destination, out_tile_path, prefix * chantype)
+  destination2 = joinpath(destination, out_tile_path, string(prefix,".%.",suffix))
 
-  if length(in_tiles)==1 && in_tiles[1]!=destination2
+  if length(in_tiles)==1 && !startswith(destination2,in_tiles[1])
     t0=time()
-    info("copying from ",in_tiles[1])
-    info("  to ",destination2)
-    cp(in_tiles[1],destination2)
-    delete && (info("  deleting ",in_tiles[1]); rm(in_tiles[1]))
+    for c=1:nchannels
+      from_file = string(in_tiles[1],'.',c-1,'.',suffix)
+      to_file = joinpath(destination, out_tile_path, string(prefix,'.',c-1,'.',suffix))
+      info("copying from ",from_file)
+      info("  to ",to_file)
+      cp(from_file,to_file)
+      delete && (info("  deleting ",from_file); rm(from_file))
+    end
     time_single_file=(time()-t0)
   elseif length(in_tiles)>1
     t0=time()
-    merge2_ws = ndalloc(shape_leaf_px, tile_type)
-    merge2_jl = unsafe_wrap(Array{UInt16,3},convert(Ptr{UInt16},nddata(merge2_ws)), tuple(shape_leaf_px...))
+    merge2_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type)
+    merge2_jl = unsafe_wrap(Array{UInt16,4},convert(Ptr{UInt16},nddata(merge2_ws)), tuple(shape_leaf_px...,nchannels))
     info("merging:")
     t1=time()
     ndfill(merge1_ws, 0x0000)
     time_clear_files=(time()-t1)
     for in_tile in in_tiles
-      info("  reading ",in_tile)
+      info("  reading ",in_tile,".%.",suffix)
       t1=time()
-      ndioClose(ndioRead(ndioOpen( in_tile, C_NULL, "r" ),merge2_ws))
+      ndioClose(ndioRead(ndioOpen( string(in_tile,".%.",suffix), C_NULL, "r" ),merge2_ws))
       time_read_files+=(time()-t1)
       t1=time()
-      merge1_jl[:,:,:] = max(merge1_jl,merge2_jl)
+      merge1_jl[:,:,:,:] = max(merge1_jl,merge2_jl)
       time_max_files+=(time()-t1)
       t1=time()
-      delete && (info("  deleting ",in_tile); rm(in_tile))
+      if delete
+        for c=1:nchannels
+          from_file = string(in_tile,'.',c-1,'.',suffix)
+          info("  deleting ",from_file)
+          rm(from_file)
+        end
+      end
       time_delete_files+=(time()-t1)
     end
     info("  copying to ",destination2)
     t1=time()
-    save_out_tile(destination, out_tile_path, prefix * chantype, merge1_jl)
+    save_out_tile(destination, out_tile_path, string(prefix,".%.",suffix), merge1_jl)
     time_write_files=(time()-t1)
     ndfree(merge2_ws)
     time_many_files=(time()-t0)
@@ -289,20 +301,20 @@ function _merge_across_filesystems(
   if octree
     if length(in_tiles)==1
       t0=time()
-      ndioClose(ndioRead(ndioOpen( in_tiles[1], C_NULL, "r" ),merge1_ws))
+      ndioClose(ndioRead(ndioOpen( destination2, C_NULL, "r" ),merge1_ws))
       time_read_files+=(time()-t0)
     elseif length(in_tiles)==0
       t0=time()
       info("saving output tile ",out_tile_path," to ",destination2)
-      save_out_tile(destination, out_tile_path, prefix * chantype, out_tile_img)
+      save_out_tile(destination, out_tile_path, string(prefix,".%.",suffix), out_tile_img)
       time_octree_save=(time()-t0)
     end
     if flag
       t0=time()
       info("downsampling output tile ",out_tile_path)
       last_morton_coord = parse(Int,out_tile_path[end])
-      scratch::Array{UInt16,3} = length(in_tiles)==0 ? out_tile_img : merge1_jl
-      downsample(out_tile_img_down, last_morton_coord, shape_leaf_px, scratch)
+      scratch::Array{UInt16,4} = length(in_tiles)==0 ? out_tile_img : merge1_jl
+      downsample(out_tile_img_down, last_morton_coord, shape_leaf_px, nchannels, scratch)
       time_octree_down=(time()-t0)
     end
   end
@@ -313,9 +325,9 @@ function _merge_across_filesystems(
         time_read_files, time_max_files, time_delete_files, time_write_files
 end
 
-merge_across_filesystems(source::String, destination, prefix, chantype, out_tile_path,
+merge_across_filesystems(source::String, destination, prefix, suffix, out_tile_path,
       recurse::Bool, octree::Bool, delete::Bool) =
-  merge_across_filesystems([source], destination, prefix, chantype, out_tile_path, recurse, octree, delete)
+  merge_across_filesystems([source], destination, prefix, suffix, out_tile_path, recurse, octree, delete)
 
 function accumulate_times(r)
   global time_octree_down, time_octree_save
@@ -333,7 +345,7 @@ function accumulate_times(r)
   time_write_files  += r[9]
 end
 
-function merge_across_filesystems(sources::Array{String,1}, destination, prefix, chantype, out_tile_path,
+function merge_across_filesystems(sources::Array{String,1}, destination, prefix, suffix, out_tile_path,
       recurse::Bool, octree::Bool, delete::Bool, flag=false, out_tile_img_down=nothing)
   global time_octree_clear
 
@@ -344,8 +356,9 @@ function merge_across_filesystems(sources::Array{String,1}, destination, prefix,
     listing = readdir(joinpath(source,out_tile_path))
     dir2 = map(x->isdir(joinpath(source,out_tile_path,x)), listing)
     sum(dir2)==0 || push!(dirs, listing[dir2]...)
+    img_files = listing[!dir2 & map(entry->endswith(entry,suffix), listing)]
     in_tiles2 = [joinpath(source,out_tile_path,x)
-          for x in listing[!dir2 & map(x->endswith(x,chantype), listing)]]
+           for x in unique(map(img_file->join(split(img_file,'.')[1:end-2],'.'), img_files)) ]
     isempty(in_tiles2) || push!(in_tiles, in_tiles2...)
   end
 
@@ -354,7 +367,7 @@ function merge_across_filesystems(sources::Array{String,1}, destination, prefix,
   out_tile_img=nothing
   if octree && length(dirs)>0 && length(in_tiles)==0
     t0=time()
-    out_tile_img = SharedArray(UInt16, shape_leaf_px...)
+    out_tile_img = SharedArray(UInt16, shape_leaf_px..., nchannels)
     fill!(out_tile_img, 0x0000)
     time_octree_clear+=(time()-t0)
   end
@@ -363,18 +376,18 @@ function merge_across_filesystems(sources::Array{String,1}, destination, prefix,
 
   ((!octree && recurse) || (octree && length(in_tiles)==0)) && for dir in unique(dirs)
     push!(futures,
-        merge_across_filesystems(sources, destination, prefix, chantype, joinpath(out_tile_path,dir),
+        merge_across_filesystems(sources, destination, prefix, suffix, joinpath(out_tile_path,dir),
           recurse, octree, delete, true, out_tile_img) )
   end
 
   foreach(f->accumulate_times(fetch(f)), futures)
 
   remotecall(_merge_across_filesystems, default_worker_pool(),
-        destination, prefix, chantype, out_tile_path, recurse, octree, delete,
+        destination, prefix, suffix, out_tile_path, recurse, octree, delete,
         flag, in_tiles, out_tile_img, out_tile_img_down)
 end
 
-function merge_output_tiles(source, destination, prefix, chantype, out_tile_path,
+function merge_output_tiles(source, destination, prefix, suffix, out_tile_path,
       recurse::Bool, octree::Bool, delete::Bool)
   global time_octree_clear=0.0, time_octree_down=0.0, time_octree_save=0.0
   global time_single_file=0.0, time_many_files=0.0
@@ -382,7 +395,7 @@ function merge_output_tiles(source, destination, prefix, chantype, out_tile_path
   global time_delete_files=0.0, time_write_files=0.0
 
   accumulate_times(fetch(merge_across_filesystems(
-        source, destination, prefix, chantype, out_tile_path, recurse, octree, delete)))
+        source, destination, prefix, suffix, out_tile_path, recurse, octree, delete)))
 
   info("copying single files took ",signif(time_single_file,4)," sec")
   info("merging multiple files took ",signif(time_many_files,4)," sec")

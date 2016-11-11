@@ -1,4 +1,4 @@
-path: /home/arthurb/projects/mouselight/src/render/test/hollowcube/scratch/data
+path: RENDER_PATH/src/render/test/hollowcube/scratch/data/onechannel
 tiles:
 - path: /00/00001
   aabb:

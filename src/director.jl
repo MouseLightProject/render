@@ -14,7 +14,9 @@ include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
 
 const jobname = ARGS[2]
 const tiles = TileBaseOpen(source)
-const tile_type = ndtype(TileShape(TileBaseIndex(tiles,1)))
+tile_shape = TileShape(TileBaseIndex(tiles,1))
+const tile_type = ndtype(tile_shape)
+const nchannels = ndshapeJ(tile_shape)[4]
 
 # delete scratch
 t0=time()
@@ -49,6 +51,7 @@ const voxelsize_used_um = shape_tiles_nm./um2nm./2^nlevels ./ shape_leaf_px
 open("$destination/calculated_parameters.jl","w") do f
   println(f,"const jobname = \"",jobname,"\"")
   println(f,"const nlevels = ",nlevels)
+  println(f,"const nchannels = ",nchannels)
   println(f,"const shape_leaf_px = [",join(map(string,shape_leaf_px),","),"]")
   println(f,"const voxelsize_used_um = ",voxelsize_used_um)
   println(f,"const origin_nm = [",join(map(string,tiles_bbox[2]),","),"]")
@@ -105,15 +108,16 @@ tiles_bbox[3][:] = round(Int,tiles_bbox[3][:] .* region_of_interest[2])
 get_job_aabbs(tiles_bbox)
 sort!(job_aabbs; lt=(x,y)->x[2]<y[2], rev=true)
 roi_vol = prod(region_of_interest[2])
-info(TileBaseCount(tiles),(roi_vol<1 ? " * "*string(roi_vol): "")," tiles with ",nchannels," channels split into ",nchannels*length(job_aabbs)," jobs", prefix="DIRECTOR: ")
+info(TileBaseCount(tiles),(roi_vol<1 ? "*"*string(roi_vol): ""),
+      " input tiles each with ",nchannels," channels split into ",length(job_aabbs)," jobs", prefix="DIRECTOR: ")
 
 include_origins_outside_roi && length(job_aabbs)>1 &&
-      warn("include_origins_outside_roi should be true only when number of jobs == number of channels")
+      warn("include_origins_outside_roi should be true only when there is just one job")
 
 TileBaseClose(tiles)
 
 # initialize tcp communication with squatters
-nnodes = min( nchannels*length(job_aabbs),
+nnodes = min( length(job_aabbs),
               throttle_leaf_nmachines,
               which_cluster=="janelia" ? 32 : length(which_cluster) )
 info("number of cluster nodes used = $nnodes", prefix="DIRECTOR: ")
@@ -168,21 +172,20 @@ t0=time()
         end
       else
         while isopen(sock)
-          idx = nextidx()
-          if idx > nchannels*length(job_aabbs)
+          jobidx = nextidx()
+          if jobidx > length(job_aabbs)
             cmd = "squatter $p terminate"
             println(sock, cmd)
             info(cmd, prefix="DIRECTOR>SQUATTER: ")
             map((x)->notify(events[x,1], nothing), 1:nnodes)
             break
           end
-          jobidx, channel = [divrem(idx-1, nchannels)...]+1
           shape = job_aabbs[jobidx][1]
-          cmd = "squatter $p dole out job $(ARGS[1]) $channel $(shape[2][1]) $(shape[2][2]) $(shape[2][3]) $(shape[3][1]) $(shape[3][2]) $(shape[3][3]) $hostname $port"
+          cmd = "squatter $p dole out job $(ARGS[1]) $(shape[2][1]) $(shape[2][2]) $(shape[2][3]) $(shape[3][1]) $(shape[3][2]) $(shape[3][3]) $hostname $port"
           println(sock, cmd)
           info(cmd, prefix="DIRECTOR>SQUATTER: ")
           nfinished = wait(events[p,2])
-          info("director has finished ",nfinished," of ",nchannels*length(job_aabbs)," jobs.  ",signif(nfinished / (nchannels*length(job_aabbs)) * 100,4),"% done", prefix="DIRECTOR: ")
+          info("director has finished ",nfinished," of ",length(job_aabbs)," jobs.  ",signif(nfinished / length(job_aabbs) * 100,4),"% done", prefix="DIRECTOR: ")
         end
       end
     end

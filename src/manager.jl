@@ -5,7 +5,7 @@
 # if used, copies local_scratch to shared_scratch
 # saves stdout/err to <destination>/squatter[0-9]*.log
 
-# julia manager.jl parameters.jl channel originX originY originZ shapeX shapeY shapeZ hostname port
+# julia manager.jl parameters.jl originX originY originZ shapeX shapeY shapeZ hostname port
 
 info(readchomp(`hostname`), prefix="MANAGER: ")
 info(readchomp(`date`), prefix="MANAGER: ")
@@ -17,9 +17,8 @@ include(ARGS[1])
 include("$destination/calculated_parameters.jl")
 include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
 
-const channel_str = ARGS[2]
-const origin_strs = ARGS[3:5]
-const shape_strs = ARGS[6:8]
+const origin_strs = ARGS[2:4]
+const shape_strs = ARGS[5:7]
 
 # how many peons
 nthreads = 8  # should match barycentricCPU.c
@@ -30,7 +29,6 @@ info(ncores," CPUs present which can collectively process ",num_procs," tiles si
 info("AVX2 = ",has_avx2, prefix="MANAGER: ")
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
-const channel=parse(Int,channel_str)
 const manager_bbox = AABBMake(3)  # process all input tiles whose origins are within this bbox
 AABBSet(manager_bbox, 3, map(x->parse(Int,x),origin_strs), map(x->parse(Int,x),shape_strs))
 const tiles = TileBaseOpen(source)
@@ -100,8 +98,8 @@ end
 
 const total_ram = parse(Int,split(readchomp(pipeline(`cat /proc/meminfo`,`head -1`)))[2])*1024
 ram_fraction = haskey(ENV,"NSLOTS") ? ncores/Sys.CPU_CORES : 1
-ncache = max(1, floor(Int,(total_ram - system_ram)*ram_fraction/2/prod(shape_leaf_px)))
-merge_array = Array(UInt16, shape_leaf_px..., ncache)
+ncache = max(1, floor(Int,(total_ram - system_ram)*ram_fraction/2/prod(shape_leaf_px)/nchannels))
+merge_array = Array(UInt16, shape_leaf_px..., nchannels, ncache)
 merge_used = falses(ncache)
 # one entry for each output tile
 # [total # input tiles, input tiles processed so far, input tiles sent so far, index to merge_array (0=not assigned yet, Inf=use local_scratch)]
@@ -123,8 +121,8 @@ length(in_tiles_idx)==0 && quit()
 
 # keep boss informed
 try
-  global sock = connect(ARGS[9],parse(Int,ARGS[10]))
-  println(sock,"manager ",proc_num," is starting job ",join(vcat(origin_strs,channel_str),"."),
+  global sock = connect(ARGS[8],parse(Int,ARGS[9]))
+  println(sock,"manager ",proc_num," is starting job ",join(origin_strs,'.'),
         " on ",readchomp(`hostname`), " for ",length(in_tiles_idx)," input tiles")
 end
 
@@ -134,7 +132,7 @@ t0=time()
   # as soon as all output tiles for a given leaf in the octree have been processed,
   #   concurrently merge and save them to shared_scratch
   hostname2 = readchomp(`hostname`)
-  default_port2 = parse(Int,ARGS[10])+1
+  default_port2 = parse(Int,ARGS[9])+1
   global sock2 = Any[]
   server2, port2 = get_available_port(default_port2)
 
@@ -177,7 +175,7 @@ t0=time()
             while merge_count[out_tile_path][3] < merge_count[out_tile_path][1]-1;  yield();  end
             msg = "manager tells peon for input tile $in_tile_num to receive output tile $out_tile_path via tcp"
             println(sock2, msg)
-            serialize(sock2, merge_array[:,:,:,merge_count[out_tile_path][4]])
+            serialize(sock2, merge_array[:,:,:,:,merge_count[out_tile_path][4]])
             info(msg, prefix="MANAGER>PEON: ")
           end
         elseif ismatch(wrote,tmp)
@@ -185,16 +183,16 @@ t0=time()
           merge_count[out_tile_path][3]+=1
           if merge_count[out_tile_path][1] == merge_count[out_tile_path][3]
             merge_output_tiles(local_scratch, shared_scratch, join(origin_strs,"-"),
-                string('.',channel-1,'.',file_format), out_tile_path, false, false, true)
+                file_format, out_tile_path, false, false, true)
             info("saved output tile ",out_tile_path," from local_scratch to shared_scratch", prefix="MANAGER: ")
           end
         elseif ismatch(sent,tmp)
           out_tile_path = match(sent,tmp).captures[4]
-          out_tile::Array{UInt16,3} = deserialize(sock2)
+          out_tile::Array{UInt16,4} = deserialize(sock2)
           merge_count[out_tile_path][3]+=1
           t1=time()
-          merge_array[:,:,:,merge_count[out_tile_path][4]] = merge_count[out_tile_path][3]==1 ? out_tile :
-                max(out_tile, merge_array[:,:,:,merge_count[out_tile_path][4]]::Array{UInt16,3})
+          merge_array[:,:,:,:,merge_count[out_tile_path][4]] = merge_count[out_tile_path][3]==1 ? out_tile :
+                max(out_tile, merge_array[:,:,:,:,merge_count[out_tile_path][4]]::Array{UInt16,4})
           time_max_files=time()-t1
           info("max'ing multiple files took ",signif(time_max_files,4)," sec")
         elseif ismatch(saved,tmp)
@@ -215,7 +213,7 @@ t0=time()
       tile_idx = nextidx()
       tile_idx>length(locality_idx) && break
       cmd = `$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/peon.jl $(ARGS[1])
-            $channel $(in_tiles_idx[locality_idx[tile_idx]]) $(join(origin_strs,"-")) $(string(solo_out_tiles))
+            $(in_tiles_idx[locality_idx[tile_idx]]) $(join(origin_strs,"-")) $(string(solo_out_tiles))
             $hostname2 $port2 $(length(xlims)) $xlims $(length(ylims)) $ylims
             $(length(zlims[in_tiles_idx[locality_idx[tile_idx]]]))
             $(zlims[in_tiles_idx[locality_idx[tile_idx]]])
@@ -246,7 +244,7 @@ info("deleting local_scratch = ",local_scratch," at end took ",round(Int,time()-
 
 # keep boss informed
 try
-  println(sock,"manager ",proc_num," has finished job ",join(vcat(origin_strs,channel_str),".")," on ",
+  println(sock,"manager ",proc_num," has finished job ",join(origin_strs,'.')," on ",
         readchomp(`hostname`), " using ",signif((scratch0-scratch1)/1024/1024,4)," GB of local_scratch")
   close(sock)
 end

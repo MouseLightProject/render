@@ -14,11 +14,11 @@ const throttle_leaf_nmachines = 32  # number of compute nodes to use to render l
 # for which_cluster=="janelia" set to 32 (max is 96)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_nmachines = 64  # number of compute nodes to use to downsample octree
-# for which_cluster=="janelia" set to 64
+const throttle_octree_nmachines = 32  # number of compute nodes to use to downsample octree
+# for which_cluster=="janelia" set to 32
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_njobs_per_machine = Sys.CPU_CORES
+const throttle_octree_njobs_per_machine = Sys.CPU_CORES>>1
 # for which_cluster=="janelia" set to 1
 # otherwise set to ncores per machine for small data sets
 
@@ -35,7 +35,6 @@ const shared_scratch=joinpath(source,"scratch","localscratch","shared_scratch")
 const logfile_scratch=joinpath(source,"scratch","localscratch","logfile_scratch")  # should be on /groups
 const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
 
-const nchannels=1
 const file_infix="halffilledcube"
 const file_format="tif"  # "tif" or "h5"
 

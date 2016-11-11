@@ -41,8 +41,15 @@ function check_images(scratchpath, testdirs, correct_nchannels, correct_ntiffs, 
         for testdir in testdirs
           push!(imgs, load(joinpath(scratchpath,testdir,root,file)))
           push!(shades[1+channel], unique(imgs[end]))
-          length(imgs)>1 && @test imgs[end-1] == imgs[end] ||
-                warn(joinpath(testdir,root,file)," off by ",sum(imgs[end-1] .!= imgs[end])," voxel(s)")
+          if length(imgs)>1
+            @test imgs[end-1] == imgs[end]
+            idx = find(imgs[end-1] .!= imgs[end])
+            if length(idx)>0
+              largest_diff = round(Int, 1/eps(eltype(imgs[end]))*maximum(abs(
+                    convert(Array{Float64}, imgs[end-1][idx])-convert(Array{Float64}, imgs[end][idx]))))
+              warn(joinpath(testdir,root,file)," off by ",length(idx)," voxel(s).  largest difference is ", largest_diff, " shade(s)")
+            end
+          end
         end
       end
     end

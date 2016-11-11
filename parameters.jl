@@ -35,7 +35,6 @@ const shared_scratch="/nobackup2/mouselight/scratch/<yourId>"
 const logfile_scratch="/groups/mousebrainmicro/mousebrainmicro/scratch/<yourId>"  # should be on /groups
 const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
 
-const nchannels=2
 const file_infix="ngc"
 const file_format="tif"  # "tif" or "h5"
 

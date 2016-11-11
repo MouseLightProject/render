@@ -1,7 +1,6 @@
-using Base.Test
-using Images
+using Base.Test, Images
 
-include("../basic_tests.jl")
+include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
 
 @testset "hollowcube" begin
 
@@ -30,7 +29,7 @@ end
 end
 
 @testset "threechannel-$v" for v in ["local", "cluster"]
-  check_logfiles(joinpath(scratchpath,"threechannel-$v"), 3*(64+1))
+  check_logfiles(joinpath(scratchpath,"threechannel-$v"), 64+1)
   check_toplevel_images(joinpath(scratchpath,"threechannel-$v","results"),2)
 end
 
@@ -40,8 +39,12 @@ end
 end
 
 @testset "linearinterp" begin
-  check_logfiles(joinpath(scratchpath,"linearinterp"), 64+1)
-  check_images(scratchpath, ["linearinterp"], 1, 64+8+1, false)
+  check_logfiles(joinpath(scratchpath,"linearinterp-onechannel"), 64+1)
+  check_images(scratchpath, ["linearinterp-onechannel"], 1, 64+8+1, false)
+  check_logfiles(joinpath(scratchpath,"linearinterp-threechannel"), 64+1)
+  check_logfiles(joinpath(scratchpath,"linearinterp-threechannel-cpu"), 64+1)
+  check_images(scratchpath, ["linearinterp-threechannel","linearinterp-threechannel-cpu"], 3, 3*(64+8+1), false)
+  info("it is normal to have 68 avx images each have ~1000 voxels be 1 shade different compared to cpu")
 end
 
 @testset "nslots" begin
@@ -66,7 +69,7 @@ end
   ncache16a = nslots(joinpath(scratchpath,"onechannel-cluster"), 16)
   ncache16b = nslots(joinpath(scratchpath,"threechannel-cluster"), 16)
   ncache32 = nslots(joinpath(scratchpath,"nslots"), 32)
-  @test ncache16a == ncache16b == div(ncache32,2)
+  @test div(ncache16a,3) == ncache16b == div(ncache32,6)
 end
 
 end

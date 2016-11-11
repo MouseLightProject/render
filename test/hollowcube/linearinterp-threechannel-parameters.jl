@@ -1,8 +1,8 @@
-const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size.
+const voxelsize_um=[1.0, 1.0, 1.0]  # desired pixel size.
 # voxelsize_used_um, in destination/calculated_parameters.jl, is that actually used.
 #   adjusted to make tile widths even and tile volume a multiple of 32*32*4,
 
-const max_pixels_per_leaf=120e6  # maximum number of pixels in output tiles
+const max_pixels_per_leaf=50^3  # maximum number of pixels in output tiles
 
 const max_tiles_per_job=1000  # maximum number of input tiles per cluster job
 # size to use all of RAM
@@ -28,32 +28,34 @@ const throttle_octree_ncores_per_job = 1
 
 const short_queue = true  # rendering MUST take less than 1 hour
 
-const source=joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube") # path to tilebase.cache.yml
-const destination=joinpath(source,"scratch","cpu","results")  # path to octree
+const scratchpath=joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch")
 
-const shared_scratch=joinpath(source,"scratch","cpu","shared_scratch")
-const logfile_scratch=joinpath(source,"scratch","cpu","logfile_scratch")  # should be on /groups
+const source=joinpath(scratchpath,"data/threechannel") # path to tilebase.cache.yml
+const destination=joinpath(scratchpath,"linearinterp-threechannel","results")  # path to octree
+
+const shared_scratch=joinpath(scratchpath,"linearinterp-threechannel","shared_scratch")
+const logfile_scratch=joinpath(scratchpath,"linearinterp-threechannel","logfile_scratch")  # should be on /groups
 const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
 
-const file_infix="halffilledcube"
+const file_infix="hollowcube"
 const file_format="tif"  # "tif" or "h5"
 
 # normalized origin and shape of sub-bounding box to render
-#const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
+const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
 
 # or use the following code to convert morton order to origin & shape
-morton_order = [5]
-const region_of_interest = (
-    squeeze(sum(
-        [(((morton_order[depth]-1)>>xyz)&1)/2^depth for xyz=0:2, depth=1:length(morton_order)] ,2),2),
-    fill(0.5^length(morton_order),3) )
+#morton_order = [8,1,7,3]
+#const region_of_interest = (
+#    squeeze(sum(
+#        [(((morton_order[depth]-1)>>xyz)&1)/2^depth for xyz=0:2, depth=1:length(morton_order)] ,2),2),
+#    fill(0.5^length(morton_order),3) )
 
 const include_origins_outside_roi=false   # set to true to render all of small test ROI
 
 const notify_addr = "arthurb@hhmi.org"
 const bill_userid = "arthurb"
 
-const interpolation = "nearest"  # "nearest" or "linear"
+const interpolation = "linear"  # "nearest" or "linear"
 
 const raw_compression_ratios = [] # or e.g. [10,80]
 const octree_compression_ratios = []
@@ -85,5 +87,5 @@ downsampling_function(arg::Array{UInt16,3}) = (@inbounds return arg[1,1,1])
 
 # the below are for testing purposes.  users shouldn't need to change.
 const dry_run = false
-const use_avx = false
+const use_avx = true
 const system_ram = 32e9

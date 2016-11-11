@@ -15,8 +15,12 @@ shared_scratch=${tmp[1]}
 logfile_scratch=${tmp[2]}
 
 outofString=$(grep "channels split into" ${logfile_scratch}/director.log)
+while [ -z "$outofString" ]; do
+  sleep 60
+  outofString=$(grep "channels split into" ${logfile_scratch}/director.log)
+done
 outofArray=($outofString)
-outof=$(( ${outofArray[1]} * ${outofArray[4]} ))
+outof=${outofArray[1]}
 
 display_it() {
   if [ -n "$2" ] ; then
@@ -79,7 +83,7 @@ while true ; do
   echo started on ${started%%.*}
   printf "\n"
 
-  echo $ntiles input tile-channels read out of $outof
+  echo $ntiles input tiles read out of $outof
   echo $sharedscratch1 output tiles saved to shared_scratch = $shared_scratch , ${sharedscratch2[10]} available
   echo $destination1 output tiles saved to destination = $destination , ${destination2[10]} available
   printf "\n"

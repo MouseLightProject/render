@@ -14,8 +14,8 @@ const throttle_leaf_nmachines = 32  # number of compute nodes to use to render l
 # for which_cluster=="janelia" set to 32 (max is 96)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_nmachines = 64  # number of compute nodes to use to downsample octree
-# for which_cluster=="janelia" set to 64
+const throttle_octree_nmachines = 32  # number of compute nodes to use to downsample octree
+# for which_cluster=="janelia" set to 32
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
 const throttle_octree_njobs_per_machine = 1
@@ -28,14 +28,15 @@ const throttle_octree_ncores_per_job = 9
 
 const short_queue = true  # rendering MUST take less than 1 hour
 
-const source=joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube") # path to tilebase.cache.yml
-const destination=joinpath(source,"scratch","threechannel-cluster","results")  # path to octree
+const scratchpath=joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch")
 
-const shared_scratch=joinpath(source,"scratch","threechannel-cluster","shared_scratch")
-const logfile_scratch=joinpath(source,"scratch","threechannel-cluster","logfile_scratch")  # should be on /groups
+const source=joinpath(scratchpath,"data/threechannel") # path to tilebase.cache.yml
+const destination=joinpath(scratchpath,"threechannel-cluster","results")  # path to octree
+
+const shared_scratch=joinpath(scratchpath,"threechannel-cluster","shared_scratch")
+const logfile_scratch=joinpath(scratchpath,"threechannel-cluster","logfile_scratch")  # should be on /groups
 const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
 
-const nchannels=3
 const file_infix="hollowcube"
 const file_format="tif"  # "tif" or "h5"
 
