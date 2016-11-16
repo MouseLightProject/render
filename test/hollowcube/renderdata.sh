@@ -6,3 +6,4 @@ ${RENDER_PATH}/src/render/src/render ${RENDER_PATH}/src/render/test/hollowcube/t
 ${RENDER_PATH}/src/render/src/render ${RENDER_PATH}/src/render/test/hollowcube/linearinterp-onechannel-parameters.jl
 ${RENDER_PATH}/src/render/src/render ${RENDER_PATH}/src/render/test/hollowcube/linearinterp-threechannel-parameters.jl
 ${RENDER_PATH}/src/render/src/render ${RENDER_PATH}/src/render/test/hollowcube/linearinterp-threechannel-cpu-parameters.jl
+${RENDER_PATH}/src/render/src/render ${RENDER_PATH}/src/render/test/hollowcube/keepscratch-parameters.jl

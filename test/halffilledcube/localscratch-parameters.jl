@@ -33,7 +33,7 @@ const destination=joinpath(source,"scratch","localscratch","results")  # path to
 
 const shared_scratch=joinpath(source,"scratch","localscratch","shared_scratch")
 const logfile_scratch=joinpath(source,"scratch","localscratch","logfile_scratch")  # should be on /groups
-const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
+const delete_scratch="as-you-go"   # "never", "at-end" or "as-you-go"
 
 const file_infix="halffilledcube"
 const file_format="tif"  # "tif" or "h5"

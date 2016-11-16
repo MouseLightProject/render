@@ -7,7 +7,7 @@ const max_pixels_per_leaf=50^3  # maximum number of pixels in output tiles
 const max_tiles_per_job=1000  # maximum number of input tiles per cluster job
 # size to use all of RAM
 
-const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
+const which_cluster = [ENV["HOSTNAME"]] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
 const throttle_leaf_nmachines = 32  # number of compute nodes to use to render leafs
@@ -18,11 +18,11 @@ const throttle_octree_nmachines = 32  # number of compute nodes to use to downsa
 # for which_cluster=="janelia" set to 32
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_njobs_per_machine = 1
+const throttle_octree_njobs_per_machine = Sys.CPU_CORES>>1
 # for which_cluster=="janelia" set to 1
 # otherwise set to ncores per machine for small data sets
 
-const throttle_octree_ncores_per_job = 9
+const throttle_octree_ncores_per_job = 1
 # for which_cluster=="janelia" set to 9 (max is 16)
 # otherwise set to 1 for small data sets
 
@@ -31,11 +31,11 @@ const short_queue = true  # rendering MUST take less than 1 hour
 const scratchpath=joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch")
 
 const source=joinpath(scratchpath,"data/onechannel") # path to tilebase.cache.yml
-const destination=joinpath(scratchpath,"onechannel-cluster","results")  # path to octree
+const destination=joinpath(scratchpath,"keepscratch","results")  # path to octree
 
-const shared_scratch=joinpath(scratchpath,"onechannel-cluster","shared_scratch")
-const logfile_scratch=joinpath(scratchpath,"onechannel-cluster","logfile_scratch")  # should be on /groups
-const delete_scratch="as-you-go"   # "never", "at-end" or "as-you-go"
+const shared_scratch=joinpath(scratchpath,"keepscratch","shared_scratch")
+const logfile_scratch=joinpath(scratchpath,"keepscratch","logfile_scratch")  # should be on /groups
+const delete_scratch="never"   # "never", "at-end" or "as-you-go"
 
 const file_infix="hollowcube"
 const file_format="tif"  # "tif" or "h5"

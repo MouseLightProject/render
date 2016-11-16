@@ -35,7 +35,7 @@ const destination=joinpath(scratchpath,"onechannel-local","results")  # path to 
 
 const shared_scratch=joinpath(scratchpath,"onechannel-local","shared_scratch")
 const logfile_scratch=joinpath(scratchpath,"onechannel-local","logfile_scratch")  # should be on /groups
-const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
+const delete_scratch="as-you-go"   # "never", "at-end" or "as-you-go"
 
 const file_infix="hollowcube"
 const file_format="tif"  # "tif" or "h5"

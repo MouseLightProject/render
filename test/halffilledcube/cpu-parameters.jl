@@ -33,7 +33,7 @@ const destination=joinpath(source,"scratch","cpu","results")  # path to octree
 
 const shared_scratch=joinpath(source,"scratch","cpu","shared_scratch")
 const logfile_scratch=joinpath(source,"scratch","cpu","logfile_scratch")  # should be on /groups
-const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
+const delete_scratch="as-you-go"   # "never", "at-end" or "as-you-go"
 
 const file_infix="halffilledcube"
 const file_format="tif"  # "tif" or "h5"

@@ -72,4 +72,14 @@ end
   @test div(ncache16a,3) == ncache16b == div(ncache32,6)
 end
 
+@testset "keepscratch" begin
+  check_logfiles(joinpath(scratchpath,"keepscratch"), 64+1)
+  check_images(scratchpath, ["onechannel-local", "keepscratch"], 1, 64+8+1, true)
+  check_toplevel_images(joinpath(scratchpath,"keepscratch","results"),1)
+
+  shared_scratch = joinpath(scratchpath,"keepscratch","shared_scratch")
+  @test isdir(shared_scratch)
+  @test length(collect(walkdir(shared_scratch))) == 73
+end
+
 end

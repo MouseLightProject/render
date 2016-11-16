@@ -136,20 +136,22 @@ else
 fi
 
 # delete shared_scratch
-cmd="date;
-     hostname;
-     df -h $shared_scratch;
-     echo deleting shared_scratch = $shared_scratch;
-     rm -rf $shared_scratch;
-     echo ./savelogs $destination | mail -s \"job $jobname finished\" $notify_addr;
-     date"
-echo $cmd &>> $logfile_scratch/render.log
-if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N ${jobname}4 -j y -b n -V \
-        -hold_jid ${jobname}3 -l h_rt=$time_limit \
-        -o $logfile_scratch/render.log -m e -M $notify_addr
-else
-  eval $cmd &>> $logfile_scratch/render.log
+if [ $delete_scratch != 'never' ]; then
+  cmd="date;
+       hostname;
+       df -h $shared_scratch;
+       echo deleting shared_scratch = $shared_scratch;
+       rm -rf $shared_scratch;
+       echo ./savelogs $destination | mail -s \"job $jobname finished\" $notify_addr;
+       date"
+  echo $cmd &>> $logfile_scratch/render.log
+  if [ $which_cluster == 'janelia' ]; then
+    echo $cmd | qsub -A $bill_userid -N ${jobname}4 -j y -b n -V \
+          -hold_jid ${jobname}3 -l h_rt=$time_limit \
+          -o $logfile_scratch/render.log -m e -M $notify_addr
+  else
+    eval $cmd &>> $logfile_scratch/render.log
+  fi
 fi
 
 # email user

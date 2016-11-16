@@ -33,7 +33,7 @@ const destination="/nobackup2/mouselight/..."  # path to octree
 
 const shared_scratch="/nobackup2/mouselight/scratch/<yourId>"
 const logfile_scratch="/groups/mousebrainmicro/mousebrainmicro/scratch/<yourId>"  # should be on /groups
-const delete_scratch="as-you-go"   # "at-end" or "as-you-go"
+const delete_scratch="as-you-go"   # "never", "at-end", or "as-you-go"
 
 const file_infix="ngc"
 const file_format="tif"  # "tif" or "h5"
