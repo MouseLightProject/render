@@ -15,15 +15,16 @@ const origin_str = ARGS[3]
 const in_tile_idx = parse(Int,ARGS[2])
 const solo_out_tiles = eval(parse(ARGS[4]))
 idx = 7
-const xlims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
+const xlims = [parse(Int,x) for x in ARGS[idx+(1:parse(Int,ARGS[idx]))]]
 idx += length(xlims)+1
-const ylims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
+const ylims = [parse(Int,x) for x in ARGS[idx+(1:parse(Int,ARGS[idx]))]]
 idx += length(ylims)+1
-const zlims = map(x->parse(Int,x), ARGS[idx+(1:parse(Int,ARGS[idx]))])
+const zlims = [parse(Int,x) for x in ARGS[idx+(1:parse(Int,ARGS[idx]))]]
 idx += length(zlims)+1
-const dims = -1+map(x->parse(Int,x), ARGS[idx:idx+2])
+const dims = -1+[parse(Int,x) for x in ARGS[idx:idx+2]]
 idx += length(dims)
-const transform_nm = reshape(map(x->parse(Int,x), ARGS[idx:end]),3,length(xlims)*length(ylims)*length(zlims))
+const transform_nm = reshape([parse(Int,x) for x in
+      ARGS[idx:end]],3,length(xlims)*length(ylims)*length(zlims))
 
 @assert all(diff(diff(xlims)).==0) "xlims not equally spaced for input tile $in_tile_idx"
 @assert all(diff(diff(ylims)).==0) "ylims not equally spaced for input tile $in_tile_idx"

@@ -1,17 +1,39 @@
 const um2nm=1e3
 
-macro retry(x)
-  n=3; s=10
-  quote
-    for i=1:$n
-      try
-        $x
-        break
-      catch e
-        i==$n ? error(e) : (warn($(string(x)));  sleep($s))
-      end
+# from julia PR #19331
+
+const DEFAULT_RETRY_N = 1
+const DEFAULT_RETRY_ON = e->true
+const DEFAULT_RETRY_MAX_DELAY = 10.0
+const DEFAULT_RETRY_FIRST_DELAY = 0.05
+const DEFAULT_RETRY_GROWTH_FACTOR = 5
+const DEFAULT_RETRY_JITTER_FACTOR = 0.1
+const DEFAULT_RETRY_MESSAGE = ""
+
+function retry2(f::Function, retry_on::Function=DEFAULT_RETRY_ON;
+            n=DEFAULT_RETRY_N,
+            max_delay=DEFAULT_RETRY_MAX_DELAY,
+            first_delay=DEFAULT_RETRY_FIRST_DELAY,
+            growth_factor=DEFAULT_RETRY_GROWTH_FACTOR,
+            jitter_factor=DEFAULT_RETRY_JITTER_FACTOR,
+            message=DEFAULT_RETRY_MESSAGE)
+    (args...) -> begin
+        delay = min(first_delay, max_delay)
+        for i = 1:n+1
+            try
+                return f(args...)
+            catch e
+                if i > n || try retry_on(e) end !== true
+                    rethrow(e)
+                end
+            end
+            jittered_delay = delay * (1.0 + (rand() * jitter_factor))
+            message=="" || warn("try #",i," failed.  will retry in ",
+                  jittered_delay," seconds.  ",message)
+            sleep(jittered_delay)
+            delay = min(delay * growth_factor, max_delay)
+        end
     end
-  end
 end
 
 function get_available_port(default_port)
@@ -94,13 +116,25 @@ ndref(nd_t,data,kind) = ccall((:ndref, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void},C
 ndnbytes(nd_t) = ccall((:ndnbytes, libnd), Csize_t, (Ptr{Void},), nd_t)
 ndShapeSet(nd_t, idim, val) =
     ccall((:ndShapeSet, libnd), Ptr{Void}, (Ptr{Void},Cuint,Csize_t), nd_t, idim-1, val)
-ndioOpen(filename,format,mode) =
-    ccall((:ndioOpen, libnd), Ptr{Void}, (Ptr{UInt8},Ptr{Void},Ptr{UInt8}), filename, format, mode)
-ndioRead(file,dst) = ccall((:ndioRead, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), file, dst)
+ndioOpen(filename,format,mode) = retry2(() -> begin
+      ptr = ccall((:ndioOpen, libnd), Ptr{Void}, (Ptr{UInt8},Ptr{Void},Ptr{UInt8}),
+            filename, format, mode)
+      ptr==C_NULL ? throw(Exception) : ptr
+    end,
+    n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="ndioOpen($filename,$format,$mode)")()
+ndioRead(file,dst) = retry2(() -> begin
+      ptr = ccall((:ndioRead, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), file, dst)
+      ptr==C_NULL ? throw(Exception) : ptr
+    end,
+    n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="ndioRead($file,$dst)")()
 ndioReadSubarray(file,dst,origin,shape) =
     ccall((:ndioReadSubarray, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void},Ptr{Csize_t},Ptr{Csize_t}),
     file, dst, origin, shape)
-ndioWrite(file,src) = ccall((:ndioWrite, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), file, src)
+ndioWrite(file,src) = retry2(() -> begin
+      ptr = ccall((:ndioWrite, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), file, src)
+      ptr==C_NULL ? throw(Exception) : ptr
+    end,
+    n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="ndioWrite($file,$src)")()
 ndioClose(file) = ccall((:ndioClose, libnd), Void, (Ptr{Void},), file)
 ndioShape(file) = ccall((:ndioShape, libnd), Ptr{Void}, (Ptr{Void},), file)
 
@@ -207,7 +241,8 @@ function save_out_tile(filesystem, path, name, data::Ptr{Void})
   try
     filepath = joinpath(filesystem,path)
     filename = joinpath(filepath,name)
-    @retry mkpath(filepath)
+    retry2(()->mkpath(filepath),
+        n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="mkpath(\"$filepath\")")()
     ndioClose(ndioWrite(ndioOpen(filename, C_NULL, "w"), data))
     for ratio in raw_compression_ratios
       run(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $filepath $(splitext(name)[1]) 0`)
@@ -250,7 +285,9 @@ function _merge_across_filesystems(
   time_single_file=0.0; time_many_files=0.0; time_clear_files=0.0
   time_read_files=0.0;   time_max_files=0.0; time_delete_files=0.0; time_write_files=0.0
 
-  @retry mkpath(joinpath(destination,out_tile_path))
+  retry2(()->mkpath(joinpath(destination,out_tile_path)),
+        n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
+        message="mkpath(\"$(joinpath(destination,out_tile_path))\")")()
   destination2 = joinpath(destination, out_tile_path, string(prefix,".%.",suffix))
 
   if length(in_tiles)==1 && !startswith(destination2,in_tiles[1])
