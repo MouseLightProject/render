@@ -1,5 +1,5 @@
-function check_logfiles(scratchpath, correct_nmergelogs)
-  logfiles = readdir(joinpath(scratchpath,"logfile_scratch"))
+function check_logfiles(logfilepath, correct_nmergelogs)
+  logfiles = readdir(logfilepath)
 
   # all log files exist?
   @test any(logfiles.=="render.log")
@@ -10,7 +10,7 @@ function check_logfiles(scratchpath, correct_nmergelogs)
 
   # any errors reported in the log files?
   for logfile in logfiles
-    log = read(joinpath(scratchpath,"logfile_scratch",logfile))
+    log = read(joinpath(logfilepath,logfile))
     @test !contains(String(log), "ERR")
     @test !contains(String(log), "WAR")
     @test !contains(String(log), "Segmentation")
@@ -22,7 +22,7 @@ function check_images(scratchpath, testdirs, correct_nchannels, correct_ntiffs, 
   hierarchies=[]
   for testdir in testdirs
     cd(joinpath(scratchpath,testdir))
-    push!(hierarchies, collect(walkdir("results")))
+    push!(hierarchies, collect(walkdir(".")))
     length(hierarchies)>1 && @test hierarchies[end-1]==hierarchies[end]
   end
 
