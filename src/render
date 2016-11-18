@@ -21,8 +21,6 @@
 #   transform.txt
 #   render.log
 
-set -e
-
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3
 export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3/julia-0.5.0/bin/julia
@@ -108,10 +106,16 @@ cmd="date;
      date;"
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t 1-64 -tc $throttle_octree_nmachines -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
+  echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t 1-64 -tc $throttle_octree_nmachines \
+        -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
         -hold_jid $jobname -R yes -l h_rt=$time_limit -o $logfile_scratch/merge'$TASK_ID'.log
 else
-  pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export HOSTNAME=$HOSTNAME; export SGE_TASK_ID={}; { $cmd } &> ${logfile_scratch}/merge{}.log"
+  pcmd="export RENDER_PATH=$RENDER_PATH;
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
+        export JULIA=$JULIA;
+        export HOSTNAME=$HOSTNAME;
+        export SGE_TASK_ID={};
+        { $cmd } &> ${logfile_scratch}/merge{}.log"
   parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq 1 64` &>> $logfile_scratch/render.log
 fi
 
@@ -133,7 +137,11 @@ if [ $which_cluster == 'janelia' ]; then
   echo $cmd | qsub -A $bill_userid -N ${jobname}3 -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
         -hold_jid ${jobname}2 -R yes -l h_rt=$time_limit -o $logfile_scratch/merge65.log
 else
-  pcmd="export RENDER_PATH=$RENDER_PATH; export LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export JULIA=$JULIA; export HOSTNAME=$HOSTNAME; { $cmd } &> ${logfile_scratch}/merge65.log"
+  pcmd="export RENDER_PATH=$RENDER_PATH;
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
+        export JULIA=$JULIA;
+        export HOSTNAME=$HOSTNAME;
+        { $cmd } &> ${logfile_scratch}/merge65.log"
   ssh ${which_cluster%%,*} $pcmd  &>> $logfile_scratch/render.log
 fi
 

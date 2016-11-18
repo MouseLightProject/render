@@ -47,6 +47,8 @@ cost==Inf32 && error("can't find satisfactory shape_leaf_px")
 const shape_leaf_px = shape_leaf_tmp+xyz
 const voxelsize_used_um = shape_tiles_nm./um2nm./2^nlevels ./ shape_leaf_px
 
+git_version(path) = readchomp(`git --git-dir=$(path)/.git log -1 --pretty=format:"%ci %H"`)
+
 # write parameter files to destination
 open("$destination/calculated_parameters.jl","w") do f
   println(f,"const jobname = \"",jobname,"\"")
@@ -56,8 +58,9 @@ open("$destination/calculated_parameters.jl","w") do f
   println(f,"const voxelsize_used_um = ",voxelsize_used_um)
   println(f,"const origin_nm = [",join(map(string,tiles_bbox[2]),","),"]")
   println(f,"const tile_type = convert(Cint,$tile_type)")
-  println(f,"const render_version = \"",
-      readchomp(`git --git-dir=$(dirname(Base.source_path()))/../.git log -1 --pretty=format:"%ci %H"`),"\"")
+  for repo in ["render", "mltk-bary", "tilebase", "nd", "ndio-series", "ndio-tiff", "ndio-hdf5", "mylib"]
+    println(f,"const $(replace(repo,'-','_'))_version = \"",git_version(joinpath(ENV["RENDER_PATH"],"src",repo)),"\"")
+  end
 end
 open("$destination/transform.txt","w") do f  # for large volume viewer
   println(f,"ox: ",tiles_bbox[2][1])
@@ -185,7 +188,8 @@ t0=time()
           println(sock, cmd)
           info(cmd, prefix="DIRECTOR>SQUATTER: ")
           nfinished = wait(events[p,2])
-          info("director has finished ",nfinished," of ",length(job_aabbs)," jobs.  ",signif(nfinished / length(job_aabbs) * 100,4),"% done", prefix="DIRECTOR: ")
+          info("director has finished ",nfinished," of ",length(job_aabbs)," jobs.  ",
+                signif(nfinished / length(job_aabbs) * 100,4),"% done", prefix="DIRECTOR: ")
         end
       end
     end
@@ -202,7 +206,11 @@ t0=time()
   else
     proc = Array(Any,nnodes)
     for n=1:nnodes
-      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n]) export RENDER_PATH=$(ENV["RENDER_PATH"]); export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]); export JULIA=$(ENV["JULIA"]); export HOSTNAME=$(ENV["HOSTNAME"]); export SGE_TASK_ID=$n; $cmd &> $logfile_scratch/squatter$n.log`
+      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n]) export RENDER_PATH=$(ENV["RENDER_PATH"]);
+            export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]);
+            export JULIA=$(ENV["JULIA"]);
+            export HOSTNAME=$(ENV["HOSTNAME"]);
+            export SGE_TASK_ID=$n; $cmd &> $logfile_scratch/squatter$n.log`
       info(pcmd, prefix="DIRECTOR: ")
       proc[n] = spawn(pcmd)
     end
