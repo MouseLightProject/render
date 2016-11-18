@@ -100,7 +100,8 @@ expr="p=addprocs(${throttle_octree_ncores_per_job});
         merge_output_tiles(shared_scratch, destination, \"default\", file_format,
               string(oct)*\"/\"*string(oct2), true, true, delete_scratch==\"as-you-go\" ? true : false);
         info(\"merging took \",string(round(Int,time()-t)),\" sec\");
-      end"
+      end;
+      rmprocs(p);"
 cmd="date;
      hostname;
      $JULIA -e '$expr';
@@ -121,7 +122,8 @@ expr="p=addprocs(${throttle_octree_ncores_per_job});
       t=time();
       merge_output_tiles(nlevels>1 ? destination : shared_scratch, destination, \"default\", file_format,
             \"\", true, true, delete_scratch==\"as-you-go\" ? true : false);
-      info(\"merging took \",string(round(Int,time()-t)),\" sec\")"
+      info(\"merging took \",string(round(Int,time()-t)),\" sec\");
+      rmprocs(p);"
 cmd="date;
      hostname;
      $JULIA -e '$expr';
@@ -158,6 +160,6 @@ fi
 echo watch -n 60 tail -n '$((LINES-2))' $logfile_scratch/monitor.log | mail -s "job $jobname started" $notify_addr
 
 # start the monitor process
-nohup sh -c "sleep 10; ${RENDER_PATH}/src/render/src/monitor $jobname $destination/set_parameters.jl &> ${logfile_scratch}/monitor.log" 2>/dev/null &
+nohup sh -c "sleep 60; ${RENDER_PATH}/src/render/src/monitor $jobname $destination/set_parameters.jl &> ${logfile_scratch}/monitor.log" 2>/dev/null &
 
 date >> $logfile_scratch/render.log
