@@ -12,10 +12,10 @@ Julia, version 5, plus the YAML package.
 
 Nathan Clack's nd, tilebase, and mltk-bary libraries.
 
-Tested with Julia v0.5.0-rc3, YAML v0.1.10, nd master (branch)
-/ c80b719e (commit), ndio-series use-tre/fdfe30a7, ndio-tiff
-ndio-format-context/df46d485, ndio-hdf5 ndio-format-context/0c7ac77c,
-tilebase master/cc171869, and mltk-bary master/966fda98.
+Tested with Julia v0.5.0, YAML v0.1.10, nd master (branch) / ef492383 (commit),
+ndio-series use-tre/fdfe30a7, ndio-tiff ndio-format-context/df46d485, ndio-hdf5
+ndio-format-context/0c7ac77c, tilebase master/cc171869, mltk-bary
+master/84e15364, and mylib stream/0ca27aae.
 
 
 Installation
@@ -30,7 +30,7 @@ unix command line and executing Pkg.add("YAML").  If desired, use the
 bash environment variable JULIA_PKGDIR to place it somewhere other than
 your home directory.  For example, somewhere on Julia's LOAD_PATH, like
 <julia-install-dir>/share/julia/site, would permit others to use the
-pipeline without having to install all of the packages themselves.
+pipeline without having to install this package themselves.
 
 Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, and ```JULIA```
 in ```render```, ```monitor```, ```savelogs```, and ```merge``` are all
@@ -140,16 +140,30 @@ sock2 = accept(server2)
 tmp = chomp(readline(sock2))
 
 in_tile_num, out_tile_path = match(ready,tmp).captures[[2,4]]
-msg = "manager tells peon for input tile $in_tile_num to write output tile $out_tile_path to local_scratch"
+msg = string("manager tells peon for input tile ",in_tile_num,
+      " to write output tile ",out_tile_path," to local_scratch")
 println(sock2, msg)
 
 while isopen(sock2) || nb_available(sock2)>0
   tmp = chomp(readline(sock2))
   tmp = chomp(readline(sock2))
   in_tile_num, out_tile_path = match(ready,tmp).captures[[2,4]]
-  msg = "manager tells peon for input tile $in_tile_num to write output tile $out_tile_path to local_scratch"
+  if read(STDIN,1)==[0x0a]  # <return>
+    msg = string("manager tells peon for input tile ",in_tile_num,
+          " to write output tile ",out_tile_path," to local_scratch")
+  else
+    msg = string("manager tells peon for input tile ",in_tile_num,
+          " to merge output tile ",out_tile_path," to shared_scratch")
+  end
   println(sock2, msg)
 end
+```
+
+
+To see how many RAM slots were used:
+
+```
+grep "using RAM slot" <full-path-to-squatter.log> | cut -d' ' -f 5 | sort | uniq | less
 ```
 
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# usage: ./janitor <destination>
+# usage: ./janitor <logfile_scratch>
 
 # run this script to clean up the nodes if you have to qdel a ./render
 # if any julia processes remain, manually ssh in and kill them
