@@ -25,6 +25,8 @@ export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3
 export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3/julia-0.5.0/bin/julia
 
+umask 002
+
 # get vars from parameters.jl file
 expr="include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       tiles = TileBaseOpen(source);
@@ -71,16 +73,19 @@ hostname >> $logfile_scratch/render.log
 
 # copy parameters to <destination>
 cp $1 $destination/set_parameters.jl
+chmod g+w $destination/set_parameters.jl
 
 # create a probably-unique job name
 jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
 echo jobname = $jobname >> $logfile_scratch/render.log
 
 # create the leaf nodes
-cmd="$JULIA ${RENDER_PATH}/src/render/src/director.jl $destination/set_parameters.jl $jobname"
+cmd="umask 002;
+     $JULIA ${RENDER_PATH}/src/render/src/director.jl $destination/set_parameters.jl $jobname"
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
-  qsub -A $bill_userid -N $jobname -j y -b y -V -shell n -l h_rt=$time_limit -o $logfile_scratch/director.log $cmd
+  echo $cmd | qsub -A $bill_userid -N $jobname -j y -b n -V -shell n -l h_rt=$time_limit \
+        -o $logfile_scratch/director.log
 else
   eval $cmd &> $logfile_scratch/director.log
 fi
@@ -100,7 +105,8 @@ expr="p=addprocs(${throttle_octree_ncores_per_job});
         info(\"merging took \",string(round(Int,time()-t)),\" sec\");
       end;
       rmprocs(p);"
-cmd="date;
+cmd="umask 002;
+     date;
      hostname;
      $JULIA -e '$expr';
      date;"
@@ -128,7 +134,8 @@ expr="p=addprocs(${throttle_octree_ncores_per_job});
             \"\", true, true, delete_scratch==\"as-you-go\" ? true : false);
       info(\"merging took \",string(round(Int,time()-t)),\" sec\");
       rmprocs(p);"
-cmd="date;
+cmd="umask 002;
+     date;
      hostname;
      $JULIA -e '$expr';
      date;"

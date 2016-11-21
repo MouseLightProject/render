@@ -2,6 +2,17 @@ using Base.Test, Images
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
 
+function check_permissions(basepath)
+  for (root, dirs, files) in walkdir(basepath)
+    for file in files
+      @test filemode(joinpath(basepath,root,file)) & 0o020 > 0
+    end
+    for dir in dirs
+      @test filemode(joinpath(basepath,root,dir)) & 0o020 > 0
+    end
+  end
+end
+
 function check_toplevel_images(basepath, nchannels)
   for nchannel=0:(nchannels-1)
     img = load(joinpath(basepath,"default.$(nchannel).tif"))
@@ -20,6 +31,7 @@ scratchpath = joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch")
 @testset "hollowcube" begin
 
 @testset "onechannel-$v" for v in ["local", "cluster"]
+  check_permissions(joinpath(scratchpath,"onechannel-$v","results"))
   check_logfiles(joinpath(scratchpath,"onechannel-$v","logfile_scratch"), 64+1)
   check_toplevel_images(joinpath(scratchpath,"onechannel-$v","results"),1)
 end
@@ -29,6 +41,7 @@ end
 end
 
 @testset "threechannel-$v" for v in ["local", "cluster"]
+  check_permissions(joinpath(scratchpath,"threechannel-$v","results"))
   check_logfiles(joinpath(scratchpath,"threechannel-$v","logfile_scratch"), 64+1)
   check_toplevel_images(joinpath(scratchpath,"threechannel-$v","results"),2)
 end
@@ -73,6 +86,8 @@ end
 end
 
 @testset "keepscratch" begin
+  check_permissions(joinpath(scratchpath,"keepscratch","results"))
+  check_permissions(joinpath(scratchpath,"keepscratch","shared_scratch"))
   check_logfiles(joinpath(scratchpath,"keepscratch","logfile_scratch"), 64+1)
   check_images(scratchpath, ["onechannel-local/results", "keepscratch/results"], 1, 64+8+1, true)
   check_toplevel_images(joinpath(scratchpath,"keepscratch","results"),1)
