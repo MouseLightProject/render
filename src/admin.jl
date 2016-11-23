@@ -89,12 +89,12 @@ function AABBBinarySubdivision(bbox)
 end
 
 function AABBGetJ(bbox)
-  ndim = Csize_t[0]
-  origin = Ptr{Int}[0]
-  shape = Ptr{Int}[0]
+  ndim = Ref{Csize_t}(0)
+  origin = Ref{Ptr{Int64}}(0)
+  shape = Ref{Ptr{Int64}}(0)
   ccall((:AABBGet, libtilebase),
-    Ptr{Void}, (Ptr{Void},Ptr{Csize_t},Ptr{Ptr{Int}},Ptr{Ptr{Int}}), bbox,ndim,origin,shape)
-  ndim[1], unsafe_wrap(Array,origin[1],ndim[1]), unsafe_wrap(Array,shape[1],ndim[1])
+    Ptr{Void}, (Ptr{Void},Ref{Csize_t},Ref{Ptr{Int64}},Ref{Ptr{Int64}}), bbox,ndim,origin,shape)
+  ndim[], unsafe_wrap(Array,origin[],ndim[]), unsafe_wrap(Array,shape[],ndim[])
 end
 
 # interface to nd
