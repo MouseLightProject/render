@@ -13,16 +13,16 @@ function check_permissions(basepath)
   end
 end
 
+#ndio-tiff is not compatible with ImageMagick.  0x7fff = 0x7f7f, hence the .>>8
 function check_toplevel_images(basepath, nchannels)
   for nchannel=0:(nchannels-1)
     img = load(joinpath(basepath,"default.$(nchannel).tif"))
-    # ImageMagic returns UInt8 instead of UInt16
-    rightanswer = zeros(UInt8,48);  rightanswer[3:end-1]=0xff>>nchannel
-    @test squeeze(maximum(raw(img),(1,2)),(1,2)) == rightanswer
-    rightanswer = zeros(UInt8,48);  rightanswer[4:end-2]=0xff>>nchannel
-    @test squeeze(maximum(raw(img),(1,3)),(1,3)) == rightanswer
-    rightanswer = zeros(UInt8,48);  rightanswer[6:end-4]=0xff>>nchannel
-    @test squeeze(maximum(raw(img),(2,3)),(2,3)) == rightanswer
+    rightanswer = zeros(UInt16,48);  rightanswer[3:end-1]=0xffff>>nchannel
+    @test squeeze(maximum(raw(img),(1,2)),(1,2)).>>8 == rightanswer.>>8
+    rightanswer = zeros(UInt16,48);  rightanswer[4:end-2]=0xffff>>nchannel
+    @test squeeze(maximum(raw(img),(1,3)),(1,3)).>>8 == rightanswer.>>8
+    rightanswer = zeros(UInt16,48);  rightanswer[6:end-4]=0xffff>>nchannel
+    @test squeeze(maximum(raw(img),(2,3)),(2,3)).>>8 == rightanswer.>>8
   end
 end
 
@@ -57,7 +57,7 @@ end
   check_logfiles(joinpath(scratchpath,"linearinterp-threechannel","logfile_scratch"), 64+1)
   check_logfiles(joinpath(scratchpath,"linearinterp-threechannel-cpu","logfile_scratch"), 64+1)
   check_images(scratchpath, ["linearinterp-threechannel/results","linearinterp-threechannel-cpu/results"], 3, 3*(64+8+1), false)
-  info("it is normal to have 68 avx images each have ~1000 voxels be 1 shade different compared to cpu")
+  info("it is normal to have 68 avx images each have ~1000 voxels be 257 shades different compared to cpu")
 end
 
 @testset "nslots" begin

@@ -4,12 +4,11 @@ include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
 
 function check_toplevel_images(basepath)
   img = load(joinpath(basepath,"default.0.tif"))
-  # ImageMagic returns UInt8 instead of UInt16
-  rightanswer = zeros(UInt8,64);  rightanswer[36:end]=0xff
+  rightanswer = zeros(UInt16,64);  rightanswer[36:end]=0xffff
   @test squeeze(maximum(raw(img),(1,2)),(1,2)) == rightanswer
-  rightanswer = zeros(UInt8,640);  rightanswer[2:438]=0xff
+  rightanswer = zeros(UInt16,640);  rightanswer[2:438]=0xffff
   @test squeeze(maximum(raw(img),(1,3)),(1,3)) == rightanswer
-  rightanswer = zeros(UInt8,454);  rightanswer[[2:94;143:233]]=0xff
+  rightanswer = zeros(UInt16,454);  rightanswer[[2:94;143:233]]=0xffff
   @test squeeze(maximum(raw(img),(2,3)),(2,3)) == rightanswer
 end
 
