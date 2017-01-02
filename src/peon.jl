@@ -102,23 +102,24 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
               out_tiles_ws[out_tile_path_next])
           info("transfered output tile ",out_tile_path_next," from RAM to shared_scratch", prefix="PEON: ")
         else
-          msg = string("peon for input tile ",in_tile_idx," has output tile ",out_tile_path_next," ready")
-          println(sock, msg)
-          info(msg, prefix="PEON: ")
+          msg_to_manager =
+                string("peon for input tile ",in_tile_idx," has output tile ",out_tile_path_next," ready")
+          println(sock, msg_to_manager)
+          info(msg_to_manager, prefix="PEON: ")
           t1=time()
-          local tmp
+          local msg_from_manager
           while true
-            tmp = chomp(readline(sock))
-            length(tmp)==0 || break
+            msg_from_manager = chomp(readline(sock))
+            length(msg_from_manager)==0 || break
           end
           time_waiting+=(time()-t1)
-          info(tmp, prefix="PEON<MANAGER: ")
-          if startswith(tmp,send)
+          info(msg_from_manager, prefix="PEON<MANAGER: ")
+          if startswith(msg_from_manager, send)
             msg = string("peon for input tile ",in_tile_idx," will send output tile ",out_tile_path_next)
             println(sock,msg)
             info(msg, prefix="PEON: ")
             serialize(sock, out_tiles_jl[out_tile_path_next])
-          elseif startswith(tmp,receive)
+          elseif startswith(msg_from_manager, receive)
             out_tiles_jl[out_tile_path_next][:] = max(out_tiles_jl[out_tile_path_next]::Array{UInt16,4},
                 deserialize(sock)::Array{UInt16,4})
             save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,".%.",file_format),
@@ -127,7 +128,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
             println(sock,msg)
             info(msg, prefix="PEON: ")
             #info("peon transfered output tile ",out_tile_path_next," from RAM to shared_scratch")
-          elseif startswith(tmp,write)
+          elseif startswith(msg_from_manager, write)
             if enough_free(local_scratch)
               save_out_tile(local_scratch, out_tile_path_next,
                   string(in_tile_idx,'.',sub_tile_str,".%.",file_format),
@@ -161,36 +162,27 @@ function process_input_tile()
   global time_initing
 
   local tiles
-  try
-    tiles = TileBaseOpen(source)
-    global tile = TileBaseIndex(tiles, in_tile_idx)
-  catch
-    error("in peon/TileBaseOpen-Index")
-  end
+  tiles = TileBaseOpen(source)
+  global tile = TileBaseIndex(tiles, in_tile_idx)
 
   info("processing input tile $in_tile_idx: ",unsafe_string(TilePath(tile)), prefix="PEON: ")
 
   local in_tile_ws, in_tile_jl, in_subtile_ws, in_subtile_jl
-  try
-    t1=time()
-    tmp = TileShape(tile)
-    shape_intile = ndshapeJ(tmp)
-    global data_type = ndtype(tmp)
-    in_tile_ws = ndalloc(shape_intile, data_type)
-    in_tile_jl = unsafe_wrap(Array,convert(Ptr{UInt16},nddata(in_tile_ws)), tuple(shape_intile...))
-    in_subtile_ws = ndinit()
-    ndcast(in_subtile_ws, data_type)
-    tmp=split(unsafe_string(TilePath(tile)),"/")
-    push!(tmp, string(tmp[end],'-',file_infix,".%.",file_format))
-    ndioClose(ndioRead(ndioOpen("/"*joinpath(tmp...), C_NULL, "r"), in_tile_ws))
-    info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec", prefix="PEON: ")
-    filename = "/"*joinpath(tmp...)
-    for ratio in octree_compression_ratios
-      spawn(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $(dirname(filename)) $(splitext(basename(filename))[1]) 0`)
-    end
-
-  catch
-    error("in peon/ndalloc")
+  t1=time()
+  tmp = TileShape(tile)
+  shape_intile = ndshapeJ(tmp)
+  global data_type = ndtype(tmp)
+  in_tile_ws = ndalloc(shape_intile, data_type)
+  in_tile_jl = unsafe_wrap(Array,convert(Ptr{UInt16},nddata(in_tile_ws)), tuple(shape_intile...))
+  in_subtile_ws = ndinit()
+  ndcast(in_subtile_ws, data_type)
+  tmp=split(unsafe_string(TilePath(tile)),"/")
+  push!(tmp, string(tmp[end],'-',file_infix,".%.",file_format))
+  ndioClose(ndioRead(ndioOpen("/"*joinpath(tmp...), C_NULL, "r"), in_tile_ws))
+  info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec", prefix="PEON: ")
+  filename = "/"*joinpath(tmp...)
+  for ratio in octree_compression_ratios
+    spawn(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $(dirname(filename)) $(splitext(basename(filename))[1]) 0`)
   end
 
   global in_subtiles_aabb = calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
@@ -204,17 +196,13 @@ function process_input_tile()
     in_subtile_jl = in_tile_jl[1+(xlims[ix]:xlims[ix+1]),1+(ylims[iy]:ylims[iy+1]),1+(zlims[iz]:zlims[iz+1]),:]
     map((i,x)->ndShapeSet(in_subtile_ws, i, x), 1:4, size(in_subtile_jl))
     ndref(in_subtile_ws, pointer(in_subtile_jl), convert(Cint,0))
-    try
-      global resampler = Ptr{Void}[0]
-      if has_avx2 && use_avx
-        BarycentricAVXinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 4)
-        BarycentricAVXsource(resampler, nddata(in_subtile_ws))
-      else
-        BarycentricCPUinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 4)
-        BarycentricCPUsource(resampler, nddata(in_subtile_ws))
-      end
-    catch
-      error("BarycentricInit error:  input tile $in_tile_idx")
+    global resampler = Ptr{Void}[0]
+    if has_avx2 && use_avx
+      BarycentricAVXinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 4)
+      BarycentricAVXsource(resampler, nddata(in_subtile_ws))
+    else
+      BarycentricCPUinit(resampler, ndshape(in_subtile_ws), shape_leaf_ptr, 4)
+      BarycentricCPUsource(resampler, nddata(in_subtile_ws))
     end
     time_initing+=(time()-t1)
 
@@ -227,21 +215,13 @@ function process_input_tile()
   ndfree(in_subtile_ws)
   ndfree(in_tile_ws)
 
-  try
-    #TileFree(tile)
-    TileBaseClose(tiles)
-  catch
-    error("peon/TileBaseClose")
-  end
+  #TileFree(tile)
+  TileBaseClose(tiles)
 
-  try
-    if has_avx2 && use_avx
-      BarycentricAVXrelease(resampler)
-    else
-      BarycentricCPUrelease(resampler)
-    end
-  catch
-    error("BarycentricRelease error:  input tile $in_tile_idx")
+  if has_avx2 && use_avx
+    BarycentricAVXrelease(resampler)
+  else
+    BarycentricCPUrelease(resampler)
   end
 
   info("initializing input tile ",in_tile_idx, " took ",round(Int,time_initing)," sec", prefix="PEON: ")

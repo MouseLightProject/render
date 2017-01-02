@@ -27,8 +27,8 @@ while isopen(sock) || nb_available(sock)>0
     info(cmd, prefix="SQUATTER: ")
     try
       run(cmd)
-    catch
-      warn("manager $proc_num might have failed")
+    catch e
+      warn("manager $proc_num might have failed: ",e)
     end
     msg = "squatter $proc_num is finished"
     println(sock,msg)

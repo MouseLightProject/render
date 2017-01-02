@@ -222,8 +222,8 @@ t0=time()
       info(cmd, prefix="MANAGER: ")
       try
         run(cmd)
-      catch
-        warn("peon for input tile $(in_tiles_idx[locality_idx[tile_idx]]) might have failed")
+      catch e
+        warn("peon for input tile ",in_tiles_idx[locality_idx[tile_idx]]," might have failed: ",e)
       end
     end
   end

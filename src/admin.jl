@@ -101,21 +101,23 @@ end
 
 const libnd = ENV["RENDER_PATH"]*"/env/lib/libnd.so"
 
-ndinit() = ccall((:ndinit, libnd), Ptr{Void}, ())
-ndheap(nd_t) = ccall((:ndheap, libnd), Ptr{Void}, (Ptr{Void},), nd_t)
+nullcheck(arg) = arg==C_NULL ? throw(OutOfMemoryError()) : arg
+
+ndinit() = nullcheck( ccall((:ndinit, libnd), Ptr{Void}, ()) )
+ndheap(nd_t) = nullcheck( ccall((:ndheap, libnd), Ptr{Void}, (Ptr{Void},), nd_t) )
 ndfree(nd_t) = ccall((:ndfree, libnd), Void, (Ptr{Void},), nd_t)
 nddata(nd_t) = ccall((:nddata, libnd), Ptr{Void}, (Ptr{Void},), nd_t)
 ndtype(nd_t) = ccall((:ndtype, libnd), Cint, (Ptr{Void},), nd_t)
 ndkind(nd_t) = ccall((:ndkind, libnd), Cint, (Ptr{Void},), nd_t)
 ndndim(nd_t) = ccall((:ndndim, libnd), Cuint, (Ptr{Void},), nd_t)
-ndcopy_ip(nd_t_dst, nd_t_src) =
-    ccall((:ndcopy_ip, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), nd_t_dst, nd_t_src)
+ndcopy_ip(nd_t_dst, nd_t_src) = nullcheck(
+    ccall((:ndcopy_ip, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), nd_t_dst, nd_t_src) )
 ndcast(nd_t,t) = ccall((:ndcast, libnd), Ptr{Void}, (Ptr{Void},Cint), nd_t,t)
 ndfill(nd_t,c) = ccall((:ndfill, libnd), Ptr{Void}, (Ptr{Void},UInt64), nd_t,c)
 ndref(nd_t,data,kind) = ccall((:ndref, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void},Cint), nd_t,data,kind)
 ndnbytes(nd_t) = ccall((:ndnbytes, libnd), Csize_t, (Ptr{Void},), nd_t)
-ndShapeSet(nd_t, idim, val) =
-    ccall((:ndShapeSet, libnd), Ptr{Void}, (Ptr{Void},Cuint,Csize_t), nd_t, idim-1, val)
+ndShapeSet(nd_t, idim, val) = nullcheck(
+    ccall((:ndShapeSet, libnd), Ptr{Void}, (Ptr{Void},Cuint,Csize_t), nd_t, idim-1, val) )
 ndioOpen(filename,format,mode) = retry2(() -> begin
       ptr = ccall((:ndioOpen, libnd), Ptr{Void}, (Ptr{UInt8},Ptr{Void},Ptr{UInt8}),
             filename, format, mode)
@@ -238,17 +240,13 @@ function save_out_tile(filesystem, path, name, data::AbstractArray{UInt16})
 end
 
 function save_out_tile(filesystem, path, name, data::Ptr{Void})
-  try
-    filepath = joinpath(filesystem,path)
-    filename = joinpath(filepath,name)
-    retry2(()->mkpath(filepath),
-        n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="mkpath(\"$filepath\")")()
-    ndioClose(ndioWrite(ndioOpen(filename, C_NULL, "w"), data))
-    for ratio in raw_compression_ratios
-      run(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $filepath $(splitext(name)[1]) 0`)
-    end
-  catch
-    error("in save_out_tile")
+  filepath = joinpath(filesystem,path)
+  filename = joinpath(filepath,name)
+  retry2(()->mkpath(filepath),
+      n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="mkpath(\"$filepath\")")()
+  ndioClose(ndioWrite(ndioOpen(filename, C_NULL, "w"), data))
+  for ratio in raw_compression_ratios
+    run(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $filepath $(splitext(name)[1]) 0`)
   end
 end
 
@@ -279,11 +277,12 @@ function _merge_across_filesystems(
       destination, prefix, suffix, out_tile_path, recurse, octree, delete, flag,
       in_tiles, out_tile_img, out_tile_img_down)
   merge1_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type)
-  merge1_jl = unsafe_wrap(Array{UInt16,4},convert(Ptr{UInt16},nddata(merge1_ws)), tuple(shape_leaf_px...,nchannels))
+  merge1_jl = unsafe_wrap(Array{UInt16,4}, convert(Ptr{UInt16},nddata(merge1_ws)),
+        tuple(shape_leaf_px...,nchannels))
 
-  time_octree_down=0.0; time_octree_save=0.0
-  time_single_file=0.0; time_many_files=0.0; time_clear_files=0.0
-  time_read_files=0.0;   time_max_files=0.0; time_delete_files=0.0; time_write_files=0.0
+  time_octree_down = time_octree_save = 0.0
+  time_single_file = time_many_files = time_clear_files = 0.0
+  time_read_files = time_max_files = time_delete_files = time_write_files = 0.0
 
   retry2(()->mkpath(joinpath(destination,out_tile_path)),
         n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
@@ -304,7 +303,8 @@ function _merge_across_filesystems(
   elseif length(in_tiles)>1
     t0=time()
     merge2_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type)
-    merge2_jl = unsafe_wrap(Array{UInt16,4},convert(Ptr{UInt16},nddata(merge2_ws)), tuple(shape_leaf_px...,nchannels))
+    merge2_jl = unsafe_wrap(Array{UInt16,4}, convert(Ptr{UInt16},nddata(merge2_ws)),
+          tuple(shape_leaf_px...,nchannels))
     info("merging:")
     t1=time()
     ndfill(merge1_ws, 0x0000)
@@ -399,7 +399,7 @@ function merge_across_filesystems(sources::Array{String,1}, destination, prefix,
     isempty(in_tiles2) || push!(in_tiles, in_tiles2...)
   end
 
-  length(dirs)==0 && length(in_tiles)==0 && return
+  length(dirs)==0 && length(in_tiles)==0 && return fill(0.0,9)
 
   out_tile_img=nothing
   if octree && length(dirs)>0 && length(in_tiles)==0
@@ -459,8 +459,8 @@ function rmcontents(dir, available, prefix)
   for file in readdir(dir)
     try
       rm(joinpath(dir,file), recursive=true)
-    catch
-      warn("can't delete",joinpath(dir,file))
+    catch e
+      warn("can't delete",joinpath(dir,file),": ",e)
     end
   end
   available=="after" && (free=get_available(dir,"start"))
