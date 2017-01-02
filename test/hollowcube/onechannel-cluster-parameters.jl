@@ -63,7 +63,7 @@ const include_origins_outside_roi=false   # set to true to render all of small t
 
 const max_pixels_per_leaf=50^3  # maximum number of pixels in output tiles
 
-const max_tiles_per_job=500  # maximum number of input tiles per cluster job
+const max_tilechannels_per_job=1000  # maximum number of input tiles * nchannels per cluster job
 # size to use all of RAM
 
 

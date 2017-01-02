@@ -97,7 +97,7 @@ function get_job_aabbs(bbox)
         (include_origins_outside_roi || (all(AABBGetJ(tile_aabb)[2] .>= bbox[2]))) &&
         (ntiles+=1)
   end
-  if ntiles > max_tiles_per_job
+  if ntiles > max_tilechannels_per_job / nchannels
     map(get_job_aabbs, AABBHalveSubdivision(bbox))
   elseif ntiles>0
     push!(job_aabbs, (bbox, ntiles))
