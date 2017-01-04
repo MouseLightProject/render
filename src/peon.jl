@@ -43,9 +43,10 @@ time_waiting=0.0
 
 type NDException <: Exception end
 
-const write = string("manager tells peon for input tile ",in_tile_idx," to write output tile")
-const send = string("manager tells peon for input tile ",in_tile_idx," to send output tile")
-const receive = string("manager tells peon for input tile ",in_tile_idx," to receive output tile")
+const write_msg = string("manager tells peon for input tile ",in_tile_idx," to write output tile")
+const send_msg = string("manager tells peon for input tile ",in_tile_idx," to send output tile")
+const receive_msg = string("manager tells peon for input tile ",in_tile_idx," to receive output tile")
+const merge_msg = string("manager tells peon for input tile ",in_tile_idx," to merge output tile")
 
 const out_tiles_ws = Dict{String,Ptr{Void}}()
 const out_tiles_jl = Dict{String,Array{UInt16,4}}()
@@ -114,37 +115,44 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
           end
           time_waiting+=(time()-t1)
           info(msg_from_manager, prefix="PEON<MANAGER: ")
-          if startswith(msg_from_manager, send)
+          if startswith(msg_from_manager, send_msg)
             msg = string("peon for input tile ",in_tile_idx," will send output tile ",out_tile_path_next)
             println(sock,msg)
             info(msg, prefix="PEON: ")
             serialize(sock, out_tiles_jl[out_tile_path_next])
-          elseif startswith(msg_from_manager, receive)
+          elseif startswith(msg_from_manager, receive_msg)
             out_tiles_jl[out_tile_path_next][:] = max(out_tiles_jl[out_tile_path_next]::Array{UInt16,4},
-                deserialize(sock)::Array{UInt16,4})
+                  deserialize(sock)::Array{UInt16,4})
             save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,".%.",file_format),
-                out_tiles_ws[out_tile_path_next])
+                  out_tiles_ws[out_tile_path_next])
             msg = string("peon for input tile ",in_tile_idx," saved output tile ",out_tile_path_next)
             println(sock,msg)
             info(msg, prefix="PEON: ")
-            #info("peon transfered output tile ",out_tile_path_next," from RAM to shared_scratch")
-          elseif startswith(msg_from_manager, write)
+          elseif startswith(msg_from_manager, write_msg) || startswith(msg_from_manager, merge_msg)
             if enough_free(local_scratch)
               save_out_tile(local_scratch, out_tile_path_next,
-                  string(in_tile_idx,'.',sub_tile_str,".%.",file_format),
-                  out_tiles_ws[out_tile_path_next])
+                    string(in_tile_idx,'.',sub_tile_str,".%.",file_format),
+                    out_tiles_ws[out_tile_path_next])
               msg = string("peon for input tile ",in_tile_idx,
-                  " wrote output tile ",out_tile_path_next," to local_scratch")
+                    " wrote output tile ",out_tile_path_next," to local_scratch")
               println(sock,msg)
               info(msg, prefix="PEON: ")
             else
               save_out_tile(shared_scratch, out_tile_path_next,
-                  string(origin_str,'.',in_tile_idx,'.',sub_tile_str,".%.",file_format),
-                  out_tiles_ws[out_tile_path_next])
-              msg = string("peon for input tile ",string(in_tile_idx),
-                  " wrote output tile ",out_tile_path_next," to shared_scratch")
+                    string(origin_str,'.',in_tile_idx,'.',sub_tile_str,".%.",file_format),
+                    out_tiles_ws[out_tile_path_next])
+              msg = string("peon for input tile ",in_tile_idx,
+                    " wrote output tile ",out_tile_path_next," to shared_scratch")
               println(sock,msg)
               warn(msg)
+            end
+            if startswith(msg_from_manager, merge_msg)
+              merge_output_tiles(local_scratch, shared_scratch,
+                    origin_str, file_format, out_tile_path_next, false, false, true)
+              msg = string("peon for input tile ",in_tile_idx,
+                    " merged output tile ",out_tile_path_next," from local_scratch to shared_scratch")
+              #println(sock,msg)  # not captured by manager
+              info(msg, prefix="PEON: ")
             end
           end
         end

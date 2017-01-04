@@ -136,22 +136,22 @@ t0=time()
   global sock2 = Any[]
   server2, port2 = get_available_port(default_port2)
 
-  const ready = r"(peon for input tile )([0-9]*)( has output tile )([1-8/]*)( ready)"
-  const wrote = r"(peon for input tile )([0-9]*)( wrote output tile )([1-8/]*)( to )"
-  const sent = r"(peon for input tile )([0-9]*)( will send output tile )([1-8/]*)"
-  const saved = r"(peon for input tile )([0-9]*)( saved output tile )([1-8/]*)"
-  const finished = r"(?<=peon for input tile )[0-9]*(?= is finished)"
+  const ready_msg = r"(peon for input tile )([0-9]*)( has output tile )([1-8/]*)( ready)"
+  const wrote_msg = r"(peon for input tile )([0-9]*)( wrote output tile )([1-8/]*)( to )"
+  const sent_msg = r"(peon for input tile )([0-9]*)( will send output tile )([1-8/]*)"
+  const saved_msg = r"(peon for input tile )([0-9]*)( saved output tile )([1-8/]*)"
+  const finished_msg = r"(?<=peon for input tile )[0-9]*(?= is finished)"
 
   @async while length(sock2)<length(in_tiles_idx)
     push!(sock2, accept(server2))
     @async let sock2=sock2[end]
       while isopen(sock2) || nb_available(sock2)>0
-        tmp = chomp(readline(sock2))
-        length(tmp)==0 && continue
-        info(tmp, prefix="MANAGER<PEON: ")
+        msg_from_peon = chomp(readline(sock2))
+        length(msg_from_peon)==0 && continue
+        info(msg_from_peon, prefix="MANAGER<PEON: ")
         local in_tile_num, out_tile_path
-        if ismatch(ready,tmp)
-          in_tile_num, out_tile_path = match(ready,tmp).captures[[2,4]]
+        if ismatch(ready_msg, msg_from_peon)
+          in_tile_num, out_tile_path = match(ready_msg,msg_from_peon).captures[[2,4]]
           merge_count[out_tile_path][2]+=1
           if merge_count[out_tile_path][4]==0
             idx = findfirst(merge_used,false)
@@ -164,30 +164,37 @@ t0=time()
             end
           end
           if merge_count[out_tile_path][4]==0xffff
-            msg = "manager tells peon for input tile $in_tile_num to write output tile $out_tile_path to local_scratch"
-            println(sock2, msg)
-            info(msg, prefix="MANAGER>PEON: ")
-          elseif merge_count[out_tile_path][2] < merge_count[out_tile_path][1]
-            msg = "manager tells peon for input tile $in_tile_num to send output tile $out_tile_path via tcp"
-            println(sock2, msg)
-            info(msg, prefix="MANAGER>PEON: ")
+            if merge_count[out_tile_path][2] < merge_count[out_tile_path][1]
+              msg = string("manager tells peon for input tile ",in_tile_num,
+                    " to write output tile ",out_tile_path," to local_scratch")
+              println(sock2, msg)
+              info(msg, prefix="MANAGER>PEON: ")
+            else
+              msg = string("manager tells peon for input tile ",in_tile_num,
+                    " to merge output tile ",out_tile_path," to shared_scratch")
+              println(sock2, msg)
+              info(msg, prefix="MANAGER>PEON: ")
+            end
           else
-            while merge_count[out_tile_path][3] < merge_count[out_tile_path][1]-1;  yield();  end
-            msg = "manager tells peon for input tile $in_tile_num to receive output tile $out_tile_path via tcp"
-            println(sock2, msg)
-            serialize(sock2, merge_array[:,:,:,:,merge_count[out_tile_path][4]])
-            info(msg, prefix="MANAGER>PEON: ")
+            if merge_count[out_tile_path][2] < merge_count[out_tile_path][1]
+              msg = string("manager tells peon for input tile ",in_tile_num,
+                    " to send output tile ",out_tile_path," via tcp")
+              println(sock2, msg)
+              info(msg, prefix="MANAGER>PEON: ")
+            else
+              while merge_count[out_tile_path][3] < merge_count[out_tile_path][1]-1;  yield();  end
+              msg = string("manager tells peon for input tile ",in_tile_num,
+                    " to receive output tile ",out_tile_path," via tcp")
+              println(sock2, msg)
+              serialize(sock2, merge_array[:,:,:,:,merge_count[out_tile_path][4]])
+              info(msg, prefix="MANAGER>PEON: ")
+            end
           end
-        elseif ismatch(wrote,tmp)
-          out_tile_path = match(wrote,tmp).captures[4]
+        elseif ismatch(wrote_msg, msg_from_peon)
+          out_tile_path = match(wrote_msg,msg_from_peon).captures[4]
           merge_count[out_tile_path][3]+=1
-          if merge_count[out_tile_path][1] == merge_count[out_tile_path][3]
-            merge_output_tiles(local_scratch, shared_scratch, join(origin_strs,"-"),
-                file_format, out_tile_path, false, false, true)
-            info("saved output tile ",out_tile_path," from local_scratch to shared_scratch", prefix="MANAGER: ")
-          end
-        elseif ismatch(sent,tmp)
-          out_tile_path = match(sent,tmp).captures[4]
+        elseif ismatch(sent_msg, msg_from_peon)
+          out_tile_path = match(sent_msg,msg_from_peon).captures[4]
           out_tile::Array{UInt16,4} = deserialize(sock2)
           merge_count[out_tile_path][3]+=1
           t1=time()
@@ -195,10 +202,10 @@ t0=time()
                 max(out_tile, merge_array[:,:,:,:,merge_count[out_tile_path][4]]::Array{UInt16,4})
           time_max_files=time()-t1
           info("max'ing multiple files took ",signif(time_max_files,4)," sec")
-        elseif ismatch(saved,tmp)
-          out_tile_path = match(saved,tmp).captures[4]
+        elseif ismatch(saved_msg, msg_from_peon)
+          out_tile_path = match(saved_msg,msg_from_peon).captures[4]
           merge_used[merge_count[out_tile_path][4]] = false
-        elseif ismatch(finished,tmp)
+        elseif ismatch(finished_msg, msg_from_peon)
           break
         end
       end
