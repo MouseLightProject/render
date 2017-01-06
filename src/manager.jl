@@ -96,9 +96,10 @@ function depth_first_traverse(bbox,out_tile_path)
   end
 end
 
-const total_ram = parse(Int,split(readchomp(pipeline(`cat /proc/meminfo`,`head -1`)))[2])*1024
+const total_ram = parse(Int,split(readchomp(`head -1 /proc/meminfo`))[2])*1024
 ram_fraction = haskey(ENV,"NSLOTS") ? ncores/Sys.CPU_CORES : 1
-ncache = max(1, floor(Int,(total_ram - system_ram)*ram_fraction/2/prod(shape_leaf_px)/nchannels))
+ncache = (total_ram - num_procs*peon_ram - other_ram) * ram_fraction/2/prod(shape_leaf_px)/nchannels
+ncache = max(1, floor(Int,ncache))
 merge_array = Array(UInt16, shape_leaf_px..., nchannels, ncache)
 merge_used = falses(ncache)
 # one entry for each output tile

@@ -22,7 +22,7 @@ function check_images(scratchpath, testdirs, correct_nchannels, correct_ntiffs, 
   hierarchies=[]
   for testdir in testdirs
     cd(joinpath(scratchpath,testdir))
-    push!(hierarchies, collect(walkdir(".")))
+    push!(hierarchies, collect(walkdir("."; topdown=false)))
     length(hierarchies)>1 && @test hierarchies[end-1]==hierarchies[end]
   end
 
@@ -31,6 +31,7 @@ function check_images(scratchpath, testdirs, correct_nchannels, correct_ntiffs, 
   shades=Vector{Vector{Float32}}[]
   for (root, dirs, files) in hierarchies[1]
     for file in files
+      info(joinpath(root,file), prefix="COMPARING: ")
       if endswith(file,".tif")
         ntiffs+=1
         channel = parse(Int, split(file,'.')[end-1])

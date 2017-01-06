@@ -63,7 +63,7 @@ const include_origins_outside_roi=false   # set to true to render all of small t
 const max_pixels_per_leaf=120e6  # maximum number of pixels in output tiles
 
 const max_tilechannels_per_job=1000  # maximum number of input tiles * nchannels per cluster job
-# size to use all of RAM
+# larger is more efficient with file i/o; smaller is more parallel computation
 
 
 const which_cluster = [ENV["HOSTNAME"]] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
@@ -91,4 +91,5 @@ const short_queue = true  # rendering MUST take less than 1 hour
 # the below are for testing purposes.  users shouldn't need to change.
 const dry_run = false
 const use_avx = false
-const system_ram = 32e9
+const peon_ram = 15*1024^3
+const other_ram = (10+5)*1024^3   # system + manager
