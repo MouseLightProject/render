@@ -156,6 +156,9 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
             end
           end
         end
+        ndfree(out_tiles_ws[out_tile_path_next])
+        delete!(out_tiles_ws,out_tile_path_next)
+        delete!(out_tiles_jl,out_tile_path_next)
         time_saving+=(time()-t0)
       end
     end

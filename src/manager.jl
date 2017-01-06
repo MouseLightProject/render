@@ -133,7 +133,7 @@ t0=time()
   #   concurrently merge and save them to shared_scratch
   hostname2 = readchomp(`hostname`)
   default_port2 = parse(Int,ARGS[9])+1
-  global sock2 = Any[]
+  global ntiles_processed=0
   server2, port2 = get_available_port(default_port2)
 
   const ready_msg = r"(peon for input tile )([0-9]*)( has output tile )([1-8/]*)( ready)"
@@ -142,14 +142,16 @@ t0=time()
   const saved_msg = r"(peon for input tile )([0-9]*)( saved output tile )([1-8/]*)"
   const finished_msg = r"(?<=peon for input tile )[0-9]*(?= is finished)"
 
-  @async while length(sock2)<length(in_tiles_idx)
-    push!(sock2, accept(server2))
-    @async let sock2=sock2[end]
+  @async while ntiles_processed<length(in_tiles_idx)
+    sock2 = accept(server2)
+    global ntiles_processed
+    ntiles_processed+=1
+    @async let sock2=sock2
       while isopen(sock2) || nb_available(sock2)>0
         msg_from_peon = chomp(readline(sock2))
         length(msg_from_peon)==0 && continue
         info(msg_from_peon, prefix="MANAGER<PEON: ")
-        local in_tile_num, out_tile_path
+        local in_tile_num, out_tile_path, out_tile::Array{UInt16,4}
         if ismatch(ready_msg, msg_from_peon)
           in_tile_num, out_tile_path = match(ready_msg,msg_from_peon).captures[[2,4]]
           merge_count[out_tile_path][2]+=1
@@ -195,7 +197,7 @@ t0=time()
           merge_count[out_tile_path][3]+=1
         elseif ismatch(sent_msg, msg_from_peon)
           out_tile_path = match(sent_msg,msg_from_peon).captures[4]
-          out_tile::Array{UInt16,4} = deserialize(sock2)
+          out_tile = deserialize(sock2)
           merge_count[out_tile_path][3]+=1
           t1=time()
           merge_array[:,:,:,:,merge_count[out_tile_path][4]] = merge_count[out_tile_path][3]==1 ? out_tile :
@@ -209,6 +211,8 @@ t0=time()
           break
         end
       end
+      out_tile = Array(UInt16,0,0,0,0)
+      gc()
     end
   end
 
