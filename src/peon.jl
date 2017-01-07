@@ -36,10 +36,10 @@ const transform_nm = reshape([parse(Int,x) for x in
 # keep boss informed
 sock = connect(ARGS[5],parse(Int,ARGS[6]))
 
-time_initing=0.0
-time_transforming=0.0
-time_saving=0.0
-time_waiting=0.0
+time_initing = 0.0
+time_transforming = 0.0
+time_saving = 0.0
+time_waiting = 0.0
 
 type NDException <: Exception end
 
@@ -61,27 +61,28 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
 
   global out_tiles_ws, out_tiles_jl, time_transforming, time_saving, time_waiting
 
-  for i=1:8
-    AABBHit(cboxes[i], in_subtile_aabb) || continue
-    out_tile_path_next = joinpath(out_tile_path,string(i))
+  for imorton = 1:8
+    AABBHit(cboxes[imorton], in_subtile_aabb) || continue
+    out_tile_path_next = joinpath(out_tile_path,string(imorton))
 
-    if !isleaf(cboxes[i])
-      depth_first_traverse_over_output_tiles(cboxes[i], out_tile_path_next, sub_tile_str,
+    if !isleaf(cboxes[imorton])
+      depth_first_traverse_over_output_tiles(cboxes[imorton], out_tile_path_next, sub_tile_str,
            sub_transform_nm, orientation, in_subtile_aabb)
     else
       info("processing output tile ",out_tile_path_next, prefix="PEON: ")
 
       t0=time()
-      const origin_nm = AABBGetJ(cboxes[i])[2]
+      const origin_nm = AABBGetJ(cboxes[imorton])[2]
       const transform = (sub_transform_nm .- origin_nm) ./ (voxelsize_used_um*um2nm)
 
       if !haskey(out_tiles_ws,out_tile_path_next)
         out_tiles_ws[out_tile_path_next] = ndalloc(vcat(shape_leaf_px,nchannels), data_type)
         out_tiles_jl[out_tile_path_next] = unsafe_wrap(Array,convert(Ptr{UInt16},
-              nddata(out_tiles_ws[out_tile_path_next])), tuple(shape_leaf_px...,nchannels))
+              nddata(out_tiles_ws[out_tile_path_next])),
+              tuple(shape_leaf_px...,nchannels)::Tuple{Int,Int,Int,Int})
         ndfill(out_tiles_ws[out_tile_path_next], 0x0000)
-        tmp = map(x->AABBHit(cboxes[i], x), in_subtiles_aabb)
-        merge_count[out_tile_path_next]=UInt8[ sum(tmp), 0 ]
+        overlapped_insubtiles::Array{Bool,3} = map(x->AABBHit(cboxes[imorton], x), in_subtiles_aabb)
+        merge_count[out_tile_path_next]=UInt8[ sum(overlapped_insubtiles), 0 ]
       end
 
       if has_avx2 && use_avx
@@ -108,7 +109,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
           println(sock, msg_to_manager)
           info(msg_to_manager, prefix="PEON: ")
           t1=time()
-          local msg_from_manager
+          local msg_from_manager::String
           while true
             msg_from_manager = chomp(readline(sock))
             length(msg_from_manager)==0 || break
@@ -121,8 +122,14 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
             info(msg, prefix="PEON: ")
             serialize(sock, out_tiles_jl[out_tile_path_next])
           elseif startswith(msg_from_manager, receive_msg)
-            out_tiles_jl[out_tile_path_next][:] = max(out_tiles_jl[out_tile_path_next]::Array{UInt16,4},
-                  deserialize(sock)::Array{UInt16,4})
+            out_tile_from_manager::Array{UInt16,4} = deserialize(sock)
+            local_out_tile = out_tiles_jl[out_tile_path_next]
+            for i4=1:nchannels, i3=1:shape_leaf_px[3], i2=1:shape_leaf_px[2], i1=1:shape_leaf_px[1]
+              @inbounds local_out_tile[i1,i2,i3,i4] =
+                    max(local_out_tile[i1,i2,i3,i4], out_tile_from_manager[i1,i2,i3,i4])
+            end
+            out_tile_from_manager = Array(UInt16,0,0,0,0)
+            gc()
             save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,".%.",file_format),
                   out_tiles_ws[out_tile_path_next])
             msg = string("peon for input tile ",in_tile_idx," saved output tile ",out_tile_path_next)
@@ -163,13 +170,12 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
       end
     end
 
-    AABBFree(cboxes[i])
+    AABBFree(cboxes[imorton])
   end
 end
 
 function process_input_tile()
   t0=time()
-
   global time_initing
 
   local tiles
@@ -178,13 +184,14 @@ function process_input_tile()
 
   info("processing input tile $in_tile_idx: ",unsafe_string(TilePath(tile)), prefix="PEON: ")
 
-  local in_tile_ws, in_tile_jl, in_subtile_ws, in_subtile_jl
+  local in_tile_ws, in_tile_jl::Array{UInt16,4}, in_subtile_ws, in_subtile_jl::Array{UInt16,4}
   t1=time()
   tmp = TileShape(tile)
   shape_intile = ndshapeJ(tmp)
   global data_type = ndtype(tmp)
   in_tile_ws = ndalloc(shape_intile, data_type)
-  in_tile_jl = unsafe_wrap(Array,convert(Ptr{UInt16},nddata(in_tile_ws)), tuple(shape_intile...))
+  in_tile_jl = unsafe_wrap(Array, convert(Ptr{UInt16},nddata(in_tile_ws)),
+        tuple(shape_intile...)::Tuple{UInt,UInt,UInt,UInt})
   in_subtile_ws = ndinit()
   ndcast(in_subtile_ws, data_type)
   tmp=split(unsafe_string(TilePath(tile)),"/")

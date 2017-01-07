@@ -275,13 +275,13 @@ end
 
 function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, recurse, octree, delete, flag,
       in_tiles, out_tile_img, out_tile_img_down)
-  merge1_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type)
-  merge1_jl = unsafe_wrap(Array{UInt16,4}, convert(Ptr{UInt16},nddata(merge1_ws)),
-        tuple(shape_leaf_px...,nchannels))
-
   time_octree_down = time_octree_save = 0.0
   time_single_file = time_many_files = time_clear_files = 0.0
   time_read_files = time_max_files = time_delete_files = time_write_files = 0.0
+
+  merge1_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type)
+  merge1_jl = unsafe_wrap(Array, convert(Ptr{UInt16},nddata(merge1_ws)),
+        tuple(shape_leaf_px...,nchannels)::Tuple{Int,Int,Int,Int})
 
   retry2(()->mkpath(joinpath(destination,out_tile_path)),
         n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
@@ -302,8 +302,8 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
   elseif length(in_tiles)>1
     t0=time()
     merge2_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type)
-    merge2_jl = unsafe_wrap(Array{UInt16,4}, convert(Ptr{UInt16},nddata(merge2_ws)),
-          tuple(shape_leaf_px...,nchannels))
+    merge2_jl = unsafe_wrap(Array, convert(Ptr{UInt16},nddata(merge2_ws)),
+          tuple(shape_leaf_px...,nchannels)::Tuple{Int,Int,Int,Int})
     info("merging:")
     t1=time()
     ndfill(merge1_ws, 0x0000)
@@ -314,7 +314,9 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
       ndioClose(ndioRead(ndioOpen( string(in_tile,".%.",suffix), C_NULL, "r" ),merge2_ws))
       time_read_files+=(time()-t1)
       t1=time()
-      merge1_jl[:,:,:,:] = max(merge1_jl,merge2_jl)
+      for i4=1:nchannels, i3=1:shape_leaf_px[3], i2=1:shape_leaf_px[2], i1=1:shape_leaf_px[1]
+        @inbounds merge1_jl[i1,i2,i3,i4] = max(merge1_jl[i1,i2,i3,i4], merge2_jl[i1,i2,i3,i4])
+      end
       time_max_files+=(time()-t1)
       t1=time()
       if delete
@@ -389,8 +391,8 @@ function merge_across_filesystems(sources::Array{String,1}, destination, prefix,
     dir2 = map(entry->isdir(joinpath(source,out_tile_path,entry)), listing)
     sum(dir2)==0 || push!(dirs, listing[dir2]...)
     img_files = listing[!dir2 & map(entry->endswith(entry,suffix), listing)]
-    in_tiles2 = [joinpath(source,out_tile_path,img_file)
-           for img_file in unique(map(img_file->join(split(img_file,'.')[1:end-2],'.'), img_files)) ]
+    in_tiles2 = [joinpath(source,out_tile_path,uniq_img_file)
+           for uniq_img_file in unique(map(img_file->join(split(img_file,'.')[1:end-2],'.'), img_files)) ]
     isempty(in_tiles2) || push!(in_tiles, in_tiles2...)
   end
 
