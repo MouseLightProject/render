@@ -21,9 +21,9 @@
 #   transform.txt
 #   render.log
 
-export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3
+export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
 export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
-export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3/julia-0.5.0/bin/julia
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.5.0/bin/julia
 
 umask 002
 

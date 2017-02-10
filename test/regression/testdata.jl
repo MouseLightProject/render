@@ -20,3 +20,5 @@ end
   @test sum(dev)==sum(prod)
   check_images(destination_path, ["987roiprod","987roidev"], 2, 64+8+1, false)
 end
+
+end

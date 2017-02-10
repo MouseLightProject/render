@@ -60,7 +60,7 @@ body will be a command with which you can monitor its progress:
 ./monitor <jobname> <path_to_set_parameters.jl>
 ```
 
-Shown is are the RAM, CPU, disk, and i/o utilization for each node on the
+Shown are the RAM, CPU, disk, and i/o utilization for each node on the
 cluster currently being used, updated every minute.  One can also point a
 browser to http://cluster-status.int.janelia.org, or use the ```qstat```
 command on the unix command line.
