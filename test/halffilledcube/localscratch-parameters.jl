@@ -77,7 +77,7 @@ const throttle_octree_nmachines = 64  # number of compute nodes to use to downsa
 # for which_cluster=="janelia" set to 64
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_njobs_per_machine = Sys.CPU_CORES>>1
+const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
 # for which_cluster=="janelia" set to 1
 # otherwise set to ncores per machine for small data sets
 
@@ -92,4 +92,4 @@ const short_queue = true  # rendering MUST take less than 1 hour
 const dry_run = false
 const use_avx = true
 const peon_ram = 15*1024^3
-const other_ram = 20*1024^3   # system + manager
+const other_ram = (10000+5)*1024^3   # system + manager

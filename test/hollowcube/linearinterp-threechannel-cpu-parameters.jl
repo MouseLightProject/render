@@ -78,7 +78,7 @@ const throttle_octree_nmachines = 64  # number of compute nodes to use to downsa
 # for which_cluster=="janelia" set to 64
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_njobs_per_machine = Sys.CPU_CORES>>1
+const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
 # for which_cluster=="janelia" set to 1
 # otherwise set to ncores per machine for small data sets
 

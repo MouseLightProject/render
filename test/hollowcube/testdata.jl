@@ -18,11 +18,11 @@ function check_toplevel_images(basepath, nchannels)
   for nchannel=0:(nchannels-1)
     img = load(joinpath(basepath,"default.$(nchannel).tif"))
     rightanswer = zeros(UInt16,48);  rightanswer[3:end-1]=0xffff>>nchannel
-    @test squeeze(maximum(raw(img),(1,2)),(1,2)).>>8 == rightanswer.>>8
-    rightanswer = zeros(UInt16,48);  rightanswer[4:end-2]=0xffff>>nchannel
-    @test squeeze(maximum(raw(img),(1,3)),(1,3)).>>8 == rightanswer.>>8
+    @test all(squeeze(maximum(rawview(channelview(img)),(1,2)),(1,2)).>>8 .== rightanswer.>>8)
     rightanswer = zeros(UInt16,48);  rightanswer[6:end-4]=0xffff>>nchannel
-    @test squeeze(maximum(raw(img),(2,3)),(2,3)).>>8 == rightanswer.>>8
+    @test all(squeeze(maximum(rawview(channelview(img)),(1,3)),(1,3)).>>8 .== rightanswer.>>8)
+    rightanswer = zeros(UInt16,48);  rightanswer[4:end-2]=0xffff>>nchannel
+    @test all(squeeze(maximum(rawview(channelview(img)),(2,3)),(2,3)).>>8 .== rightanswer.>>8)
   end
 end
 

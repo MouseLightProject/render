@@ -43,7 +43,7 @@ function check_images(scratchpath, testdirs, correct_nchannels, correct_ntiffs, 
           push!(imgs, load(joinpath(scratchpath,testdir,root,file)))
           push!(shades[1+channel], unique(imgs[end]))
           if length(imgs)>1
-            @test imgs[end-1] == imgs[end]
+            @test all(imgs[end-1] .== imgs[end])
             idx = find(imgs[end-1] .!= imgs[end])
             if length(idx)>0
               largest_diff = round(Int, 1/eps(eltype(imgs[end]))*maximum(abs(
