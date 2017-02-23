@@ -33,7 +33,7 @@ your home directory.  For example, somewhere on Julia's LOAD_PATH, like
 pipeline without having to install this package themselves.
 
 Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, and ```JULIA```
-in ```render```, ```monitor```, ```savelogs```, and ```merge``` are all
+in ```render```, ```monitor```, and ```savelogs``` are all
 set appropriately.
 
 
@@ -97,16 +97,6 @@ be sure to delete all the temporary files on the cluster nodes:
 
 The render can be restricted to a partial sub-volume using the
 region_of_interest or morton_order variables in the copy of parameters.jl.
-To merge two different such octrees from the same brain into a single octree,
-use the merge script:
-
-```
-./merge <source1> <source2> ... <sourceN> <destination>
-```
-
-The merge script can also be used to fix sub-volumes that have not been
-rendered correctly.  Simply re-render the region in question and merge with
-the rest.
 
 Finally, Janelia has many file systems to use for the source, destination, and
 scratch spaces.  Test their relative I/O performance as follows:
