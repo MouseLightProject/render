@@ -275,7 +275,7 @@ end
 
 function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, recurse, octree, delete, flag,
       in_tiles, out_tile_img, out_tile_img_down)
-  time_octree_down = time_octree_save = 0.0
+  time_octree_read = time_octree_down = time_octree_save = 0.0
   time_single_file = time_many_files = time_clear_files = 0.0
   time_read_files = time_max_files = time_delete_files = time_write_files = 0.0
 
@@ -340,7 +340,7 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
     if length(in_tiles)==1
       t0=time()
       ndioClose(ndioRead(ndioOpen( destination2, C_NULL, "r" ),merge1_ws))
-      time_read_files+=(time()-t0)
+      time_octree_read+=(time()-t0)
     elseif length(in_tiles)==0
       t0=time()
       info("saving output tile ",out_tile_path," to ",destination2)
@@ -358,25 +358,26 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
   end
 
   ndfree(merge1_ws)
-  time_octree_down, time_octree_save,
+  time_octree_read, time_octree_down, time_octree_save,
         time_single_file, time_many_files, time_clear_files,
         time_read_files, time_max_files, time_delete_files, time_write_files
 end
 
 function accumulate_times(r)
-  global time_octree_down, time_octree_save
+  global time_octree_read, time_octree_down, time_octree_save
   global time_single_file, time_many_files, time_clear_files
   global time_read_files, time_max_files, time_delete_files, time_write_files
 
-  time_octree_down  += r[1]
-  time_octree_save  += r[2]
-  time_single_file  += r[3]
-  time_many_files   += r[4]
-  time_clear_files  += r[5]
-  time_read_files   += r[6]
-  time_max_files    += r[7]
-  time_delete_files += r[8]
-  time_write_files  += r[9]
+  time_octree_read  += r[1]
+  time_octree_down  += r[2]
+  time_octree_save  += r[3]
+  time_single_file  += r[4]
+  time_many_files   += r[5]
+  time_clear_files  += r[6]
+  time_read_files   += r[7]
+  time_max_files    += r[8]
+  time_delete_files += r[9]
+  time_write_files  += r[10]
 end
 
 function merge_across_filesystems(sources::Array{String,1}, destination, prefix, suffix, out_tile_path,
@@ -396,7 +397,7 @@ function merge_across_filesystems(sources::Array{String,1}, destination, prefix,
     isempty(in_tiles2) || push!(in_tiles, in_tiles2...)
   end
 
-  length(dirs)==0 && length(in_tiles)==0 && return fill(0.0,9)
+  length(dirs)==0 && length(in_tiles)==0 && return fill(0.0,10)
 
   out_tile_img=nothing
   if octree && length(dirs)>0 && length(in_tiles)==0
@@ -428,7 +429,7 @@ merge_across_filesystems(source::String, destination, prefix, suffix, out_tile_p
 
 function merge_output_tiles(source, destination, prefix, suffix, out_tile_path,
       recurse::Bool, octree::Bool, delete::Bool)
-  global time_octree_clear=0.0, time_octree_down=0.0, time_octree_save=0.0
+  global time_octree_clear=0.0, time_octree_read=0.0, time_octree_down=0.0, time_octree_save=0.0
   global time_single_file=0.0, time_many_files=0.0
   global time_clear_files=0.0, time_read_files=0.0, time_max_files=0.0
   global time_delete_files=0.0, time_write_files=0.0
@@ -446,6 +447,7 @@ function merge_output_tiles(source, destination, prefix, suffix, out_tile_path,
 
   if octree
     info("clearing octree took ",signif(time_octree_clear,4)," sec")
+    info("reading octree took ",signif(time_octree_read,4)," sec")
     info("downsampling octree took ",signif(time_octree_down,4)," sec")
     info("saving octree took ",signif(time_octree_save,4)," sec")
   end
