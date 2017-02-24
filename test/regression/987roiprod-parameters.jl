@@ -1,4 +1,4 @@
-const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size.
+const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size
 # voxelsize_used_um, in destination/calculated_parameters.jl, is that actually used.
 #   adjusted to make tile widths even and tile volume a multiple of 32*32*4,
 
@@ -10,15 +10,15 @@ const max_tiles_per_job=1000  # maximum number of input tiles per cluster job
 const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
-const throttle_leaf_nmachines = 1  # number of compute nodes to use to render leafs
+const throttle_leaf_nmachines = 1  # maximum number of compute nodes to use to render leafs
 # for which_cluster=="janelia" set to 16 (max is 32)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_nmachines = 1  # number of compute nodes to use to downsample octree
+const throttle_octree_nmachines = 1  # maximum number of compute nodes to use to downsample octree
 # for which_cluster=="janelia" set to 32
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_njobs_per_machine = 1
+const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
 # for which_cluster=="janelia" set to 1
 # otherwise set to ncores per machine for small data sets
 
@@ -60,7 +60,7 @@ const octree_compression_ratios = []
 
 const dry_run = false
 
-# build the octree with a function below.  should return uint16
+# build the octree with a function below.  should return UInt16
 
 # the simplest and fastest
 downsampling_function(arg::Array{UInt16,3}) = (@inbounds return arg[1,1,1])

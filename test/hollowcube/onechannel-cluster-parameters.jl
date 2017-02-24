@@ -12,7 +12,7 @@ const shared_scratch=joinpath(scratchpath,"onechannel-cluster","shared_scratch")
 const logfile_scratch=joinpath(scratchpath,"onechannel-cluster","logfile_scratch")  # should be on /groups
 const delete_scratch="as-you-go"   # "never", "at-end" or "as-you-go"
 
-const voxelsize_um=[1.0, 1.0, 1.0]  # desired pixel size.
+const voxelsize_um=[1.0, 1.0, 1.0]  # desired pixel size
 # voxelsize_used_um, in destination/calculated_parameters.jl, is that actually used.
 #   adjusted to make tile widths even and tile volume a multiple of 32*32*4,
 
@@ -22,7 +22,7 @@ const raw_compression_ratios = [] # or e.g. [10,80]
 const octree_compression_ratios = []
 
 
-# build the octree with a function below.  should return uint16
+# build the octree with a function below.  should return UInt16
 
 # 1. the simplest and fastest
 downsampling_function(arg::Array{UInt16,3}) = (@inbounds return arg[1,1,1])
@@ -31,7 +31,7 @@ downsampling_function(arg::Array{UInt16,3}) = (@inbounds return arg[1,1,1])
 #downsampling_function(arg::Array{UInt16,3}) = UInt16(sum(arg)>>3)
 
 # 3. 2nd brightest of the 8 pixels
-# equivalent to sort(reshape(arg,8))[7] but half the time and a third the memory usage
+# equivalent to sort(vec(arg))[7] but half the time and a third the memory usage
 #function downsampling_function(arg::Array{UInt16,3})
 #  m0::UInt16 = 0x0000
 #  m1::UInt16 = 0x0000
@@ -70,16 +70,16 @@ const max_tilechannels_per_job=1000  # maximum number of input tiles * nchannels
 const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
-const throttle_leaf_nmachines = 64  # number of compute nodes to use to render leafs
-# for which_cluster=="janelia" set to 64 (max is 64)
+const throttle_leaf_nmachines = 96  # maximum number of compute nodes to use to render leafs
+# for which_cluster=="janelia" set to 96 (max is 96)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_nmachines = 64  # number of compute nodes to use to downsample octree
-# for which_cluster=="janelia" set to 64
+const throttle_octree_njobs = 512  # maximum number of compute nodes to use to downsample octree
+# for which_cluster=="janelia" set to 512 (max is 512)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_njobs_per_machine = 1
-# for which_cluster=="janelia" set to 1
+const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
+# ignored when which_cluster=="janelia"
 # otherwise set to ncores per machine for small data sets
 
 const throttle_octree_ncores_per_job = 9

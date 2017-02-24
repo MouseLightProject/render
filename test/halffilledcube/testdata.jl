@@ -17,7 +17,7 @@ scratchpath = joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube/scratc
 @testset "halffilledcube" begin
 
 @testset "$v" for v in ["cpu", "avx", "localscratch"]
-  check_logfiles( joinpath(scratchpath,"$v","logfile_scratch"), 64+1)
+  check_logfiles( joinpath(scratchpath,"$v","logfile_scratch"), 512+1)
   check_toplevel_images(joinpath(scratchpath,"$v","results"))
 end
 

@@ -32,7 +32,7 @@ function check_images(scratchpath, testdirs, correct_nchannels, correct_ntiffs, 
   for (root, dirs, files) in hierarchies[1]
     for file in files
       if endswith(file,".tif")
-        info(joinpath(root,file), prefix="COMPARING: ")
+        #info(joinpath(root,file), prefix="COMPARING: ")
         ntiffs+=1
         channel = parse(Int, split(file,'.')[end-1])
         while length(shades)<channel+1

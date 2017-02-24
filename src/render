@@ -8,7 +8,7 @@
 #   watch -n 120 tail -n 40 <destination>/monitor.log
 
 # data are temporarily logged in <logfile_scratch>/{director,monitor,squatter1-N,merge1-M}.log,
-# where N=throttle_leaf_nmachines from parameters.jl, and M~throttle_octree_nmachines, and then
+# where N=throttle_leaf_nmachines from parameters.jl, and M~throttle_octree_njobs, and then
 # tar'd into <destination>/logs.tar.gz.  manual queries into these log files are informative:
 #   tar xzfO <destination>/logs.tar.gz render.log 
 #   tar xzfO <destination>/logs.tar.gz | grep "ERROR"
@@ -34,7 +34,7 @@ expr="include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       nchannels = ndshapeJ(tile_shape)[4];
       print(join([destination,shared_scratch,logfile_scratch,delete_scratch,notify_addr,bill_userid,
             typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),
-            throttle_octree_nmachines,throttle_octree_njobs_per_machine,throttle_octree_ncores_per_job,
+            throttle_octree_njobs,throttle_octree_njobs_per_machine,throttle_octree_ncores_per_job,
             nchannels,short_queue],' '))"
 read -a tmp <<< $($JULIA -L $1 -e "$expr")
 destination=${tmp[0]}
@@ -44,7 +44,7 @@ delete_scratch=${tmp[3]}
 notify_addr=${tmp[4]}
 bill_userid=${tmp[5]}
 which_cluster=${tmp[6]}
-throttle_octree_nmachines=${tmp[7]}
+throttle_octree_njobs=${tmp[7]}
 throttle_octree_njobs_per_machine=${tmp[8]}
 throttle_octree_ncores_per_job=${tmp[9]}
 nchannels=${tmp[10]}
@@ -90,39 +90,51 @@ else
   eval $cmd &> $logfile_scratch/director.log
 fi
 
+# get nlevels from calculated_parameters.jl file
+while [ ! -f ${destination}/calculated_parameters.jl ]; do sleep 2; done
+expr="include(joinpath(destination,\"calculated_parameters.jl\"));
+      print(nlevels)"
+read -a tmp <<< $($JULIA -L $1 -e "$expr")
+nlevels=${tmp[0]}
+
 # downsample the octree
-expr="p=addprocs(${throttle_octree_ncores_per_job});
-      @everywhere include(\"${destination}/set_parameters.jl\");
-      @everywhere include(\"${destination}/calculated_parameters.jl\");
-      @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
-      t=time();
-      id=parse(Int,ENV[\"SGE_TASK_ID\"]);
-      oct=(id-1)>>3+1;
-      oct2=(id-1)%8+1;
-      if isdir(joinpath(shared_scratch,string(oct),string(oct2)))
-        merge_output_tiles(shared_scratch, destination, \"default\", file_format,
-              string(oct)*\"/\"*string(oct2), true, true, delete_scratch==\"as-you-go\" ? true : false);
-        info(\"merging took \",string(round(Int,time()-t)),\" sec\");
-      end;
-      rmprocs(p);"
-cmd="umask 002;
-     date;
-     hostname;
-     $JULIA -e '$expr';
-     date;"
-echo $cmd &>> $logfile_scratch/render.log
-if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t 1-64 -tc $throttle_octree_nmachines \
-        -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
-        -hold_jid $jobname -R yes -l h_rt=$time_limit -o $logfile_scratch/merge'$TASK_ID'.log
+if [ "$nlevels" -gt "2" ]; then
+  expr="p=addprocs(${throttle_octree_ncores_per_job});
+        @everywhere include(\"${destination}/set_parameters.jl\");
+        @everywhere include(\"${destination}/calculated_parameters.jl\");
+        @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
+        t=time();
+        id=parse(Int,ENV[\"SGE_TASK_ID\"]);
+        oct1,oct2,oct3 = ((id-1)&0x1c0)>>6+1, ((id-1)&0x38)>>3+1, ((id-1)&0x7)+1;
+        if isdir(joinpath(shared_scratch,string(oct1),string(oct2),string(oct3)))
+          merge_output_tiles(shared_scratch, destination, \"default\", file_format,
+                string(oct1)*\"/\"*string(oct2)*\"/\"*string(oct3),
+                true, true, delete_scratch==\"as-you-go\" ? true : false);
+          info(\"merging took \",string(round(Int,time()-t)),\" sec\");
+        end;
+        rmprocs(p);"
+  cmd="umask 002;
+       date;
+       hostname;
+       $JULIA -e '$expr';
+       date;"
+  echo $cmd &>> $logfile_scratch/render.log
+  if [ $which_cluster == 'janelia' ]; then
+    echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t 1-512 -tc $throttle_octree_njobs \
+          -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
+          -hold_jid $jobname -R yes -l h_rt=$time_limit -o $logfile_scratch/merge'$TASK_ID'.log
+  else
+    pcmd="export RENDER_PATH=$RENDER_PATH;
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
+          export JULIA=$JULIA;
+          export HOSTNAME=$HOSTNAME;
+          export SGE_TASK_ID={};
+          { $cmd } &> ${logfile_scratch}/merge{}.log"
+    parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq 1 512` &>> $logfile_scratch/render.log
+  fi
+  hold="-hold_jid ${jobname}2"
 else
-  pcmd="export RENDER_PATH=$RENDER_PATH;
-        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
-        export JULIA=$JULIA;
-        export HOSTNAME=$HOSTNAME;
-        export SGE_TASK_ID={};
-        { $cmd } &> ${logfile_scratch}/merge{}.log"
-  parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq 1 64` &>> $logfile_scratch/render.log
+  hold="-hold_jid $jobname"
 fi
 
 expr="p=addprocs(${throttle_octree_ncores_per_job});
@@ -130,7 +142,7 @@ expr="p=addprocs(${throttle_octree_ncores_per_job});
       @everywhere include(\"${destination}/calculated_parameters.jl\");
       @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       t=time();
-      merge_output_tiles(nlevels>1 ? destination : shared_scratch, destination, \"default\", file_format,
+      merge_output_tiles(nlevels>2 ? destination : shared_scratch, destination, \"default\", file_format,
             \"\", true, true, delete_scratch==\"as-you-go\" ? true : false);
       info(\"merging took \",string(round(Int,time()-t)),\" sec\");
       rmprocs(p);"
@@ -141,14 +153,15 @@ cmd="umask 002;
      date;"
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N ${jobname}3 -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
-        -hold_jid ${jobname}2 -R yes -l h_rt=$time_limit -o $logfile_scratch/merge65.log
+  echo $cmd | qsub -A $bill_userid -N ${jobname}3 \
+        -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
+        $hold -R yes -l h_rt=$time_limit -o $logfile_scratch/merge513.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH;
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
         export JULIA=$JULIA;
         export HOSTNAME=$HOSTNAME;
-        { $cmd } &> ${logfile_scratch}/merge65.log"
+        { $cmd } &> ${logfile_scratch}/merge513.log"
   ssh ${which_cluster%%,*} $pcmd  &>> $logfile_scratch/render.log
 fi
 
