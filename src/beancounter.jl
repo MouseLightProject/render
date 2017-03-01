@@ -2,11 +2,17 @@
 
 # julia ./beancounter.jl <destination>
 
+const destination = ARGS[1]
+
+using Gadfly, Colors
+
+### profile chart
 data = String[]
-stream = open(`tar xzfO $(joinpath(ARGS[1],"logs.tar.gz"))`)[1]
-while ~eof(stream)
-  line = readline(stream)
-  contains(line,"took") && push!(data,line)
+open(`tar xzfO $(joinpath(destination,"logs.tar.gz"))`) do stream 
+  while ~eof(stream)
+    line = readline(stream)
+    contains(line,"took") && push!(data,line)
+  end
 end
 
 for var in ["reading input tile", "initializing", "transforming", "saving output tiles", "waiting", "overall",
@@ -23,23 +29,68 @@ for var in ["reading input tile", "initializing", "transforming", "saving output
   @eval $(Symbol(var2*"_max")) = maximum($(Symbol(var2*"_data")))
   @eval $(Symbol(var2*"_min")) = minimum($(Symbol(var2*"_data")))
   @eval $(Symbol(var2*"_sum")) = sum($(Symbol(var2*"_data")))
-  @eval println($var2*" took ",signif($(Symbol(var2*"_sum")),4)," sec, n=",$(Symbol(var2*"_n")))
-  #@eval println($var*" took ",$(Symbol(var*"_min")),", ",$(Symbol(var*"_q")),", ",$(Symbol(var*"_max"))," sec, n=",$(Symbol(var*"_n")))
 end
 
-println("read took: ",reading_input_tile_sum / overall_sum * peons_sum / 60/60,"h")
-println("xform took: ",(initializing_sum +transforming_sum) / overall_sum * peons_sum / 60/60,"h")
-println("write took: ",saving_output_tiles_sum / overall_sum * peons_sum / 60/60,"h")
+plots=Plot[]
 
-using Gadfly
 x = ["reading input tile", "initializing", "transforming", "saving output tiles", "waiting",
      "copying single", "merging multiple", "clearing multiple", "reading multiple", "max'ing multiple", "deleting multiple", "writing multiple",
      "clearing octree", "downsampling octree", "saving octree"]
 y = map(x->replace(x," ","_")*"_sum", x)
 y = [@eval $(Symbol(x)) for x in y]
-chart = plot(x=x, y=y, Geom.bar, Guide.xlabel(""), Guide.ylabel(""), Guide.title(basename(ARGS[1])),
+push!(plots, plot(x=x, y=y./3600, Geom.bar,
+      Guide.xlabel(""), Guide.ylabel("CPU time (hr)"), Guide.title(basename(destination)),
       color=[fill("leaf",5)...;fill("merge",7)...;fill("octree",3)...],
-      Scale.color_discrete_manual("red","green","blue"),
-      Guide.ylabel("CPU time (sec)"));
-#      Coord.Cartesian(ymin=0.0,ymax=4e5));
-draw(PNG(joinpath(ARGS[1],"beancounter.png"), 6inch, 6inch), chart)
+      Scale.color_discrete_manual("red","green","blue")))
+
+
+### resource usage over time
+units = Dict('K'=>10^3, 'M'=>10^6, 'G'=>10^9, '0'=>1)
+
+data = Dict{String,Matrix{Float32}}()
+open(`tar xzfO $(joinpath(destination,"logs.tar.gz")) monitor.log`) do stream 
+  while ~eof(stream)
+    line = readline(stream)
+    fields = split(line)
+    length(fields)==12 || continue
+    node = fields[2]
+    datum = map(field -> in(field,["-","--M"]) ? NaN :
+        units[field[end]] * parse(Float32,field[1:end-1]), fields[[4,6,8,9,10]])
+    push!(datum, map(field -> parse(Float32,field), fields[[11,12]])...)
+    if haskey(data,node)
+      data[node] = vcat(data[node], datum')
+    else
+      data[node] = datum'
+    end
+  end
+end
+
+idx=7; label="# tile-channels"
+ydata=Float32[]
+for node in keys(data)
+  if isempty(ydata)
+    ydata = data[node][:,idx]
+  elseif length(ydata) < size(data[node],1)
+    push!(ydata, zeros(Float32,size(data[node],1)-length(ydata))...)
+    ydata += data[node][:,idx]
+  elseif length(ydata) > size(data[node],1)
+    ydata[1:size(data[node],1)] += data[node][:,idx]
+  end
+end
+push!(plots, plot(y=ydata, Geom.line, Theme(default_color=colorant"black"),
+      Guide.xlabel("time"), Guide.ylabel(label)))
+
+colors=colormap("RdBu",length(data))
+
+for (idx, label) in [(1,"RAM (GB)"), (6,"CPU (%)"), (2,"swap (GB)"), (3,"scratch (GB)")]
+  layers=[]
+  xmax=0;
+  for (node,color) in zip(keys(data),colors)
+    xmax = max(xmax,size(data[node],1))
+    toGB = idx==6 ? 1.0 : 1024^3
+    push!(layers, layer(y=data[node][:,idx]/toGB, Geom.line, Theme(default_color=color)))
+  end
+  push!(plots, plot(layers..., Guide.xlabel("time"), Guide.ylabel(label)))
+end
+
+draw(PDF(joinpath(destination,"beancounter.pdf"), 3*4inch, 2*3inch), gridstack(reshape(plots,2,3)))

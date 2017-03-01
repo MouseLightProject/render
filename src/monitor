@@ -6,8 +6,8 @@
 
 interval=120   # in seconds
 
-export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3
-export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3/julia-0.5.0/bin/julia
+export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.5.0/bin/julia
 
 read -a tmp <<< $($JULIA -L $2 -e "print(destination,' ',shared_scratch,' ',logfile_scratch)")
 destination=${tmp[0]}
@@ -40,6 +40,7 @@ while true ; do
   readarray -t alllogs < <(echo "$data" | tr -s ' ' | cut -s -f11 -d ' ')
   nodes=()
   logs=()
+  squatterornot=()
   cont=0
   for i in $(seq 0 $((${#alljobs[@]} - 1))) ; do
     if [ ${alljobs[$i]%%[0-9]} == $1 ] ; then
@@ -49,6 +50,11 @@ while true ; do
         tmp=${tmp##*@}
         nodes+=(${tmp%%.*})
         logs+=(${alllogs[i]}.log)
+        if [ ${alljobs[$i]} == ${1}1 ] ; then
+          squatterornot+=(1)
+        else
+          squatterornot+=(0)
+        fi
       fi
     fi
   done
@@ -72,7 +78,7 @@ while true ; do
     localscratch[i]=$(ssh -q ${nodes[i]} df -h /scratch)
     load[i]=$(ssh -q ${nodes[i]} mpstat 1 1)
     io[i]=$(ssh -q ${nodes[i]} tail -n +3 /proc/net/dev | sed 's/.*://')
-    if [ -e $logfile_scratch/squatter${logs[i]} ] ; then
+    if [ "${squatterornot[i]}" -eq "1" -a -e $logfile_scratch/squatter${logs[i]} ] ; then
       tiles[i]=$(grep -c "reading input tile" $logfile_scratch/squatter${logs[i]})
     fi
   done

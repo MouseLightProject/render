@@ -2,7 +2,7 @@ const notify_addr = "<yourId>@janelia.hhmi.org"
 const bill_userid = "<yourId>"
 
 const source="/groups/mousebrainmicro/stitch/..."  # path to tilebase.cache.yml
-const destination="/nobackup2/mouselight/..."  # path to octree
+const destination="/nrs/mouselight/..."  # path to octree
 
 const file_infix="ngc"
 const file_format="tif"  # "tif" or "h5"

@@ -8,8 +8,8 @@
 
 set -e
 
-export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3
-export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric3/julia-0.5.0/bin/julia
+export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.5.0/bin/julia
 
 umask 002
 
