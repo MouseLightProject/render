@@ -2,8 +2,6 @@
 
 # usage: ./monitor <jobname> <path_to_set_parameters.jl>
 
-# output is also appended to <destination>/logs.tar.gz/monitor.log
-
 interval=120   # in seconds
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
@@ -74,13 +72,14 @@ while true ; do
   unset tiles
   for i in $(seq 0 $((${#nodes[@]} - 1))) ; do
     #echo ${nodes[i]}
-    memory[i]=$(qhost -h ${nodes[i]})
-    localscratch[i]=$(ssh -q ${nodes[i]} df -h /scratch)
-    load[i]=$(ssh -q ${nodes[i]} mpstat 1 1)
-    io[i]=$(ssh -q ${nodes[i]} tail -n +3 /proc/net/dev | sed 's/.*://')
+    memory[i]=$(qhost -h ${nodes[i]}) &
+    localscratch[i]=$(ssh -q ${nodes[i]} df -h /scratch) &
+    load[i]=$(ssh -q ${nodes[i]} mpstat 1 1) &
+    io[i]=$(ssh -q ${nodes[i]} tail -n +3 /proc/net/dev | sed 's/.*://') &
     if [ "${squatterornot[i]}" -eq "1" -a -e $logfile_scratch/squatter${logs[i]} ] ; then
-      tiles[i]=$(grep -c "reading input tile" $logfile_scratch/squatter${logs[i]})
+      tiles[i]=$(grep -c "reading input tile" $logfile_scratch/squatter${logs[i]}) &
     fi
+    wait
   done
 
   # print data to screen, and dump to log

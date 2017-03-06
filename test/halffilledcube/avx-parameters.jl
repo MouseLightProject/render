@@ -62,7 +62,7 @@ const include_origins_outside_roi=false   # set to true to render all of small t
 
 const max_pixels_per_leaf=120e6  # maximum number of pixels in output tiles
 
-const max_tilechannels_per_job=1000  # maximum number of input tiles * nchannels per cluster job
+const max_tilechannels_per_job=500  # maximum number of input tiles * nchannels per cluster job
 # larger is more efficient with file i/o; smaller is more parallel computation
 
 
@@ -73,8 +73,8 @@ const throttle_leaf_nmachines = 96  # maximum number of compute nodes to use to 
 # for which_cluster=="janelia" set to 96 (max is 96)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_njobs = 512  # maximum number of compute nodes to use to downsample octree
-# for which_cluster=="janelia" set to 512 (max is 512)
+const throttle_octree_njobs = 256  # maximum number of compute nodes to use to downsample octree
+# for which_cluster=="janelia" set to 256 (max is 512)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
 const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
