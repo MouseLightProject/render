@@ -31,16 +31,16 @@ tiles_bbox = AABBGetJ(TileBaseAABB(tiles))
 const shape_tiles_nm = tiles_bbox[3]
 const nlevels = max(0, ceil(Int,
     log(8, prod(map(Float64,shape_tiles_nm)) / (prod(voxelsize_um)*um2nm^3) / max_pixels_per_leaf) ))
-shape_leaf_tmp = round(Int,round(shape_tiles_nm./um2nm./voxelsize_um./2^nlevels,-1,2))
+shape_leaf_tmp = round.(Int, round.(shape_tiles_nm./um2nm./voxelsize_um./2^nlevels, -1, 2))
 # there must be better ways to ensure
 # that prod(shape_leaf_px) is divisible by 32*32*4, and
 # that each element is even
-xyz=Array(Int,3)
+xyz=Array{Int}(3)
 cost=Inf32
 for x=-20:2:20, y=-20:2:20, z=-20:2:20
-  if mod(prod(shape_leaf_tmp+[x,y,z]),32*32*4)==0 && sum(abs([x,y,z]))<cost
+  if mod(prod(shape_leaf_tmp+[x,y,z]),32*32*4)==0 && sum(abs.([x,y,z]))<cost
     xyz=[x,y,z]
-    cost=sum(abs([x,y,z]))
+    cost=sum(abs.([x,y,z]))
   end
 end
 cost==Inf32 && error("can't find satisfactory shape_leaf_px")
@@ -106,8 +106,8 @@ function get_job_aabbs(bbox)
 end
 
 job_aabbs = []
-tiles_bbox[2][:] = round(Int,tiles_bbox[2][:] + tiles_bbox[3].*region_of_interest[1])
-tiles_bbox[3][:] = round(Int,tiles_bbox[3][:] .* region_of_interest[2])
+tiles_bbox[2][:] = round.(Int,tiles_bbox[2][:] + tiles_bbox[3].*region_of_interest[1])
+tiles_bbox[3][:] = round.(Int,tiles_bbox[3][:] .* region_of_interest[2])
 get_job_aabbs(tiles_bbox)
 sort!(job_aabbs; lt=(x,y)->x[2]<y[2], rev=true)
 roi_vol = prod(region_of_interest[2])
@@ -124,7 +124,7 @@ nnodes = min( length(job_aabbs),
               throttle_leaf_nmachines,
               which_cluster=="janelia" ? 96 : length(which_cluster) )
 info("number of cluster nodes used = $nnodes", prefix="DIRECTOR: ")
-events = Array(Condition,nnodes,2)
+events = Array{Condition}(nnodes,2)
 hostname = readchomp(`hostname`)
 default_port = 2000
 ready = r"(?<=squatter )[0-9]*(?= is ready)"
@@ -136,7 +136,7 @@ server, port = get_available_port(default_port)
   let sock = accept(server)
     @async begin
       while isopen(sock) || nb_available(sock)>0
-        tmp = chomp(readline(sock))
+        tmp = chomp(readline(sock,chomp=false))
         length(tmp)==0 && continue
         info(tmp, prefix="DIRECTOR<SQUATTER: ")
         flush(STDOUT);  flush(STDERR)
@@ -197,22 +197,23 @@ t0=time()
   end
 
   #launch_workers
-  cmd = `umask 002;
+  cmd = `umask 002 \;
          $(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/squatter.jl $(ARGS[1]) $hostname $port`
   if which_cluster=="janelia"
     queue = short_queue ? `-W 60 -n 16` : `-W 10080 -n 32`
-    pcmd = pipeline(`echo $cmd`, `bsub -P $bill_userid $queue -J $(jobname)1[1-$nnodes]
+    pcmd = pipeline(`echo $cmd`, `bsub -P $bill_userid $queue -J $(jobname)1\[1-$nnodes\]
           -R"select[avx2]" -o $logfile_scratch/squatter%I.log`)
     info(pcmd, prefix="DIRECTOR: ")
     jobid = match(r"(?<=Job <)[0-9]*", readchomp(pcmd)).match
   else
-    proc = Array(Any,nnodes)
+    proc = Array{Any}(nnodes)
     for n=1:nnodes
-      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n]) export RENDER_PATH=$(ENV["RENDER_PATH"]);
-            export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]);
-            export JULIA=$(ENV["JULIA"]);
-            export HOSTNAME=$(ENV["HOSTNAME"]);
-            export LSB_JOBINDEX=$n; $cmd &> $logfile_scratch/squatter$n.log`
+      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n]) export RENDER_PATH=$(ENV["RENDER_PATH"]) \;
+            export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]) \;
+            export JULIA=$(ENV["JULIA"]) \;
+            export HOSTNAME=$(ENV["HOSTNAME"]) \;
+            export LSB_JOBINDEX=$n \;
+            $cmd \&\> $logfile_scratch/squatter$n.log`
       info(pcmd, prefix="DIRECTOR: ")
       proc[n] = spawn(pcmd)
     end

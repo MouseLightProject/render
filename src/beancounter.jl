@@ -10,7 +10,7 @@ using Gadfly, Colors
 data = String[]
 open(`tar xzfO $(joinpath(destination,"logs.tar.gz"))`) do stream 
   while ~eof(stream)
-    line = readline(stream)
+    line = readline(stream,chomp=false)
     contains(line,"took") && push!(data,line)
   end
 end
@@ -50,7 +50,7 @@ units = Dict('K'=>10^3, 'M'=>10^6, 'G'=>10^9, '0'=>1)
 data = Dict{String,Matrix{Float32}}()
 open(`tar xzfO $(joinpath(destination,"logs.tar.gz")) monitor.log`) do stream 
   while ~eof(stream)
-    line = readline(stream)
+    line = readline(stream,chomp=false)
     fields = split(line)
     length(fields)==12 || continue
     node = fields[2]

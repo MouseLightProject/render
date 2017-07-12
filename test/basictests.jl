@@ -46,7 +46,7 @@ function check_images(scratchpath, testdirs, correct_nchannels, correct_ntiffs, 
             @test all(imgs[end-1] .== imgs[end])
             idx = find(imgs[end-1] .!= imgs[end])
             if length(idx)>0
-              largest_diff = round(Int, 1/eps(eltype(imgs[end]))*maximum(abs(
+              largest_diff = round.(Int, 1/eps(eltype(imgs[end]))*maximum(abs.(
                     convert(Array{Float64}, imgs[end-1][idx])-
                     convert(Array{Float64}, imgs[end][idx]))))
               warn(joinpath(testdir,root,file)," off by ",length(idx),

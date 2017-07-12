@@ -102,7 +102,7 @@ const total_ram = parse(Int,split(readchomp(`head -1 /proc/meminfo`))[2])*1024
 ram_fraction = haskey(ENV,"LSB_DJOB_NUMPROC") ? ncores/Sys.CPU_CORES : 1
 ncache = (total_ram - num_procs*peon_ram - other_ram) * ram_fraction/2/prod(shape_leaf_px)/nchannels
 ncache = max(1, floor(Int,ncache))
-const merge_array = Array(UInt16, shape_leaf_px..., nchannels, ncache)
+const merge_array = Array{UInt16}(shape_leaf_px..., nchannels, ncache)
 const merge_used = falses(ncache)
 # one entry for each output tile
 # [total # input tiles, input tiles processed so far, input tiles sent so far, index to merge_array (0=not assigned yet, Inf=use local_scratch)]
@@ -137,7 +137,7 @@ const finished_msg = r"(?<=peon for input tile )[0-9]*(?= is finished)"
 
 function wrangle_peon(sock)
   while isopen(sock) || nb_available(sock)>0
-    msg_from_peon = chomp(readline(sock))
+    msg_from_peon = chomp(readline(sock,chomp=false))
     length(msg_from_peon)==0 && continue
     info(msg_from_peon, prefix="MANAGER<PEON: ")
     local in_tile_num::AbstractString, out_tile_path::AbstractString, out_tile::Array{UInt16,4}
@@ -207,7 +207,7 @@ function wrangle_peon(sock)
       break
     end
   end
-  out_tile = Array(UInt16,0,0,0,0)
+  out_tile = Array{UInt16}(0,0,0,0)
   gc()
 end
 

@@ -8,11 +8,11 @@ generate an octree for viewing with the Janelia Workstation.
 Requirements
 ============
 
-Julia, version 5, plus the YAML package.
+Julia, version 6, plus the YAML package.
 
 Nathan Clack's nd, tilebase, and mltk-bary libraries.
 
-Tested with Julia v0.5.0, YAML v0.1.10, nd master (branch) / ef492383 (commit),
+Tested with Julia v0.6.0, YAML v0.2.1, nd master (branch) / ef492383 (commit),
 ndio-series use-tre/fdfe30a7, ndio-tiff ndio-format-context/df46d485, ndio-hdf5
 ndio-format-context/0c7ac77c, tilebase master/cc171869, mltk-bary
 master/84e15364, and mylib stream/0ca27aae.
@@ -127,7 +127,7 @@ const ready = r"(peon for input tile )([0-9]*)( has output tile )([1-8/]*)( read
 port2=2001
 server2 = listen(port2)
 sock2 = accept(server2)
-tmp = chomp(readline(sock2))
+tmp = readline(sock2)
 
 in_tile_num, out_tile_path = match(ready,tmp).captures[[2,4]]
 msg = string("manager tells peon for input tile ",in_tile_num,
@@ -135,8 +135,8 @@ msg = string("manager tells peon for input tile ",in_tile_num,
 println(sock2, msg)
 
 while isopen(sock2) || nb_available(sock2)>0
-  tmp = chomp(readline(sock2))
-  tmp = chomp(readline(sock2))
+  tmp = readline(sock2)
+  tmp = readline(sock2)
   in_tile_num, out_tile_path = match(ready,tmp).captures[[2,4]]
   if read(STDIN,1)==[0x0a]  # <return>
     msg = string("manager tells peon for input tile ",in_tile_num,

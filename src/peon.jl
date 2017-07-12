@@ -111,7 +111,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
           t1=time()
           local msg_from_manager::String
           while true
-            msg_from_manager = chomp(readline(sock))
+            msg_from_manager = chomp(readline(sock,chomp=false))
             length(msg_from_manager)==0 || break
           end
           time_waiting+=(time()-t1)
@@ -128,7 +128,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
               @inbounds local_out_tile[i1,i2,i3,i4] =
                     max(local_out_tile[i1,i2,i3,i4], out_tile_from_manager[i1,i2,i3,i4])
             end
-            out_tile_from_manager = Array(UInt16,0,0,0,0)
+            out_tile_from_manager = Array{UInt16}(0,0,0,0)
             gc()
             save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,".%.",file_format),
                   out_tiles_ws[out_tile_path_next])

@@ -19,7 +19,7 @@ sock = connect(ARGS[2],parse(Int,ARGS[3]))
 println(sock,"squatter ",proc_num," is ready on ",readchomp(`hostname`))
 
 while isopen(sock) || nb_available(sock)>0
-  tmp = chomp(readline(sock))
+  tmp = chomp(readline(sock,chomp=false))
   length(tmp)==0 && continue
   info(tmp, prefix="SQUATTER<DIRECTOR: ")
   if ismatch(dole_out,tmp)
