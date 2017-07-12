@@ -1,4 +1,4 @@
-# qsub'ed by director
+# bsub'ed by director
 # sequentially spawns a local manager for each sub-bounding box, and
 # saves stdout/err to <destination>/squatter[0-9]*.log
 
@@ -7,7 +7,7 @@
 include(ARGS[1])
 include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
 
-const proc_num = ENV["SGE_TASK_ID"]
+const proc_num = ENV["LSB_JOBINDEX"]
 
 const dole_out = Regex("squatter "*proc_num*" dole out job")
 const terminate = Regex("squatter "*proc_num*" terminate")

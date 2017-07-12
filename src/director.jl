@@ -1,5 +1,5 @@
-# qsub'ed by render to one core of a regular compute node
-# qsubs a bunch of squatters to gpu and/or cpu nodes
+# bsub'ed by render to one core of a regular compute node
+# bsubs a bunch of squatters to gpu and/or cpu nodes
 # partitions the bounding box of the tilespace into countof_job sized sub bounding boxes
 # parcels out multiple sub bounding boxes to each squatter
 # saves stdout/err to <destination>/render.log
@@ -165,10 +165,11 @@ t0=time()
 
     @async begin
       sock = wait(events[p,1])
+
       if sock==nothing
         info("deleting squatter ",p, prefix="DIRECTOR: ")
         if which_cluster=="janelia"
-          cmd = `qdel $(jobid).$p`
+          cmd = `bkill $(jobid)\[$p\]`
           try;  run(cmd);  end
         else
           kill(proc[p])
@@ -199,11 +200,11 @@ t0=time()
   cmd = `umask 002;
          $(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/squatter.jl $(ARGS[1]) $hostname $port`
   if which_cluster=="janelia"
-    queue = short_queue ? `-l h_rt=3599 -pe batch 16 -l avx2=true` : `-l h_rt=604800 -pe batch 32`
-    pcmd = pipeline(`echo $cmd`, `qsub -A $bill_userid -t 1-$nnodes $queue -N $(jobname)1
-          -R yes -b n -j y -V -shell n -o $logfile_scratch/squatter'$TASK_ID'.log`)
+    queue = short_queue ? `-W 60 -n 16` : `-W 10080 -n 32`
+    pcmd = pipeline(`echo $cmd`, `bsub -P $bill_userid $queue -J $(jobname)1[1-$nnodes]
+          -R"select[avx2]" -o $logfile_scratch/squatter%I.log`)
     info(pcmd, prefix="DIRECTOR: ")
-    jobid = match(r"(?<=job-array )[0-9]*", readchomp(pcmd)).match
+    jobid = match(r"(?<=Job <)[0-9]*", readchomp(pcmd)).match
   else
     proc = Array(Any,nnodes)
     for n=1:nnodes
@@ -211,7 +212,7 @@ t0=time()
             export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]);
             export JULIA=$(ENV["JULIA"]);
             export HOSTNAME=$(ENV["HOSTNAME"]);
-            export SGE_TASK_ID=$n; $cmd &> $logfile_scratch/squatter$n.log`
+            export LSB_JOBINDEX=$n; $cmd &> $logfile_scratch/squatter$n.log`
       info(pcmd, prefix="DIRECTOR: ")
       proc[n] = spawn(pcmd)
     end

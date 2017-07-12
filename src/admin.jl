@@ -256,9 +256,9 @@ end
 # by merge to combine multiple previous renders       (recurse=either, octree=false, delete=false)
 
 function downsample(out_tile_jl, coord, shape_leaf_px, nchannels, scratch)
-  ix = (((coord-1)>>0)&1 * shape_leaf_px[1]>>1)
-  iy = (((coord-1)>>1)&1 * shape_leaf_px[2]>>1)
-  iz = (((coord-1)>>2)&1 * shape_leaf_px[3]>>1)
+  ix = ((coord-1)>>0)&1 * shape_leaf_px[1]>>1
+  iy = ((coord-1)>>1)&1 * shape_leaf_px[2]>>1
+  iz = ((coord-1)>>2)&1 * shape_leaf_px[3]>>1
   for c=1:nchannels
     for z=1:2:shape_leaf_px[3]-1
       tmpz = iz + (z+1)>>1

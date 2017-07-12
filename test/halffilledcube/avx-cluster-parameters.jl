@@ -1,22 +1,21 @@
 const notify_addr = "arthurb@hhmi.org"
 const bill_userid = "scicompsoft"
 
-const scratchpath=joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch")
-const source=joinpath(scratchpath,"data/onechannel") # path to tilebase.cache.yml
-const destination=joinpath(scratchpath,"linearinterp-onechannel","results")  # path to octree
+const source=joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube") # path to tilebase.cache.yml
+const destination=joinpath(source,"scratch","avx-cluster","results")  # path to octree
 
-const file_infix="hollowcube"
+const file_infix="halffilledcube"
 const file_format="tif"  # "tif" or "h5"
 
-const shared_scratch=joinpath(scratchpath,"linearinterp-onechannel","shared_scratch")
-const logfile_scratch=joinpath(scratchpath,"linearinterp-onechannel","logfile_scratch")  # should be on /groups
+const shared_scratch=joinpath(source,"scratch","avx-cluster","shared_scratch")
+const logfile_scratch=joinpath(source,"scratch","avx-cluster","logfile_scratch")  # should be on /groups
 const delete_scratch="as-you-go"   # "never", "at-end" or "as-you-go"
 
-const voxelsize_um=[1.0, 1.0, 1.0]  # desired pixel size
+const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size
 # voxelsize_used_um, in destination/calculated_parameters.jl, is that actually used.
 #   adjusted to make tile widths even and tile volume a multiple of 32*32*4,
 
-const interpolation = "linear"  # "nearest" or "linear"
+const interpolation = "nearest"  # "nearest" or "linear"
 
 const raw_compression_ratios = [] # or e.g. [10,80]
 const octree_compression_ratios = []
@@ -49,25 +48,25 @@ downsampling_function(arg::Array{UInt16,3}) = (@inbounds return arg[1,1,1])
 
 
 # normalized origin and shape of sub-bounding box to render
-const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
+#const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) == octant three
 
 # or use the following code to convert morton order to origin & shape
-#morton_order = [8,1,7,3]
-#const region_of_interest = (
-#    squeeze(sum(
-#        [(((morton_order[depth]-1)>>xyz)&1)/2^depth for xyz=0:2, depth=1:length(morton_order)] ,2),2),
-#    fill(0.5^length(morton_order),3) )
+morton_order = [5]
+const region_of_interest = (
+    squeeze(sum(
+        [(((morton_order[depth]-1)>>xyz)&1)/2^depth for xyz=0:2, depth=1:length(morton_order)] ,2),2),
+    fill(0.5^length(morton_order),3) )
 
 const include_origins_outside_roi=false   # set to true to render all of small test ROI
 
 
-const max_pixels_per_leaf=50^3  # maximum number of pixels in output tiles
+const max_pixels_per_leaf=120e6  # maximum number of pixels in output tiles
 
 const max_tilechannels_per_job=500  # maximum number of input tiles * nchannels per cluster job
 # larger is more efficient with file i/o; smaller is more parallel computation
 
 
-const which_cluster = [ENV["HOSTNAME"]] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
+const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
 const throttle_leaf_nmachines = 96  # maximum number of compute nodes to use to render leafs
@@ -82,7 +81,7 @@ const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
 # ignored when which_cluster=="janelia"
 # otherwise set to ncores per machine for small data sets
 
-const throttle_octree_ncores_per_job = 1
+const throttle_octree_ncores_per_job = 9
 # for which_cluster=="janelia" set to 9 (max is 16)
 # otherwise set to 1 for small data sets
 

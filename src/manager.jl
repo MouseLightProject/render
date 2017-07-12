@@ -11,7 +11,7 @@ info(readchomp(`hostname`), prefix="MANAGER: ")
 info(readchomp(`date`), prefix="MANAGER: ")
 
 proc_num = nothing
-try;  global proc_num = ENV["SGE_TASK_ID"];  end
+try;  global proc_num = ENV["LSB_JOBINDEX"];  end
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
@@ -24,7 +24,7 @@ const port_director = parse(Int,ARGS[9])
 
 # how many peons
 nthreads = 8  # should match barycentricCPU.c
-ncores = haskey(ENV,"NSLOTS") ? parse(Int,ENV["NSLOTS"]) : Sys.CPU_CORES
+ncores = haskey(ENV,"LSB_DJOB_NUMPROC") ? parse(Int,ENV["LSB_DJOB_NUMPROC"]) : Sys.CPU_CORES
 num_procs = div(ncores,nthreads)
 info(ncores," CPUs present which can collectively process ",num_procs," tiles simultaneously", prefix="MANAGER: ")
 
@@ -99,7 +99,7 @@ function depth_first_traverse(bbox,out_tile_path)
 end
 
 const total_ram = parse(Int,split(readchomp(`head -1 /proc/meminfo`))[2])*1024
-ram_fraction = haskey(ENV,"NSLOTS") ? ncores/Sys.CPU_CORES : 1
+ram_fraction = haskey(ENV,"LSB_DJOB_NUMPROC") ? ncores/Sys.CPU_CORES : 1
 ncache = (total_ram - num_procs*peon_ram - other_ram) * ram_fraction/2/prod(shape_leaf_px)/nchannels
 ncache = max(1, floor(Int,ncache))
 const merge_array = Array(UInt16, shape_leaf_px..., nchannels, ncache)

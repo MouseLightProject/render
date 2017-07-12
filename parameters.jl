@@ -1,5 +1,5 @@
 const notify_addr = "<yourId>@janelia.hhmi.org"
-const bill_userid = "<yourId>"
+const bill_userid = "mouselight"
 
 const source="/groups/mousebrainmicro/stitch/..."  # path to tilebase.cache.yml
 const destination="/nrs/mouselight/..."  # path to octree

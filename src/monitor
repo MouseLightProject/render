@@ -2,12 +2,15 @@
 
 # usage: ./monitor <jobname> <path_to_set_parameters.jl>
 
+jobname=$1
+parametersjl=$2
+
 interval=120   # in seconds
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.5.0/bin/julia
 
-read -a tmp <<< $($JULIA -L $2 -e "print(destination,' ',shared_scratch,' ',logfile_scratch)")
+read -a tmp <<< $($JULIA -L $parametersjl -e "print(destination,' ',shared_scratch,' ',logfile_scratch)")
 destination=${tmp[0]}
 shared_scratch=${tmp[1]}
 logfile_scratch=${tmp[2]}
@@ -27,28 +30,37 @@ display_it() {
     echo
   fi; }
 
+human_readable() {
+  if [ "${#1}" -gt "9" ] ; then
+    echo ${1:0:-9}G
+  elif [ "${#1}" -gt "6" ] ; then
+    echo ${1:0:-6}M
+  elif [ "${#1}" -gt "3" ] ; then
+    echo ${1:0:-3}K
+  else
+    echo ${1}B
+  fi; }
+
 START=$(date +%s)
 while true ; do
 
   # list the nodes
-  data=$(qstat)
-  readarray -t alljobs < <(echo "$data" | tr -s ' ' | cut -s -f4 -d ' ')
-  readarray -t allstates < <(echo "$data" | tr -s ' ' | cut -s -f6 -d ' ')
-  readarray -t allnodes < <(echo "$data" | tr -s ' ' | cut -s -f9 -d ' ')
-  readarray -t alllogs < <(echo "$data" | tr -s ' ' | cut -s -f11 -d ' ')
+  data=$(bjobs -o "name:15 stat: alloc_slot:")
+  readarray -t alljobs < <(echo "$data" | tr -s ' ' | cut -s -f1 -d ' ' | cut -f1 -d '[')
+  readarray -t allstates < <(echo "$data" | tr -s ' ' | cut -s -f2 -d ' ')
+  readarray -t allnodes < <(echo "$data" | tr -s ' ' | cut -s -f3 -d ' ' | cut -f2 -d '*')
+  readarray -t alllogs < <(echo "$data" | tr -s ' ' | cut -s -f1 -d ' ' | sed -e 's/$/[]/' | cut -f2 -d '[' | cut -f1 -d ']')
   nodes=()
   logs=()
   squatterornot=()
   cont=0
   for i in $(seq 0 $((${#alljobs[@]} - 1))) ; do
-    if [ ${alljobs[$i]%%[0-9]} == $1 ] ; then
+    if [ ${alljobs[$i]%[0-9]} == $jobname ] ; then
       cont=1
-      if [ ${allstates[$i]} == "r" ] ; then
-        tmp=${allnodes[i]}
-        tmp=${tmp##*@}
-        nodes+=(${tmp%%.*})
+      if [ ${allstates[$i]} == "RUN" ] ; then
+        nodes+=(${allnodes[i]})
         logs+=(${alllogs[i]}.log)
-        if [ ${alljobs[$i]} == ${1}1 ] ; then
+        if [ "${alljobs[$i]}" == "${jobname}1" ] ; then
           squatterornot+=(1)
         else
           squatterornot+=(0)
@@ -72,12 +84,17 @@ while true ; do
   unset tiles
   for i in $(seq 0 $((${#nodes[@]} - 1))) ; do
     #echo ${nodes[i]}
-    memory[i]=$(qhost -h ${nodes[i]}) &
-    localscratch[i]=$(ssh -q ${nodes[i]} df -h /scratch) &
-    load[i]=$(ssh -q ${nodes[i]} mpstat 1 1) &
-    io[i]=$(ssh -q ${nodes[i]} tail -n +3 /proc/net/dev | sed 's/.*://') &
+    meminfo=$(ssh -q ${nodes[i]} cat /proc/meminfo)
+    memory[i]=\
+$(echo "$meminfo" | grep MemTotal:  | tr -s ' ' | cut -f2 -d ' ')' '\
+$(echo "$meminfo" | grep Active:    | tr -s ' ' | cut -f2 -d ' ')' '\
+$(echo "$meminfo" | grep SwapTotal: | tr -s ' ' | cut -f2 -d ' ')' '\
+$(echo "$meminfo" | grep SwapFree:  | tr -s ' ' | cut -f2 -d ' ')
+    localscratch[i]=$(ssh -q ${nodes[i]} df -h /scratch)
+    load[i]=$(ssh -q ${nodes[i]} mpstat 1 1)
+    io[i]=$(ssh -q ${nodes[i]} tail -n +3 /proc/net/dev | sed 's/.*://')
     if [ "${squatterornot[i]}" -eq "1" -a -e $logfile_scratch/squatter${logs[i]} ] ; then
-      tiles[i]=$(grep -c "reading input tile" $logfile_scratch/squatter${logs[i]}) &
+      tiles[i]=$(grep -c "reading input tile" $logfile_scratch/squatter${logs[i]})
     fi
     wait
   done
@@ -115,7 +132,11 @@ while true ; do
     fi
     last_rX[i]=${rX[i]};  last_tX[i]=${tX[i]}
     printf "%4s%8s" " ${logs[i]%.log}" ${nodes[i]}
-    printf "%9s%8s" ${memoryArray[@]:30:4} ${localscratchArray[@]:8:2}
+    memtotal=$(human_readable ${memoryArray[0]})
+    memused=$(human_readable ${memoryArray[1]})
+    swaptotal=$(human_readable ${memoryArray[2]})
+    swapused=$(human_readable $((${memoryArray[2]} - ${memoryArray[3]})))
+    printf "%9s%8s" $memtotal $memused $swaptotal $swapused ${localscratchArray[@]:8:2}
     printf "%8sM%7sM" $rXMBps $tXMBps
     printf "%9s%9s" ${loadArray[23]} ${tiles[i]}
     printf "\n"

@@ -22,7 +22,7 @@
 #   render.log
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
-export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
+export LD_LIBRARY_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/env/lib:/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.5.0/bin/julia
 
 umask 002
@@ -51,9 +51,9 @@ nchannels=${tmp[10]}
 short_queue=${tmp[11]}
 
 if [ "$short_queue" = "true" ] ; then
-  time_limit=3599   # an hour
+  time_limit=60   # an hour
 else
-  time_limit=604800  # a week
+  time_limit=10080  # a week
 fi
 
 # delete <logfile_scratch> and <destination> if they exist
@@ -73,7 +73,7 @@ hostname >> $logfile_scratch/render.log
 
 # copy parameters to <destination>
 cp $1 $destination/set_parameters.jl
-chmod g+w $destination/set_parameters.jl
+chmod g+rw $destination/set_parameters.jl
 
 # create a probably-unique job name
 jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
@@ -84,7 +84,7 @@ cmd="umask 002;
      $JULIA ${RENDER_PATH}/src/render/src/director.jl $destination/set_parameters.jl $jobname"
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N $jobname -j y -b n -V -shell n -l h_rt=$time_limit \
+  echo $cmd | bsub -P $bill_userid -J $jobname -W $time_limit \
         -o $logfile_scratch/director.log
 else
   eval $cmd &> $logfile_scratch/director.log
@@ -104,7 +104,7 @@ if [ "$nlevels" -gt "2" ]; then
         @everywhere include(\"${destination}/calculated_parameters.jl\");
         @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
         t=time();
-        id=parse(Int,ENV[\"SGE_TASK_ID\"]);
+        id=parse(Int,ENV[\"LSB_JOBINDEX\"]);
         oct1,oct2,oct3 = ((id-1)&0x1c0)>>6+1, ((id-1)&0x38)>>3+1, ((id-1)&0x7)+1;
         if isdir(joinpath(shared_scratch,string(oct1),string(oct2),string(oct3)))
           merge_output_tiles(shared_scratch, destination, \"default\", file_format,
@@ -120,21 +120,21 @@ if [ "$nlevels" -gt "2" ]; then
        date;"
   echo $cmd &>> $logfile_scratch/render.log
   if [ $which_cluster == 'janelia' ]; then
-    echo $cmd | qsub -A $bill_userid -N ${jobname}2 -t 1-512 -tc $throttle_octree_njobs \
-          -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
-          -hold_jid $jobname -R yes -l h_rt=$time_limit -o $logfile_scratch/merge'$TASK_ID'.log
+    echo $cmd | bsub -P $bill_userid -J ${jobname}2[1-512]%${throttle_octree_njobs} \
+          -n $throttle_octree_ncores_per_job \
+          -w "done($jobname)" -W $time_limit -o $logfile_scratch/merge%I.log
   else
     pcmd="export RENDER_PATH=$RENDER_PATH;
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
           export JULIA=$JULIA;
           export HOSTNAME=$HOSTNAME;
-          export SGE_TASK_ID={};
+          export LSB_JOBINDEX={};
           { $cmd } &> ${logfile_scratch}/merge{}.log"
     parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq 1 512` &>> $logfile_scratch/render.log
   fi
-  hold="-hold_jid ${jobname}2"
+  hold="-w done(${jobname}2)"
 else
-  hold="-hold_jid $jobname"
+  hold="-w done($jobname)"
 fi
 
 expr="p=addprocs(${throttle_octree_ncores_per_job});
@@ -153,9 +153,9 @@ cmd="umask 002;
      date;"
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | qsub -A $bill_userid -N ${jobname}3 \
-        -pe batch $throttle_octree_ncores_per_job -j y -b n -V \
-        $hold -R yes -l h_rt=$time_limit -o $logfile_scratch/merge513.log
+  echo $cmd | bsub -P $bill_userid -J ${jobname}3 \
+        -n $throttle_octree_ncores_per_job \
+        $hold -W $time_limit -o $logfile_scratch/merge513.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH;
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
@@ -176,9 +176,10 @@ if [ $delete_scratch != 'never' ]; then
        date"
   echo $cmd &>> $logfile_scratch/render.log
   if [ $which_cluster == 'janelia' ]; then
-    echo $cmd | qsub -A $bill_userid -N ${jobname}4 -j y -b n -V \
-          -hold_jid ${jobname}3 -l h_rt=$time_limit \
-          -o $logfile_scratch/render.log -m e -M $notify_addr
+    echo $cmd | bsub -P $bill_userid -J ${jobname}4 \
+          -w "done(${jobname}3)" -W $time_limit \
+          -o $logfile_scratch/render.log
+          #-m e -M $notify_addr
   else
     eval $cmd &>> $logfile_scratch/render.log
   fi

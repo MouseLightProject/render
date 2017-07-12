@@ -1,5 +1,5 @@
 const notify_addr = "arthurb@hhmi.org"
-const bill_userid = "arthurb"
+const bill_userid = "scicompsoft"
 
 const scratchpath=joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch")
 const source=joinpath(scratchpath,"data/onechannel") # path to tilebase.cache.yml

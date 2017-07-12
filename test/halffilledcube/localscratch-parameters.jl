@@ -1,5 +1,5 @@
 const notify_addr = "arthurb@hhmi.org"
-const bill_userid = "arthurb"
+const bill_userid = "scicompsoft"
 
 const source=joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube") # path to tilebase.cache.yml
 const destination=joinpath(source,"scratch","localscratch","results")  # path to octree
