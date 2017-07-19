@@ -255,9 +255,9 @@ if !dry_run
   process_input_tile()
 
   for (k,v) in merge_count
-    info((k,v), prefix="PEON: ")
     v[1]>1 && v[1]!=v[2] && warn("not all input subtiles processed for output tile ",k," : ",v)
   end
+  #info(merge_count, prefix="PEON: ")  ### causes seg faults
 
   map(ndfree,values(out_tiles_ws))
 end
