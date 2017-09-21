@@ -55,7 +55,8 @@ open("$destination/calculated_parameters.jl","w") do f
   println(f,"const nlevels = ",nlevels)
   println(f,"const nchannels = ",nchannels)
   println(f,"const shape_leaf_px = [",join(map(string,shape_leaf_px),","),"]")
-  println(f,"const voxelsize_used_um = ",voxelsize_used_um)
+  println(f,"const voxelsize_used_um = [",
+        voxelsize_used_um[1], ',', voxelsize_used_um[2], ',', voxelsize_used_um[3], ']')
   println(f,"const origin_nm = [",join(map(string,tiles_bbox[2]),","),"]")
   println(f,"const tile_type = convert(Cint,$tile_type)")
   for repo in ["render", "mltk-bary", "tilebase", "nd", "ndio-series", "ndio-tiff", "ndio-hdf5", "mylib"]
