@@ -15,16 +15,18 @@ const origin_str = ARGS[3]
 const in_tile_idx = parse(Int,ARGS[2])
 const solo_out_tiles = eval(parse(ARGS[4]))
 idx = 7
-const xlims = [parse(Int,x) for x in ARGS[idx+(1:parse(Int,ARGS[idx]))]]
-idx += length(xlims)+1
-const ylims = [parse(Int,x) for x in ARGS[idx+(1:parse(Int,ARGS[idx]))]]
-idx += length(ylims)+1
-const zlims = [parse(Int,x) for x in ARGS[idx+(1:parse(Int,ARGS[idx]))]]
-idx += length(zlims)+1
+const nxlims = parse(Int,ARGS[idx])
+const xlims = [parse(Int,x) for x in ARGS[idx+(1:nxlims)]]
+idx += nxlims+1
+const nylims = parse(Int,ARGS[idx])
+const ylims = [parse(Int,x) for x in ARGS[idx+(1:nylims)]]
+idx += nylims+1
+const nzlims = parse(Int,ARGS[idx])
+const zlims = [parse(Int,x) for x in ARGS[idx+(1:nzlims)]]
+idx += nzlims+1
 const dims = -1+[parse(Int,x) for x in ARGS[idx:idx+2]]
 idx += length(dims)
-const transform_nm = reshape([parse(Int,x) for x in
-      ARGS[idx:end]],3,length(xlims)*length(ylims)*length(zlims))
+const transform_nm = reshape([parse(Int,x) for x in ARGS[idx:end]], 3, nxlims*nylims*nzlims)
 
 @assert all(diff(diff(xlims)).==0) "xlims not equally spaced for input tile $in_tile_idx"
 @assert all(diff(diff(ylims)).==0) "ylims not equally spaced for input tile $in_tile_idx"
@@ -54,6 +56,21 @@ const merge_count = Dict{String,Array{UInt8,1}}()
 
 # 2 -> sizeof(UInt16), 20e3 -> .tif metadata size, 15 -> max # possible concurrent saves, need to generalize
 enough_free(path) = parse(Int,split(readstring(`df $path`))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
+
+### https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
+function Compact1By2(x)
+  x &= 0x09249249;                   # x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
+  x = (x | (x >>  2)) & 0x030c30c3;  # x = ---- --98 ---- 76-- --54 ---- 32-- --10
+  x = (x | (x >>  4)) & 0x0300f00f;  # x = ---- --98 ---- ---- 7654 ---- ---- 3210
+  x = (x | (x >>  8)) & 0xff0000ff;  # x = ---- --98 ---- ---- ---- ---- 7654 3210
+  x = (x | (x >> 16)) & 0x000003ff;  # x = ---- ---- ---- ---- ---- --98 7654 3210
+  x+1
+end
+
+function morton_decode(m)
+  m -= 1
+  Compact1By2(m>>0), Compact1By2(m>>1), Compact1By2(m>>2)
+end
 
 function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_str,
         sub_transform_nm, orientation, in_subtile_aabb)
@@ -207,7 +224,10 @@ function process_input_tile()
 
   # for each input subtile, recursively traverse the output tiles
   shape_leaf_ptr = pointer(convert(Array{Cuint,1},vcat(shape_leaf_px,nchannels)))
-  for ix=1:length(xlims)-1, iy=1:length(ylims)-1, iz=1:length(zlims)-1
+  for m=1:max(nxlims,nylims,nzlims)^3
+    ix,iy,iz = morton_decode(m)
+    (ix>nxlims-1 || iy>nylims-1 || iz>nzlims-1) && continue
+
     info("processing transform ",xlims[ix:ix+1],"-",ylims[iy:iy+1],"-",zlims[iz:iz+1],
           " for input tile ",in_tile_idx, prefix="PEON: ")
     t1=time()
