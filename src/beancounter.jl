@@ -54,7 +54,7 @@ end
 
 
 ### resource usage over time
-units = Dict('K'=>10^3, 'M'=>10^6, 'G'=>10^9, '0'=>1)
+units = Dict('B'=>1', 'K'=>10^3, 'M'=>10^6, 'G'=>10^9)
 
 data = Dict{String,Matrix{Float32}}()
 open(`tar xzfO $(joinpath(destination,"logs.tar.gz")) monitor.log`) do stream 

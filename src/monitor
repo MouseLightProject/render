@@ -30,13 +30,13 @@ display_it() {
     echo
   fi; }
 
-human_readable() {
+human_readable() {  # assumes $1 is in KB
   if [ "${#1}" -gt "9" ] ; then
-    echo ${1:0:-9}G
+    echo ${1:0:-9}T
   elif [ "${#1}" -gt "6" ] ; then
-    echo ${1:0:-6}M
+    echo ${1:0:-6}G
   elif [ "${#1}" -gt "3" ] ; then
-    echo ${1:0:-3}K
+    echo ${1:0:-3}M
   else
     echo ${1}B
   fi; }
