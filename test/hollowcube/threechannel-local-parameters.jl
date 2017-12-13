@@ -62,6 +62,7 @@ const include_origins_outside_roi=false   # set to true to render all of small t
 
 
 const max_pixels_per_leaf=50^3  # maximum number of pixels in output tiles
+const leaf_dim_divisible_by=2    # each dim of leafs should be divisible by this
 
 const max_tilechannels_per_job=500  # maximum number of input tiles * nchannels per cluster job
 # larger is more efficient with file i/o; smaller is more parallel computation

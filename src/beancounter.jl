@@ -20,7 +20,7 @@ end
 
 for var in ["reading input tile", "initializing", "transforming", "saving output tiles", "waiting", "overall",
             "peons", "squatters", "merging",
-            "copying single", "merging multiple", "clearing multiple", "reading multiple", "max'ing multiple", "deleting multiple", "writing multiple",
+            "copying / moving single", "merging multiple", "clearing multiple", "reading multiple", "max'ing multiple", "deleting multiple", "writing multiple",
             "clearing octree", "downsampling octree", "saving octree"]
   idx = map(x->ismatch(Regex(".*"*var*".*"),x), data)
   any(idx) || continue
@@ -37,7 +37,7 @@ end
 plots=Plot[]
 
 x = ["reading input tile", "initializing", "transforming", "saving output tiles", "waiting",
-     "copying single", "merging multiple", "clearing multiple", "reading multiple", "max'ing multiple", "deleting multiple", "writing multiple",
+     "copying / moving single", "merging multiple", "clearing multiple", "reading multiple", "max'ing multiple", "deleting multiple", "writing multiple",
      "clearing octree", "downsampling octree", "saving octree"]
 y = map(x->replace(x," ","_")*"_sum", x)
 y = [@eval $(Symbol(x)) for x in y]

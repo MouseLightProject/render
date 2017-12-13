@@ -293,10 +293,15 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
     for c=1:nchannels
       from_file = string(in_tiles[1],'.',c-1,'.',suffix)
       to_file = joinpath(destination, out_tile_path, string(prefix,'.',c-1,'.',suffix))
-      info("copying from ",from_file)
-      info("  to ",to_file)
-      cp(from_file,to_file)
-      delete && (info("  deleting ",from_file); rm(from_file))
+      if delete
+        info("moving from ",from_file)
+        info("  to ",to_file)
+        mv(from_file,to_file)
+      else
+        info("copying from ",from_file)
+        info("  to ",to_file)
+        cp(from_file,to_file)
+      end
     end
     time_single_file=(time()-t0)
   elseif length(in_tiles)>1
@@ -444,7 +449,7 @@ function merge_output_tiles(source, destination, prefix, suffix, out_tile_path,
   accumulate_times(fetch(merge_across_filesystems(
         source, destination, prefix, suffix, out_tile_path, recurse, octree, delete)))
 
-  info("copying single files took ",signif(time_single_file,4)," sec")
+  info("copying / moving single files took ",signif(time_single_file,4)," sec")
   info("merging multiple files took ",signif(time_many_files,4)," sec")
   info("  clearing multiple files took ",signif(time_clear_files,4)," sec")
   info("  reading multiple files took ",signif(time_read_files,4)," sec")
