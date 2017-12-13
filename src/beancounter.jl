@@ -6,9 +6,12 @@ const destination = ARGS[1]
 
 using Gadfly, Colors
 
+log_tar_gz = joinpath(destination,"logs.tar.gz")
+
 ### profile chart
 data = String[]
-open(`tar xzfO $(joinpath(destination,"logs.tar.gz"))`) do stream 
+open(`ls`)  ### hack for julia 0.6
+open(`tar xzfO $log_tar_gz`) do stream 
   while ~eof(stream)
     line = readline(stream,chomp=false)
     contains(line,"took") && push!(data,line)
@@ -42,6 +45,12 @@ push!(plots, plot(x=x, y=y./3600, Geom.bar,
       Guide.xlabel(""), Guide.ylabel("CPU time (hr)"), Guide.title(basename(destination)),
       color=[fill("leaf",5)...;fill("merge",7)...;fill("octree",3)...],
       Scale.color_discrete_manual("red","green","blue")))
+
+
+if !success(pipeline(`tar tf $log_tar_gz`,`grep monitor.log`))
+  draw(PDF(joinpath(destination,"beancounter.pdf"), 4inch, 3inch), plots[1])
+  exit()
+end
 
 
 ### resource usage over time

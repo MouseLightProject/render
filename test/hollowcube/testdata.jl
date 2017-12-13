@@ -32,7 +32,7 @@ scratchpath = joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch")
 
 @testset "onechannel-$v" for v in ["local", "cluster"]
   check_permissions(joinpath(scratchpath,"onechannel-$v","results"))
-  check_logfiles(joinpath(scratchpath,"onechannel-$v","logfile_scratch"), 1)
+  check_logfiles(joinpath(scratchpath,"onechannel-$v","results","logs.tar.gz"), 1)
   check_toplevel_images(joinpath(scratchpath,"onechannel-$v","results"),1)
 end
 
@@ -42,7 +42,7 @@ end
 
 @testset "threechannel-$v" for v in ["local", "cluster"]
   check_permissions(joinpath(scratchpath,"threechannel-$v","results"))
-  check_logfiles(joinpath(scratchpath,"threechannel-$v","logfile_scratch"), 1)
+  check_logfiles(joinpath(scratchpath,"threechannel-$v","results","logs.tar.gz"), 1)
   check_toplevel_images(joinpath(scratchpath,"threechannel-$v","results"),2)
 end
 
@@ -52,25 +52,27 @@ end
 end
 
 @testset "linearinterp" begin
-  check_logfiles(joinpath(scratchpath,"linearinterp-onechannel","logfile_scratch"), 1)
+  check_logfiles(joinpath(scratchpath,"linearinterp-onechannel","results","logs.tar.gz"), 1)
   check_images(scratchpath, ["linearinterp-onechannel/results"], 1, 64+8+1, false)
-  check_logfiles(joinpath(scratchpath,"linearinterp-threechannel","logfile_scratch"), 1)
-  check_logfiles(joinpath(scratchpath,"linearinterp-threechannel-cpu","logfile_scratch"), 1)
+  check_logfiles(joinpath(scratchpath,"linearinterp-threechannel","results","logs.tar.gz"), 1)
+  check_logfiles(joinpath(scratchpath,"linearinterp-threechannel-cpu","results","logs.tar.gz"), 1)
   check_images(scratchpath, ["linearinterp-threechannel/results","linearinterp-threechannel-cpu/results"], 3, 3*(64+8+1), false)
   info("it is normal to have 68 avx images each have ~1000 voxels be 257 shades different compared to cpu")
 end
 
 @testset "nslots" begin
-  check_logfiles(joinpath(scratchpath,"nslots","logfile_scratch"), 1)
+  check_logfiles(joinpath(scratchpath,"nslots","results","logs.tar.gz"), 1)
   check_images(scratchpath, ["onechannel-cluster/results", "nslots/results"], 1, 64+8+1, true)
   check_toplevel_images(joinpath(scratchpath,"nslots","results"),1)
 
   function nslots(scratchpath, rightanswer)
     r = "MANAGER: $rightanswer CPUs"
-    squatters = filter(file->contains(file,"squatter"), readdir(joinpath(scratchpath,"logfile_scratch")))
+    logfilepath = joinpath(scratchpath,"results","logs.tar.gz")
+    squatters = filter(file->contains(file,"squatter"), readlines(`tar tvzf $logfilepath`))
     ncache = []
     for squatter in squatters
-      log = readlines(joinpath(scratchpath,"logfile_scratch",squatter))
+      squatter_file = split(squatter,' ')[end]
+      log = readlines(`tar xvzfO $logfilepath $squatter_file`)
       @test any(line->startswith(line,r), log)
       idx = findfirst(line->startswith(line,"MANAGER: allocated RAM for"), log)
       push!(ncache, parse(Int, split(log[idx])[5]))
@@ -88,7 +90,7 @@ end
 @testset "keepscratch" begin
   check_permissions(joinpath(scratchpath,"keepscratch","results"))
   check_permissions(joinpath(scratchpath,"keepscratch","shared_scratch"))
-  check_logfiles(joinpath(scratchpath,"keepscratch","logfile_scratch"), 1)
+  check_logfiles(joinpath(scratchpath,"keepscratch","results","logs.tar.gz"), 1)
   check_images(scratchpath, ["onechannel-local/results", "keepscratch/results"], 1, 64+8+1, true)
   check_toplevel_images(joinpath(scratchpath,"keepscratch","results"),1)
 

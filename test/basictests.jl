@@ -1,19 +1,21 @@
 function check_logfiles(logfilepath, correct_nmergelogs)
-  logfiles = readdir(logfilepath)
+  logfiles = readlines(`tar tvzf $logfilepath`)
 
   # all log files exist?
-  @test any(logfiles.=="render.log")
-  @test any(logfiles.=="director.log")
-  @test any(logfiles.=="monitor.log")
-  @test any(file->startswith(file,"squatter"), logfiles)
-  @test sum(map(x->startswith(x, "merge"), logfiles)) == correct_nmergelogs
+  @test any(x->endswith(x,"render.log"), logfiles)
+  @test any(x->endswith(x,"director.log"), logfiles)
+  #@test any(x->endswith(x,"monitor.log"), logfiles)
+  @test any(x->endswith(x,"squatter1.log"), logfiles)
+  @test sum(map(x->contains(x, "merge"), logfiles)) == correct_nmergelogs
 
   # any errors reported in the log files?
-  for logfile in logfiles
-    log = read(joinpath(logfilepath,logfile))
-    @test !contains(String(log), "ERR")
-    @test !contains(String(log), "WAR")
-    @test !contains(String(log), "Segmentation")
+  log = readlines(pipeline(`tar xvzfO $logfilepath`, stderr=DevNull))
+  for err in ["ERR","Err","WAR","War","Segmentation"]
+    badlines = filter(x->contains(x,err) && !contains(x,"can't delete"), log)
+    @test length(badlines)==0
+    for badline in badlines
+      println(badline)
+    end
   end
 end
 

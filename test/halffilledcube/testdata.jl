@@ -17,7 +17,7 @@ scratchpath = joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube/scratc
 @testset "halffilledcube" begin
 
 @testset "$v" for v in ["cpu", "avx", "localscratch"]
-  check_logfiles( joinpath(scratchpath,"$v","logfile_scratch"), 512+1)
+  check_logfiles( joinpath(scratchpath,"$v","results","logs.tar.gz"), 512+1)
   check_toplevel_images(joinpath(scratchpath,"$v","results"))
 end
 
@@ -27,8 +27,9 @@ end
 end
 
 @testset "localscratch" begin
-  log = readlines(joinpath(scratchpath,"localscratch","logfile_scratch","squatter1.log"))
-  @test any(log.=="MANAGER: allocated RAM for 1 output tiles\n")
+  logfilepath = joinpath(scratchpath,"localscratch","results","logs.tar.gz")
+  log = readlines(`tar xvzfO $logfilepath squatter1.log`)
+  @test any(log.=="MANAGER: allocated RAM for 1 output tiles")
   @test any(line->contains(line,"to local_scratch"), log)
 end
 

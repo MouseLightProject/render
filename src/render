@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# usage: ./render <copy_of_parameters.jl>
+# usage: src/render <copy_of_parameters.jl>
 
 # git-pull will complain if parameters.jl is modified
 
@@ -117,7 +117,7 @@ if [ "$nlevels" -gt "2" ]; then
        date;
        hostname;
        $JULIA -e '$expr';
-       date;"
+       date"
   echo $cmd &>> $logfile_scratch/render.log
   if [ $which_cluster == 'janelia' ]; then
     echo $cmd | bsub -P $bill_userid -J ${jobname}2[1-512]%${throttle_octree_njobs} \
@@ -150,7 +150,7 @@ cmd="umask 002;
      date;
      hostname;
      $JULIA -e '$expr';
-     date;"
+     date"
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | bsub -P $bill_userid -J ${jobname}3 \
@@ -165,26 +165,6 @@ else
   ssh ${which_cluster%%,*} $pcmd  &>> $logfile_scratch/render.log
 fi
 
-# delete shared_scratch
-if [ $delete_scratch != 'never' ]; then
-  cmd="date;
-       hostname;
-       df -h $shared_scratch;
-       echo deleting shared_scratch = $shared_scratch;
-       rm -rf $shared_scratch;
-       echo ./savelogs $destination | mail -s \"job $jobname finished\" $notify_addr;
-       date"
-  echo $cmd &>> $logfile_scratch/render.log
-  if [ $which_cluster == 'janelia' ]; then
-    echo $cmd | bsub -P $bill_userid -J ${jobname}4 \
-          -w "done(${jobname}3)" -W $time_limit \
-          -o $logfile_scratch/render.log
-          #-m e -M $notify_addr
-  else
-    eval $cmd &>> $logfile_scratch/render.log
-  fi
-fi
-
 # email user
 echo watch -n 60 tail -n '$((LINES-2))' $logfile_scratch/monitor.log | mail -s "job $jobname started" $notify_addr
 
@@ -192,3 +172,39 @@ echo watch -n 60 tail -n '$((LINES-2))' $logfile_scratch/monitor.log | mail -s "
 nohup sh -c "sleep 60; ${RENDER_PATH}/src/render/src/monitor $jobname $destination/set_parameters.jl &> ${logfile_scratch}/monitor.log" 2>/dev/null &
 
 date >> $logfile_scratch/render.log
+
+# delete shared_scratch
+if [ $delete_scratch != 'never' ]; then
+  cmd="date;
+       hostname;
+       df -h $shared_scratch;
+       echo deleting shared_scratch = $shared_scratch;
+       rm -rf $shared_scratch;
+       date"
+  echo $cmd &>> $logfile_scratch/render.log
+  if [ $which_cluster == 'janelia' ]; then
+    echo $cmd | bsub -P $bill_userid -J ${jobname}4 \
+          -w "done(${jobname}3)" -W $time_limit
+  else
+    eval $cmd
+  fi
+fi
+
+# tar log files, profile
+cmd="date;
+     hostname;
+     echo tar\'ing log files in $logfile_scratch;
+     cd $logfile_scratch;
+     tar czf $destination/logs.tar.gz *log;
+     echo deleting logfile_scratch = $logfile_scratch;
+     rm -rf $logfile_scratch;
+     echo running beancounter;
+     $JULIA ${RENDER_PATH}/src/render/src/beancounter.jl $destination;
+     date"
+echo $cmd &>> $logfile_scratch/render.log
+if [ $which_cluster == 'janelia' ]; then
+  echo $cmd | bsub -P $bill_userid -J ${jobname}5 \
+        -w "done(${jobname}3)" -W $time_limit
+else
+  eval $cmd
+fi
