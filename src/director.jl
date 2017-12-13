@@ -31,20 +31,23 @@ tiles_bbox = AABBGetJ(TileBaseAABB(tiles))
 const shape_tiles_nm = tiles_bbox[3]
 const nlevels = max(0, ceil(Int,
     log(8, prod(map(Float64,shape_tiles_nm)) / (prod(voxelsize_um)*um2nm^3) / max_pixels_per_leaf) ))
-shape_leaf_tmp = round.(Int, round.(shape_tiles_nm./um2nm./voxelsize_um./2^nlevels, -1, 2))
-# there must be better ways to ensure
-# that prod(shape_leaf_px) is divisible by 32*32*4, and
-# that each element is even
+shape_leaf_px_initial = round.(Int, round.(shape_tiles_nm./um2nm./voxelsize_um./2^nlevels, -1, 2))
+# ensure that the leaf volume is divisible by 32*32*4 (for GPU), and
+# that each leaf dimension is divisible by leaf_dim_divisible_by (for chunking)
 xyz=Array{Int}(3)
 cost=Inf32
-for x=-20:2:20, y=-20:2:20, z=-20:2:20
-  if mod(prod(shape_leaf_tmp+[x,y,z]),32*32*4)==0 && sum(abs.([x,y,z]))<cost
+const shape_leaf_dim_search_range = -20:2:20
+for x=shape_leaf_dim_search_range, y=shape_leaf_dim_search_range, z=shape_leaf_dim_search_range
+  if mod(prod(shape_leaf_px_initial+[x,y,z]), 32*32*4)==0 &&
+     all(map(x->mod(x,leaf_dim_divisible_by), shape_leaf_px_initial+[x,y,z]).==0) &&
+     sum(abs.([x,y,z]))<cost
     xyz=[x,y,z]
     cost=sum(abs.([x,y,z]))
+    info("adjusting leaf_shape: cost=",cost," delta_xyz=",xyz, prefix="DIRECTOR: ")
   end
 end
 cost==Inf32 && error("can't find satisfactory shape_leaf_px")
-const shape_leaf_px = shape_leaf_tmp+xyz
+const shape_leaf_px = shape_leaf_px_initial+xyz
 const voxelsize_used_um = shape_tiles_nm./um2nm./2^nlevels ./ shape_leaf_px
 
 git_version(path) = readchomp(`git --git-dir=$(path)/.git log -1 --pretty=format:"%ci %H"`)
