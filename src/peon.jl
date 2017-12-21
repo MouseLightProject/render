@@ -8,7 +8,8 @@
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
-include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
+include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
+include(joinpath(ENV["RENDER_PATH"],"src/render/src/morton.jl"))
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
 const origin_str = ARGS[3]
@@ -56,21 +57,6 @@ const merge_count = Dict{String,Array{UInt8,1}}()
 
 # 2 -> sizeof(UInt16), 20e3 -> .tif metadata size, 15 -> max # possible concurrent saves, need to generalize
 enough_free(path) = parse(Int,split(readstring(`df $path`))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
-
-### https://fgiesen.wordpress.com/2009/12/13/decoding-morton-codes/
-function Compact1By2(x)
-  x &= 0x09249249;                   # x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
-  x = (x | (x >>  2)) & 0x030c30c3;  # x = ---- --98 ---- 76-- --54 ---- 32-- --10
-  x = (x | (x >>  4)) & 0x0300f00f;  # x = ---- --98 ---- ---- 7654 ---- ---- 3210
-  x = (x | (x >>  8)) & 0xff0000ff;  # x = ---- --98 ---- ---- ---- ---- 7654 3210
-  x = (x | (x >> 16)) & 0x000003ff;  # x = ---- ---- ---- ---- ---- --98 7654 3210
-  x+1
-end
-
-function morton_decode(m)
-  m -= 1
-  Compact1By2(m>>0), Compact1By2(m>>1), Compact1By2(m>>2)
-end
 
 function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_str,
         sub_transform_nm, orientation, in_subtile_aabb)
@@ -208,7 +194,7 @@ function process_input_tile()
   global data_type = ndtype(tmp)
   in_tile_ws = ndalloc(shape_intile, data_type)
   in_tile_jl = unsafe_wrap(Array, convert(Ptr{UInt16},nddata(in_tile_ws)),
-        tuple(shape_intile...)::Tuple{UInt,UInt,UInt,UInt})
+        tuple(shape_intile...)::Tuple{UInt,UInt,UInt,UInt});
   in_subtile_ws = ndinit()
   ndcast(in_subtile_ws, data_type)
   tmp=split(unsafe_string(TilePath(tile)),"/")
@@ -225,7 +211,7 @@ function process_input_tile()
   # for each input subtile, recursively traverse the output tiles
   shape_leaf_ptr = pointer(convert(Array{Cuint,1},vcat(shape_leaf_px,nchannels)))
   for m=1:max(nxlims,nylims,nzlims)^3
-    ix,iy,iz = morton_decode(m)
+    ix,iy,iz = morton3cartesian(m)
     (ix>nxlims-1 || iy>nylims-1 || iz>nzlims-1) && continue
 
     info("processing transform ",xlims[ix:ix+1],"-",ylims[iy:iy+1],"-",zlims[iz:iz+1],

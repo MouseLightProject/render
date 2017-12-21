@@ -5,7 +5,7 @@
 # julia squatter.jl parameters.jl hostname port
 
 include(ARGS[1])
-include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
+include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 
 const proc_num = ENV["LSB_JOBINDEX"]
 

@@ -10,7 +10,7 @@ info(readchomp(`date`), prefix="DIRECTOR: ")
 info(readchomp(`hostname`), prefix="DIRECTOR: ")
 
 include(ARGS[1])
-include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
+include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 
 const jobname = ARGS[2]
 const tiles = TileBaseOpen(source)

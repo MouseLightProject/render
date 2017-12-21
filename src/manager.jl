@@ -15,7 +15,7 @@ try;  global proc_num = ENV["LSB_JOBINDEX"];  end
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
-include(ENV["RENDER_PATH"]*"/src/render/src/admin.jl")
+include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 
 const origin_strs = ARGS[2:4]
 const shape_strs = ARGS[5:7]

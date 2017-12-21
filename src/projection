@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# usage: src/projection <copy_of_parameters.jl>
+
+export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
+export LD_LIBRARY_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/env/lib:/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.6.0/bin/julia
+export JULIA_PKGDIR=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.6.0/share/julia/site
+
+umask 002
+
+# get vars from parameters.jl file
+expr="print(join([bill_userid,frompath,topath,which_cluster,throttle,delete_scratch],' '))"
+read -a tmp <<< $($JULIA -L $1 -e "$expr")
+bill_userid=${tmp[0]}
+frompath=${tmp[1]}
+topath=${tmp[2]}
+which_cluster=${tmp[3]}
+throttle=${tmp[4]}
+delete_scratch=${tmp[5]}
+
+# get vars from calculated_parameters.jl file
+expr="print(nlevels)"
+nlevels=$($JULIA -L ${frompath}/calculated_parameters.jl -e "$expr")
+
+if [ -d $topath ] ; then
+  echo "deleting topath = $topath"
+  rm -rf $topath
+fi
+mkdir -p $topath/logs
+
+date >> ${topath}/logs/projection.log
+hostname >> ${topath}/logs/projection.log
+
+# copy parameters to <destination>
+cp $1 $topath/set_parameters.jl
+chmod g+rw $topath/set_parameters.jl
+
+# create a probably-unique job name
+jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
+echo jobname = $jobname >> ${topath}/logs/projection.log
+
+cmd="umask 002;
+     date;
+     hostname;
+     $JULIA ${RENDER_PATH}/src/render/src/projection1.jl ${topath}/set_parameters.jl \$LSB_JOBINDEX;
+     date"
+echo $cmd &>> ${topath}/logs/projection.log
+nface_leafs=$((4**nlevels))
+if [ $which_cluster == 'janelia' ]; then
+  echo $cmd | bsub -P $bill_userid \
+        -J ${jobname}1[1-$nface_leafs]%$throttle \
+        -n 2 \
+        -W 60 -o ${topath}/logs/projection%I.log
+else
+  pcmd="export RENDER_PATH=$RENDER_PATH;
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
+        export JULIA=$JULIA;
+        export JULIA_PKGDIR=$JULIA_PKGDIR;
+        export HOSTNAME=$HOSTNAME;
+        export LSB_JOBINDEX={};
+        { $cmd } &> ${topath}/logs/projection{}.log"
+  parallel -S $which_cluster $pcmd ::: `seq 0 $nface_leafs` &>> ${topath}/logs/projection.log
+fi
+
+cmd="umask 002;
+     date;
+     hostname;
+     $JULIA ${RENDER_PATH}/src/render/src/projection2.jl ${topath}/set_parameters.jl;
+     date"
+echo $cmd &>> ${topath}/logs/projection.log
+if [ $which_cluster == 'janelia' ]; then
+  echo $cmd | bsub -P $bill_userid \
+        -J ${jobname}2 \
+        -n 4 \
+        -W 60 -o ${topath}/logs/projection.log \
+        -w ${jobname}1
+else
+  eval $cmd &>> ${topath}/logs/projection.log
+fi
+
+if [ $delete_scratch == 'yes' ]; then
+  cmd="umask 002;
+       date;
+       hostname;
+       du -sh ${topath}/tiles;
+       echo deleting scratch = ${topath}/tiles;
+       rm -rf ${topath}/tiles;
+       date"
+  echo $cmd &>> ${topath}/logs/projection.log
+  if [ $which_cluster == 'janelia' ]; then
+    echo $cmd | bsub -P $bill_userid \
+          -J ${jobname}3 \
+          -W 60 -o ${topath}/logs/projection.log \
+          -w ${jobname}2
+  else
+    eval $cmd &>> ${topath}/logs/projection.log
+  fi
+fi

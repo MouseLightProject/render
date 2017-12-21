@@ -187,10 +187,13 @@ if [ $delete_scratch != 'never' ]; then
   echo $cmd &>> $logfile_scratch/render.log
   if [ $which_cluster == 'janelia' ]; then
     echo $cmd | bsub -P $bill_userid -J ${jobname}4 \
-          -w "done(${jobname}3)" -W $time_limit
+          -w "done(${jobname}3)" -W $time_limit \
+          -o ${destination}/delete.log
   else
-    eval $cmd
+    eval $cmd &> ${destination}/delete.log
   fi
+else
+  touch ${destination}/delete.log
 fi
 
 # tar log files, profile
@@ -207,7 +210,8 @@ cmd="date;
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | bsub -P $bill_userid -J ${jobname}5 \
-        -w "done(${jobname}3)" -W $time_limit
+        -w "done(${jobname}3)" -W $time_limit \
+        -o ${destination}/tar-profile.log
 else
-  eval $cmd
+  eval $cmd &> ${destination}/tar-profile.log
 fi
