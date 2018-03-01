@@ -51,7 +51,7 @@ if [ $which_cluster == 'janelia' ]; then
   echo $cmd | bsub -P $bill_userid \
         -J ${jobname}1[1-$nface_leafs]%$throttle \
         -n 2 \
-        -W 60 -o ${topath}/logs/projection%I.log
+        -o ${topath}/logs/projection%I.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH;
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
