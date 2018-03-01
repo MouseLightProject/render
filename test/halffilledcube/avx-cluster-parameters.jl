@@ -5,7 +5,8 @@ const source=joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube") # pat
 const destination=joinpath(source,"scratch","avx-cluster","results")  # path to octree
 
 const file_infix="halffilledcube"
-const file_format="tif"  # "tif" or "h5"
+const file_format_load="tif"  # "tif" or "h5"
+const file_format_save="tif"  # "tif" or "h5"
 
 const shared_scratch=joinpath(source,"scratch","avx-cluster","shared_scratch")
 const logfile_scratch=joinpath(source,"scratch","avx-cluster","logfile_scratch")  # should be on /groups

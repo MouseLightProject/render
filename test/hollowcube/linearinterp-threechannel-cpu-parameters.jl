@@ -6,7 +6,8 @@ const source=joinpath(scratchpath,"data/threechannel") # path to tilebase.cache.
 const destination=joinpath(scratchpath,"linearinterp-threechannel-cpu","results")  # path to octree
 
 const file_infix="hollowcube"
-const file_format="tif"  # "tif" or "h5"
+const file_format_load="tif"  # "tif" or "h5"
+const file_format_save="tif"  # "tif" or "h5"
 
 const shared_scratch=joinpath(scratchpath,"linearinterp-threechannel-cpu","shared_scratch")
 const logfile_scratch=joinpath(scratchpath,"linearinterp-threechannel-cpu","logfile_scratch")  # should be on /groups

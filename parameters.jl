@@ -5,7 +5,8 @@ const source="/groups/mousebrainmicro/stitch/..."  # path to tilebase.cache.yml
 const destination="/nrs/mouselight/..."  # path to octree
 
 const file_infix="ngc"
-const file_format="tif"  # "tif" or "h5"
+const file_format_load="tif"  # "tif" or "h5"
+const file_format_save="tif"  # "tif" or "h5"
 
 const shared_scratch="/nrs/mouselight/scratch/<yourId>"
 const logfile_scratch="/groups/mousebrainmicro/mousebrainmicro/scratch/<yourId>"  # should be on /groups

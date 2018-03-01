@@ -6,7 +6,8 @@ const source=joinpath(scratchpath,"data/onechannel") # path to tilebase.cache.ym
 const destination=joinpath(scratchpath,"nslots","results")  # path to octree
 
 const file_infix="hollowcube"
-const file_format="tif"  # "tif" or "h5"
+const file_format_load="tif"  # "tif" or "h5"
+const file_format_save="tif"  # "tif" or "h5"
 
 const shared_scratch=joinpath(scratchpath,"nslots","shared_scratch")
 const logfile_scratch=joinpath(scratchpath,"nslots","logfile_scratch")  # should be on /groups

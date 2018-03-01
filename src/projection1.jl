@@ -74,7 +74,7 @@ stack = Array{UInt16}(stack_size...);
 
 for ileaf in eachindex(leaf_paths)
   in_path = joinpath(frompath, join(leaf_paths[ileaf],Base.Filesystem.path_separator))
-  ndioClose(ndioRead(ndioOpen( string(in_path,"/default.%.",file_format), C_NULL, "r" ),read_ws))
+  ndioClose(ndioRead(ndioOpen( string(in_path,"/default.%.",file_format_save), C_NULL, "r" ),read_ws))
   stack_index = Any[:,:,:,:]
   stack_index[axis] = (ileaf-1)*size(read_jl)[axis]+1 : ileaf*size(read_jl)[axis]
   stack[stack_index...] = read_jl
@@ -106,4 +106,4 @@ end
 mkpath(joinpath(topath,"tiles"))
 out_path = joinpath(topath, "tiles", join(face_leaf_path))
 info("saving to ",out_path)
-ndioClose(ndioWrite(ndioOpen( string(out_path,".",file_format), C_NULL, "w" ),projection_ws))
+ndioClose(ndioWrite(ndioOpen( string(out_path,".",file_format_save), C_NULL, "w" ),projection_ws))

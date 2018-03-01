@@ -23,7 +23,7 @@ tif_files = filter(x->ismatch(r"^[1-8].*\.tif",x), readdir(joinpath(topath,"tile
 for tile in unique([split(x,'.')[1] for x in tif_files])
   info(tile)
   in_path = joinpath(topath,"tiles",tile)
-  img = load(in_path*'.'*file_format)
+  img = load(in_path*'.'*file_format_save)
 
   quadtree_path = [parse(Int,x) for x in tile[1:nlevels]]
   if axis==1
@@ -44,7 +44,7 @@ end
 out_path = joinpath(topath, "projection-$(projection_size[1])x$(projection_size[2])")
 info("saving to ",out_path)
 flip = projection_size[1]>projection_size[2]
-save(out_path*'.'*file_format, flip ? transpose(projection_img) : projection_img)
+save(out_path*'.'*file_format_save, flip ? transpose(projection_img) : projection_img)
 
 for output_pixel_size_um in output_pixel_sizes_um
   downsample_by = output_pixel_size_um ./ voxelsize_used_um[setdiff(1:3,axis)]
@@ -57,5 +57,5 @@ for output_pixel_size_um in output_pixel_sizes_um
   out_path = joinpath(topath, "projection-$(downsample_size[1])x$(downsample_size[2])-$(output_pixel_size_um)um")
   info("saving to ",out_path)
   flip = downsample_size[1]>downsample_size[2]
-  save(out_path*'.'*file_format, flip ? transpose(downsample_img) : downsample_img)
+  save(out_path*'.'*file_format_save, flip ? transpose(downsample_img) : downsample_img)
 end

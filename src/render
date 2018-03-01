@@ -138,7 +138,7 @@ if [ "$nlevels" -gt "2" ]; then
         frompath = downsample_from_existing_leaves ? destination : shared_scratch;
         delete_flag = !downsample_from_existing_leaves && delete_scratch==\"as-you-go\";
         if isdir(joinpath(frompath,string(oct1),string(oct2),string(oct3)))
-          merge_output_tiles(frompath, destination, \"default\", file_format,
+          merge_output_tiles(frompath, destination, \"default\", file_format_save,
                 string(oct1)*\"/\"*string(oct2)*\"/\"*string(oct3), true, true, delete_flag);
           info(\"merging took \",string(round(Int,time()-t)),\" sec\");
         end;
@@ -173,7 +173,7 @@ expr="p=addprocs(${throttle_octree_ncores_per_job});
       t=time();
       frompath = (nlevels>2 || downsample_from_existing_leaves) ? destination : shared_scratch;
       delete_flag = !downsample_from_existing_leaves && delete_scratch==\"as-you-go\";
-      merge_output_tiles(frompath, destination, \"default\", file_format, \"\", true, true, delete_flag);
+      merge_output_tiles(frompath, destination, \"default\", file_format_save, \"\", true, true, delete_flag);
       info(\"merging took \",string(round(Int,time()-t)),\" sec\");
       rmprocs(p);"
 cmd="umask 002;
