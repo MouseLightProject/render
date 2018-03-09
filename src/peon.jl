@@ -103,7 +103,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
       if merge_count[out_tile_path_next][2]==merge_count[out_tile_path_next][1]
         t0=time()
         if out_tile_path_next in solo_out_tiles
-          save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,".%.",file_format_save),
+          save_tile(shared_scratch, out_tile_path_next, origin_str, file_format_save,
               out_tiles_ws[out_tile_path_next])
           info("transfered output tile ",out_tile_path_next," from RAM to shared_scratch", prefix="PEON: ")
         else
@@ -133,23 +133,23 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
             end
             out_tile_from_manager = Array{UInt16}(0,0,0,0)
             gc()
-            save_out_tile(shared_scratch, out_tile_path_next, string(origin_str,".%.",file_format_save),
+            save_tile(shared_scratch, out_tile_path_next, origin_str, file_format_save,
                   out_tiles_ws[out_tile_path_next])
             msg = string("peon for input tile ",in_tile_idx," saved output tile ",out_tile_path_next)
             println(sock,msg)
             info(msg, prefix="PEON: ")
           elseif startswith(msg_from_manager, write_msg) || startswith(msg_from_manager, merge_msg)
             if enough_free(local_scratch)
-              save_out_tile(local_scratch, out_tile_path_next,
-                    string(in_tile_idx,'.',sub_tile_str,".%.",file_format_save),
+              save_tile(local_scratch, out_tile_path_next,
+                    string(in_tile_idx,'.',sub_tile_str), file_format_save,
                     out_tiles_ws[out_tile_path_next])
               msg = string("peon for input tile ",in_tile_idx,
                     " wrote output tile ",out_tile_path_next," to local_scratch")
               println(sock,msg)
               info(msg, prefix="PEON: ")
             else
-              save_out_tile(shared_scratch, out_tile_path_next,
-                    string(origin_str,'.',in_tile_idx,'.',sub_tile_str,".%.",file_format_save),
+              save_tile(shared_scratch, out_tile_path_next,
+                    string(origin_str,'.',in_tile_idx,'.',sub_tile_str), file_format_save,
                     out_tiles_ws[out_tile_path_next])
               msg = string("peon for input tile ",in_tile_idx,
                     " wrote output tile ",out_tile_path_next," to shared_scratch")
@@ -198,13 +198,13 @@ function process_input_tile()
   in_subtile_ws = ndinit()
   ndcast(in_subtile_ws, data_type)
   tmp=split(unsafe_string(TilePath(tile)),"/")
-  push!(tmp, string(tmp[end],'-',file_infix,".%.",file_format_load))
-  ndioClose(ndioRead(ndioOpen("/"*joinpath(tmp...), C_NULL, "r"), in_tile_ws))
+  push!(tmp, string(tmp[end],'-',file_infix))
+  load_tile("/"*joinpath(tmp...),file_format_load,in_tile_ws)
   info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec", prefix="PEON: ")
   filename = "/"*joinpath(tmp...)
-  for ratio in octree_compression_ratios
-    spawn(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $(dirname(filename)) $(splitext(basename(filename))[1]) 0`)
-  end
+  #for ratio in octree_compression_ratios
+  #  spawn(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $(dirname(filename)) $(basename(filename)) 0`)
+  #end
 
   global in_subtiles_aabb = calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
 

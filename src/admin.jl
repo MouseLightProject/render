@@ -236,20 +236,26 @@ end
 
 :shape_leaf_px in names(Main) && (save_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type, false))
 
-function save_out_tile(filesystem, path, name, data::AbstractArray{UInt16})
-  ndref(save_ws, pointer(data), convert(Cint,0))   # 0==nd_heap;  need to generalize
-  save_out_tile(filesystem, path, name, save_ws)
+function load_tile(filename,ext,data::Ptr{Void})
+  filepath = string(filename,".%.",ext)
+  ndioClose(ndioRead(ndioOpen( filepath, C_NULL, "r" ),data))
 end
 
-function save_out_tile(filesystem, path, name, data::Ptr{Void})
+function save_tile(filesystem, path, basename, ext, data::AbstractArray{UInt16})
+  ndref(save_ws, pointer(data), convert(Cint,0))   # 0==nd_heap;  need to generalize
+  save_tile(filesystem, path, basename, ext, save_ws)
+end
+
+function save_tile(filesystem, path, basename, ext, data::Ptr{Void})
+  name = string(basename,".%.",ext)
   filepath = joinpath(filesystem,path)
   filename = joinpath(filepath,name)
   retry2(()->mkpath(filepath),
       n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="mkpath(\"$filepath\")")()
   ndioClose(ndioWrite(ndioOpen(filename, C_NULL, "w"), data))
-  for ratio in raw_compression_ratios
-    run(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $filepath $(splitext(name)[1]) 0`)
-  end
+#  for ratio in raw_compression_ratios
+#    run(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $filepath $(splitext(name)[1]) 0`)
+#  end
 end
 
 # the merge API could perhaps be simplified. complexity arises because it is called:
@@ -275,6 +281,18 @@ function downsample(out_tile_jl, coord, shape_leaf_px, nchannels, scratch)
   end
 end
 
+function mv_or_cp(from_file, to_file, delete)
+  if delete
+    info("moving from ",from_file)
+    info("  to ",to_file)
+    mv(from_file,to_file)
+  else
+    info("copying from ",from_file)
+    info("  to ",to_file)
+    cp(from_file,to_file)
+  end
+end
+
 function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, recurse, octree, delete, flag,
       in_tiles, out_tile_img, out_tile_img_down)
   time_octree_read = time_octree_down = time_octree_save = 0.0
@@ -288,22 +306,20 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
   retry2(()->mkpath(joinpath(destination,out_tile_path)),
         n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
         message="mkpath(\"$(joinpath(destination,out_tile_path))\")")()
-  destination2 = joinpath(destination, out_tile_path, string(prefix,".%.",suffix))
+  destination2 = joinpath(destination, out_tile_path, prefix)
 
   if length(in_tiles)==1 && !startswith(destination2,in_tiles[1])
     t0=time()
-    for c=1:nchannels
-      from_file = string(in_tiles[1],'.',c-1,'.',suffix)
-      to_file = joinpath(destination, out_tile_path, string(prefix,'.',c-1,'.',suffix))
-      if delete
-        info("moving from ",from_file)
-        info("  to ",to_file)
-        mv(from_file,to_file)
-      else
-        info("copying from ",from_file)
-        info("  to ",to_file)
-        cp(from_file,to_file)
+    if suffix=="tif"
+      for c=1:nchannels
+        from_file = string(in_tiles[1],'.',c-1,'.',suffix)
+        to_file = joinpath(destination, out_tile_path, string(prefix,'.',c-1,'.',suffix))
+        mv_or_cp(from_file, to_file, delete)
       end
+    else
+      from_file = string(in_tiles[1],'.',suffix)
+      to_file = joinpath(destination, out_tile_path, string(prefix,'.',suffix))
+      mv_or_cp(from_file, to_file, delete)
     end
     time_single_file=(time()-t0)
   elseif length(in_tiles)>1
@@ -318,7 +334,7 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
     for in_tile in in_tiles
       info("  reading ",in_tile,".%.",suffix)
       t1=time()
-      ndioClose(ndioRead(ndioOpen( string(in_tile,".%.",suffix), C_NULL, "r" ),merge2_ws))
+      load_tile(in_tile, suffix, merge2_ws)
       time_read_files+=(time()-t1)
       t1=time()
       for i4=1:nchannels, i3=1:shape_leaf_px[3], i2=1:shape_leaf_px[2], i1=1:shape_leaf_px[1]
@@ -327,8 +343,14 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
       time_max_files+=(time()-t1)
       t1=time()
       if delete
-        for c=1:nchannels
-          from_file = string(in_tile,'.',c-1,'.',suffix)
+        if suffix=="tif"
+          for c=1:nchannels
+            from_file = string(in_tile,'.',c-1,'.',suffix)
+            info("  deleting ",from_file)
+            rm(from_file)
+          end
+        else
+          from_file = string(in_tile,'.',suffix)
           info("  deleting ",from_file)
           rm(from_file)
         end
@@ -337,7 +359,7 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
     end
     info("  copying to ",destination2)
     t1=time()
-    save_out_tile(destination, out_tile_path, string(prefix,".%.",suffix), merge1_ws)
+    save_tile(destination, out_tile_path, prefix, suffix, merge1_ws)
     time_write_files=(time()-t1)
     ndfree(merge2_ws)
     time_many_files=(time()-t0)
@@ -346,12 +368,12 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
   if octree
     if length(in_tiles)==1
       t0=time()
-      ndioClose(ndioRead(ndioOpen( destination2, C_NULL, "r" ),merge1_ws))
+      load_tile(destination2,suffix,merge1_ws)
       time_octree_read+=(time()-t0)
     elseif length(in_tiles)==0
       t0=time()
       info("saving output tile ",out_tile_path," to ",destination2)
-      save_out_tile(destination, out_tile_path, string(prefix,".%.",suffix), out_tile_img)
+      save_tile(destination, out_tile_path, prefix, suffix, out_tile_img)
       time_octree_save=(time()-t0)
     end
     if flag
@@ -399,8 +421,9 @@ function merge_across_filesystems(sources::Array{String,1}, destination, prefix,
     dir2 = map(entry->isdir(joinpath(source,out_tile_path,entry)), listing)
     sum(dir2)==0 || push!(dirs, listing[dir2]...)
     img_files = listing[.!dir2 .& map(entry->endswith(entry,suffix), listing)]
-    in_tiles2 = [joinpath(source,out_tile_path,uniq_img_file)
-           for uniq_img_file in unique(map(img_file->join(split(img_file,'.')[1:end-2],'.'), img_files)) ]
+    lopoff = suffix=="tif" ? 2 : 1
+    uniq_img_files = unique(map(img_file->join(split(img_file,'.')[1:end-lopoff],'.'), img_files))
+    in_tiles2 = [joinpath(source,out_tile_path,uniq_img_file) for uniq_img_file in uniq_img_files]
     isempty(in_tiles2) || push!(in_tiles, in_tiles2...)
   end
 
