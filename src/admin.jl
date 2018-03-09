@@ -253,9 +253,6 @@ function save_tile(filesystem, path, basename, ext, data::Ptr{Void})
   retry2(()->mkpath(filepath),
       n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="mkpath(\"$filepath\")")()
   ndioClose(ndioWrite(ndioOpen(filename, C_NULL, "w"), data))
-#  for ratio in raw_compression_ratios
-#    run(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $filepath $(splitext(name)[1]) 0`)
-#  end
 end
 
 # the merge API could perhaps be simplified. complexity arises because it is called:

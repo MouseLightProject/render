@@ -18,10 +18,7 @@ const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size
 
 const interpolation = "nearest"  # "nearest" or "linear"
 
-const raw_compression_ratios = [] # or e.g. [10,80]
-const octree_compression_ratios = []
 const downsample_from_existing_leaves=false
-
 
 # build the octree with a function below.  should return UInt16
 

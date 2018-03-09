@@ -202,9 +202,6 @@ function process_input_tile()
   load_tile("/"*joinpath(tmp...),file_format_load,in_tile_ws)
   info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec", prefix="PEON: ")
   filename = "/"*joinpath(tmp...)
-  #for ratio in octree_compression_ratios
-  #  spawn(`$(ENV["RENDER_PATH"])/src/mj2/compressfiles/run_compressbrain_cluster.sh /usr/local/matlab-2014b $ratio $filename $(dirname(filename)) $(basename(filename)) 0`)
-  #end
 
   global in_subtiles_aabb = calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
 
