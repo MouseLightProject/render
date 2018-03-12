@@ -28,6 +28,8 @@ export LD_LIBRARY_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycent
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.6.0/bin/julia
 export JULIA_PKGDIR=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.6.0/share/julia/site
 
+parameters_file=$1
+
 umask 002
 
 # get vars from parameters.jl file
@@ -160,7 +162,7 @@ if [ "$nlevels" -gt "2" ]; then
           export JULIA_PKGDIR=$JULIA_PKGDIR;
           export HOSTNAME=$HOSTNAME;
           export LSB_JOBINDEX={};
-          { $cmd } &> ${logfile_scratch}/merge{}.log"
+          $cmd &> ${logfile_scratch}/merge{}.log"
     parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq 1 512` &>> $logfile_scratch/render.log
   fi
   hold="-w done(${jobname}2)"
@@ -192,7 +194,7 @@ else
         export JULIA=$JULIA;
         export JULIA_PKGDIR=$JULIA_PKGDIR;
         export HOSTNAME=$HOSTNAME;
-        { $cmd } &> ${logfile_scratch}/merge513.log"
+        $cmd &> ${logfile_scratch}/merge513.log"
   ssh ${which_cluster%%,*} $pcmd  &>> $logfile_scratch/render.log
 fi
 

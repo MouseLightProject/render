@@ -10,7 +10,7 @@ export JULIA_PKGDIR=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric
 umask 002
 
 # get vars from parameters.jl file
-expr="print(join([bill_userid,frompath,topath,which_cluster,throttle,delete_scratch],' '))"
+expr="print(join([bill_userid,frompath,topath,typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),throttle,delete_scratch],' '))"
 read -a tmp <<< $($JULIA -L $1 -e "$expr")
 bill_userid=${tmp[0]}
 frompath=${tmp[1]}
@@ -59,8 +59,8 @@ else
         export JULIA_PKGDIR=$JULIA_PKGDIR;
         export HOSTNAME=$HOSTNAME;
         export LSB_JOBINDEX={};
-        { $cmd } &> ${topath}/logs/projection{}.log"
-  parallel -S $which_cluster $pcmd ::: `seq 0 $nface_leafs` &>> ${topath}/logs/projection.log
+        $cmd &> ${topath}/logs/projection{}.log"
+  parallel -S $which_cluster $pcmd ::: `seq 1 $nface_leafs` &>> ${topath}/logs/projection.log
 fi
 
 cmd="umask 002;
@@ -96,4 +96,22 @@ if [ $delete_scratch == 'yes' ]; then
   else
     eval $cmd &>> ${topath}/logs/projection.log
   fi
+fi
+
+# tar log files
+cmd="date;
+     hostname;
+     echo tar\'ing log files in ${topath}/logs;
+     cd ${topath}/logs;
+     tar czf ${topath}/logs.tar.gz *log;
+     echo deleting ${topath}/logs;
+     rm -rf ${topath}/logs;
+     date"
+echo $cmd &>> ${topath}/logs/projection.log
+if [ $which_cluster == 'janelia' ]; then
+  echo $cmd | bsub -P $bill_userid -J ${jobname}4 \
+        -w "done(${jobname}3)" \
+        -o ${topath}/tar.log
+else
+  eval $cmd &> ${topath}/tar.log
 fi
