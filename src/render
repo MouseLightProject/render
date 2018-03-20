@@ -130,7 +130,9 @@ fi
 
 # downsample the octree
 if [ "$nlevels" -gt "2" ]; then
-  expr="p=addprocs(${throttle_octree_ncores_per_job});
+  expr="import Images, HDF5;
+        p=addprocs(${throttle_octree_ncores_per_job});
+        @everywhere using Images, HDF5;
         @everywhere include(\"${destination}/set_parameters.jl\");
         @everywhere include(\"${destination}/calculated_parameters.jl\");
         @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
@@ -168,7 +170,9 @@ if [ "$nlevels" -gt "2" ]; then
   hold="-w done(${jobname}2)"
 fi
 
-expr="p=addprocs(${throttle_octree_ncores_per_job});
+expr="import Images, HDF5;
+      p=addprocs(${throttle_octree_ncores_per_job});
+      @everywhere using Images, HDF5;
       @everywhere include(\"${destination}/set_parameters.jl\");
       @everywhere include(\"${destination}/calculated_parameters.jl\");
       @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");

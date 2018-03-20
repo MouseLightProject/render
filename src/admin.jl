@@ -52,6 +52,7 @@ end
 
 has_avx2 = contains(readstring("/proc/cpuinfo"),"avx2")
 
+
 # interface to tilebase
 
 const libtilebase = ENV["RENDER_PATH"]*"/env/lib/libtilebase.so"
@@ -99,64 +100,15 @@ function AABBGetJ(bbox)
   ndim[], unsafe_wrap(Array,origin[],ndim[]), unsafe_wrap(Array,shape[],ndim[])
 end
 
+
 # interface to nd
 
-const libnd = ENV["RENDER_PATH"]*"/env/lib/libnd.so"
-
-nullcheck(arg) = arg==C_NULL ? throw(OutOfMemoryError()) : arg
-
-ndinit() = nullcheck( ccall((:ndinit, libnd), Ptr{Void}, ()) )
-ndheap(nd_t) = nullcheck( ccall((:ndheap, libnd), Ptr{Void}, (Ptr{Void},), nd_t) )
-ndfree(nd_t) = ccall((:ndfree, libnd), Void, (Ptr{Void},), nd_t)
-nddata(nd_t) = ccall((:nddata, libnd), Ptr{Void}, (Ptr{Void},), nd_t)
-ndtype(nd_t) = ccall((:ndtype, libnd), Cint, (Ptr{Void},), nd_t)
-ndkind(nd_t) = ccall((:ndkind, libnd), Cint, (Ptr{Void},), nd_t)
-ndndim(nd_t) = ccall((:ndndim, libnd), Cuint, (Ptr{Void},), nd_t)
-ndcopy_ip(nd_t_dst, nd_t_src) = nullcheck(
-    ccall((:ndcopy_ip, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), nd_t_dst, nd_t_src) )
-ndcast(nd_t,t) = ccall((:ndcast, libnd), Ptr{Void}, (Ptr{Void},Cint), nd_t,t)
-ndfill(nd_t,c) = ccall((:ndfill, libnd), Ptr{Void}, (Ptr{Void},UInt64), nd_t,c)
-ndref(nd_t,data,kind) = ccall((:ndref, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void},Cint), nd_t,data,kind)
-ndnbytes(nd_t) = ccall((:ndnbytes, libnd), Csize_t, (Ptr{Void},), nd_t)
-ndShapeSet(nd_t, idim, val) = nullcheck(
-    ccall((:ndShapeSet, libnd), Ptr{Void}, (Ptr{Void},Cuint,Csize_t), nd_t, idim-1, val) )
-ndioOpen(filename,format,mode) = retry2(() -> begin
-      ptr = ccall((:ndioOpen, libnd), Ptr{Void}, (Ptr{UInt8},Ptr{Void},Ptr{UInt8}),
-            filename, format, mode)
-      ptr==C_NULL ? throw(Exception) : ptr
-    end,
-    n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="ndioOpen($filename,$format,$mode)")()
-ndioRead(file,dst) = retry2(() -> begin
-      ptr = ccall((:ndioRead, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), file, dst)
-      ptr==C_NULL ? throw(Exception) : ptr
-    end,
-    n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="ndioRead($file,$dst)")()
-ndioReadSubarray(file,dst,origin,shape) =
-    ccall((:ndioReadSubarray, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void},Ptr{Csize_t},Ptr{Csize_t}),
-    file, dst, origin, shape)
-ndioWrite(file,src) = retry2(() -> begin
-      ptr = ccall((:ndioWrite, libnd), Ptr{Void}, (Ptr{Void},Ptr{Void}), file, src)
-      ptr==C_NULL ? throw(Exception) : ptr
-    end,
-    n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="ndioWrite($file,$src)")()
-ndioClose(file) = ccall((:ndioClose, libnd), Void, (Ptr{Void},), file)
-ndioShape(file) = ccall((:ndioShape, libnd), Ptr{Void}, (Ptr{Void},), file)
-
-retain_for_gc = Any[]
-
-for f in ("ndshape", "ndstrides")
-  @eval function $(Symbol(f))(nd_t)
-    push!(retain_for_gc, convert(Array{Cuint}, unsafe_wrap(Array,  # hack: size_t -> Cuint
-        ccall(($f, libnd), Ptr{Csize_t}, (Ptr{Void},), nd_t)
-        ,ndndim(nd_t))) )
-    pointer(retain_for_gc[end])
-  end
-  @eval function $(Symbol(f*"J"))(nd_t)  # memory leak?
-    unsafe_wrap(Array,
-        ccall(($f, libnd), Ptr{Csize_t}, (Ptr{Void},), nd_t)
-        ,ndndim(nd_t))
-  end
+function ndshapeJ(tile_shape)
+  ndim = unsafe_load(Ptr{Csize_t}(tile_shape),1)
+  ptr_shape = unsafe_load(Ptr{Csize_t}(tile_shape),2)
+  [unsafe_load(Ptr{Csize_t}(ptr_shape),i) for i=1:ndim]
 end
+
 
 # interface to mltk-bary
 
@@ -222,37 +174,83 @@ function calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
   in_subtiles_aabb
 end
 
-function ndalloc(tileshape, tiletype, heap=true)
-  tmp_ws = ndinit()
-  for (i,x) in enumerate(tileshape)
-    ndShapeSet(tmp_ws, i, x)
-  end
-  ndcast(tmp_ws, tiletype)
-  heap || return tmp_ws
-  tile_ws=ndheap(tmp_ws)
-  ndfree(tmp_ws)
-  tile_ws
+load_tile(filename,ext,shape) = retry2(() -> _load_tile(filename,ext,shape),
+    n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
+    message="load_tile($filename,$ext,$shape)")()
+
+function _load_tile(filename,ext,shape)
+  if ext=="tif"
+    regex = Regex("$(basename(filename))\.[0-9]\.$ext")
+    files = filter(x->ismatch(regex,x), readdir(dirname(filename)))
+    @assert length(files)==shape[end]
+    img = Array{UInt16}(shape...)
+    for (c,file) in enumerate(files)
+      img[:,:,:,c] = PermutedDimsArray(rawview(channelview(
+            load(string(filename,'.',c-1,'.',ext)))), (2,1,3))
+    end
+    return img
+  else
+    tdata = h5read(string(filename,'.',ext), "/data")
+    reshape(tdata,size(tdata)[1:end-1])
+  end 
 end
 
-:shape_leaf_px in names(Main) && (save_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type, false))
+save_tile(filesystem, path, basename, ext, data) = retry2(
+    () -> _save_tile(filesystem, path, basename, ext, data),
+    n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
+    message="save_tile($filesystem,$path,$basename,$ext)")()
 
-function load_tile(filename,ext,data::Ptr{Void})
-  filepath = string(filename,".%.",ext)
-  ndioClose(ndioRead(ndioOpen( filepath, C_NULL, "r" ),data))
-end
-
-function save_tile(filesystem, path, basename, ext, data::AbstractArray{UInt16})
-  ndref(save_ws, pointer(data), convert(Cint,0))   # 0==nd_heap;  need to generalize
-  save_tile(filesystem, path, basename, ext, save_ws)
-end
-
-function save_tile(filesystem, path, basename, ext, data::Ptr{Void})
-  name = string(basename,".%.",ext)
+function _save_tile(filesystem, path, basename, ext, data)
   filepath = joinpath(filesystem,path)
-  filename = joinpath(filepath,name)
   retry2(()->mkpath(filepath),
-      n=10, first_delay=60, growth_factor=3, max_delay=60*60*24, message="mkpath(\"$filepath\")")()
-  ndioClose(ndioWrite(ndioOpen(filename, C_NULL, "w"), data))
+      n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
+      message="mkpath(\"$filepath\")")()
+  if ext=="tif"
+    for c=1:size(data,4)
+      save(string(joinpath(filepath,basename),'.',c-1,'.',ext),
+           permutedims(data[:,:,:,c],(2,1,3)))
+    end
+  else
+    tdata = reshape(sdata(data),(size(data)...,1))   # remove sdata() when fixed
+    fn = string(joinpath(filepath,basename),'.',ext)
+    h5write(fn, "/data", tdata)
+    h5writeattr(fn, "/data", Dict("axis_tags"=>
+"""{
+  "axes": [
+    {
+      "key": "t",
+      "typeFlags": 8,
+      "resolution": 0,
+      "description": ""
+    },
+    {
+      "key": "c",
+      "typeFlags": 1,
+      "resolution": 0,
+      "description": ""
+    },
+    {
+      "key": "z",
+      "typeFlags": 2,
+      "resolution": 0,
+      "description": ""
+    },
+    {
+      "key": "y",
+      "typeFlags": 2,
+      "resolution": 0,
+      "description": ""
+    },
+    {
+      "key": "x",
+      "typeFlags": 2,
+      "resolution": 0,
+      "description": ""
+    }
+  ]
+}
+"""))
+  end
 end
 
 # the merge API could perhaps be simplified. complexity arises because it is called:
@@ -260,7 +258,7 @@ end
 # by manager.jl to handle overflow into local_scratch (recurse=false,  octree=false, delete=true)
 # by merge to combine multiple previous renders       (recurse=either, octree=false, delete=false)
 
-function downsample(out_tile_jl, coord, shape_leaf_px, nchannels, scratch)
+function downsample(out_tile, coord, shape_leaf_px, nchannels, scratch)
   ix = ((coord-1)>>0)&1 * shape_leaf_px[1]>>1
   iy = ((coord-1)>>1)&1 * shape_leaf_px[2]>>1
   iz = ((coord-1)>>2)&1 * shape_leaf_px[3]>>1
@@ -271,7 +269,7 @@ function downsample(out_tile_jl, coord, shape_leaf_px, nchannels, scratch)
         tmpy = iy + (y+1)>>1
         for x=1:2:shape_leaf_px[1]-1
           tmpx = ix + (x+1)>>1
-          @inbounds out_tile_jl[tmpx, tmpy, tmpz, c] = downsampling_function(scratch[x:x+1, y:y+1, z:z+1, c])
+          @inbounds out_tile[tmpx, tmpy, tmpz, c] = downsampling_function(scratch[x:x+1, y:y+1, z:z+1, c])
         end
       end
     end
@@ -296,9 +294,7 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
   time_single_file = time_many_files = time_clear_files = 0.0
   time_read_files = time_max_files = time_delete_files = time_write_files = 0.0
 
-  merge1_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type)
-  merge1_jl = unsafe_wrap(Array, convert(Ptr{UInt16},nddata(merge1_ws)),
-        tuple(shape_leaf_px...,nchannels)::Tuple{Int,Int,Int,Int})
+  merge1 = Array{UInt16}(shape_leaf_px...,nchannels)
 
   retry2(()->mkpath(joinpath(destination,out_tile_path)),
         n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
@@ -321,21 +317,18 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
     time_single_file=(time()-t0)
   elseif length(in_tiles)>1
     t0=time()
-    merge2_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type)
-    merge2_jl = unsafe_wrap(Array, convert(Ptr{UInt16},nddata(merge2_ws)),
-          tuple(shape_leaf_px...,nchannels)::Tuple{Int,Int,Int,Int})
     info("merging:")
     t1=time()
-    ndfill(merge1_ws, 0x0000)
+    fill!(merge1, 0x0000)
     time_clear_files=(time()-t1)
     for in_tile in in_tiles
       info("  reading ",in_tile,".%.",suffix)
       t1=time()
-      load_tile(in_tile, suffix, merge2_ws)
+      merge2 = load_tile(in_tile, suffix, (shape_leaf_px...,nchannels))
       time_read_files+=(time()-t1)
       t1=time()
       for i4=1:nchannels, i3=1:shape_leaf_px[3], i2=1:shape_leaf_px[2], i1=1:shape_leaf_px[1]
-        @inbounds merge1_jl[i1,i2,i3,i4] = max(merge1_jl[i1,i2,i3,i4], merge2_jl[i1,i2,i3,i4])
+        @inbounds merge1[i1,i2,i3,i4] = max(merge1[i1,i2,i3,i4], merge2[i1,i2,i3,i4])
       end
       time_max_files+=(time()-t1)
       t1=time()
@@ -356,16 +349,15 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
     end
     info("  copying to ",destination2)
     t1=time()
-    save_tile(destination, out_tile_path, prefix, suffix, merge1_ws)
+    save_tile(destination, out_tile_path, prefix, suffix, merge1)
     time_write_files=(time()-t1)
-    ndfree(merge2_ws)
     time_many_files=(time()-t0)
   end
 
   if octree
     if length(in_tiles)==1
       t0=time()
-      load_tile(destination2,suffix,merge1_ws)
+      merge1 = load_tile(destination2,suffix, (shape_leaf_px...,nchannels))
       time_octree_read+=(time()-t0)
     elseif length(in_tiles)==0
       t0=time()
@@ -377,13 +369,12 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
       t0=time()
       info("downsampling output tile ",out_tile_path)
       last_morton_coord = parse(Int,out_tile_path[end])
-      scratch::Array{UInt16,4} = length(in_tiles)==0 ? out_tile_img : merge1_jl
+      scratch::Array{UInt16,4} = length(in_tiles)==0 ? out_tile_img : merge1
       downsample(out_tile_img_down, last_morton_coord, shape_leaf_px, nchannels, scratch)
       time_octree_down=(time()-t0)
     end
   end
 
-  ndfree(merge1_ws)
   time_octree_read, time_octree_down, time_octree_save,
         time_single_file, time_many_files, time_clear_files,
         time_read_files, time_max_files, time_delete_files, time_write_files

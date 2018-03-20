@@ -63,29 +63,24 @@ isempty(crop_range) && exit()
 
 const tiles = TileBaseOpen(String(frompath))
 tile_shape = TileShape(TileBaseIndex(tiles,1))
-const tile_type = ndtype(tile_shape)
 
-read_ws = ndalloc(vcat(shape_leaf_px,nchannels), tile_type)
-read_jl = unsafe_wrap(Array, convert(Ptr{UInt16},nddata(read_ws)),
-      tuple(shape_leaf_px...,nchannels)::Tuple{Int,Int,Int,Int});
-stack_size = [size(read_jl)...]
+tile_size = (shape_leaf_px...,nchannels)
+stack_size = [tile_size...]
 stack_size[axis] *= length(leaf_paths)
 stack = Array{UInt16}(stack_size...);
 
 for ileaf in eachindex(leaf_paths)
   in_path = joinpath(frompath, join(leaf_paths[ileaf],Base.Filesystem.path_separator))
-  ndioClose(ndioRead(ndioOpen( string(in_path,"/default.%.",file_format_save), C_NULL, "r" ),read_ws))
+  read_img = load_tile( string(in_path,"/default.%.",file_format_save), tile_size)
   stack_index = Any[:,:,:,:]
-  stack_index[axis] = (ileaf-1)*size(read_jl)[axis]+1 : ileaf*size(read_jl)[axis]
-  stack[stack_index...] = read_jl
+  stack_index[axis] = (ileaf-1)*tile_size[axis]+1 : ileaf*tile_size[axis]
+  stack[stack_index...] = read_img
 end
 
 permuted_stack = PermutedDimsArray(stack, [setdiff(1:3,axis)..., axis, 4]);
 
 
-projection_ws = ndalloc(vcat(size(permuted_stack)[1:2]...), tile_type)
-projection_jl = unsafe_wrap(Array, convert(Ptr{UInt16},nddata(projection_ws)),
-      tuple(size(permuted_stack)[1:2]...)::Tuple{Int,Int});
+projection_img = Array{UInt16}(size(permuted_stack)[1:2]...)
 
 function scale_and_clamp(arg::Vector, black_level, white_level)
   signed_arg = convert(Vector{Float32}, arg)
@@ -98,12 +93,12 @@ for x=1:size(permuted_stack,1), y=1:size(permuted_stack,2)
         signal_black_level, signal_white_level)
   reference = scale_and_clamp(permuted_stack[x,y,:,reference_channel],
         reference_black_level, reference_white_level)
-  projection = projection_function(signal - reference)
-  projection_jl[x,y] = round(UInt16, clamp(projection, 0, typemax(UInt16)))
+  projection_tile = projection_function(signal - reference)
+  projection_img[x,y] = round(UInt16, clamp(projection_tile, 0, typemax(UInt16)))
 end
 
 
 mkpath(joinpath(topath,"tiles"))
 out_path = joinpath(topath, "tiles", join(face_leaf_path))
 info("saving to ",out_path)
-ndioClose(ndioWrite(ndioOpen( string(out_path,".",file_format_save), C_NULL, "w" ),projection_ws))
+save(string(out_path,".",file_format_save), PermutedDimsArray(projection_img,(2,1)))

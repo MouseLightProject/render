@@ -19,56 +19,80 @@ function check_logfiles(logfilepath, correct_nmergelogs)
   end
 end
 
-function check_images(scratchpath, testdirs, correct_nchannels, correct_ntiffs, black_and_white)
+function load_tif_or_h5(basepath)
+  if isfile(joinpath(basepath,"default.0.tif"))
+    files = filter(x->ismatch(r"default.[0-9].tif",x), readdir(basepath))
+    img_raw = load(joinpath(basepath,"default.0.tif"))
+    img = Array{UInt16}(size(img_raw)...,length(files))
+    img[:,:,:,1] = rawview(channelview(img_raw))
+    for ichannel=2:length(files)  
+      img_raw = load(joinpath(basepath,"default.$(ichannel-1).tif"))
+      img[:,:,:,ichannel] = rawview(channelview(img_raw))
+    end
+    permuteddimsview(img, (2,1,3,4))
+  elseif isfile(joinpath(basepath,"default.h5"))
+    img = h5read(joinpath(basepath,"default.h5"),"/data")
+    reshape(img,size(img)[1:end-1])
+  else
+    []
+  end
+end
+
+function check_images(scratchpath, testdirs, correct_nchannels, correct_nimages, black_and_white)
   # results directories recursively identical?
   hierarchies=[]
   for testdir in testdirs
-    cd(joinpath(scratchpath,testdir))
+    cd(joinpath(scratchpath,testdir,"results"))
     push!(hierarchies, collect(walkdir("."; topdown=true)))
-    length(hierarchies)>1 && @test hierarchies[end-1]==hierarchies[end]
+    length(hierarchies)>1 || continue
+    @test length(hierarchies[end-1])==length(hierarchies[end])
+    length(hierarchies[end-1])==length(hierarchies[end]) || continue
+    for (one,two) in zip(hierarchies[end-1],hierarchies[end])
+      @test one[1]==two[1]
+      @test one[2]==two[2]
+      @test isempty(one[3])==isempty(two[3])
+    end
   end
 
   # correct number of images, are they black & white, and identical?
-  ntiffs=0
-  shades=Vector{Vector{Float32}}[]
+  nimages=0
+  shades=Set{UInt16}[]
   for (root, dirs, files) in hierarchies[1]
-    for file in files
-      if endswith(file,".tif")
-        #info(joinpath(root,file), prefix="COMPARING: ")
-        ntiffs+=1
-        channel = parse(Int, split(file,'.')[end-1])
-        while length(shades)<channel+1
-          push!(shades,[])
-        end
-        imgs=[]
-        for testdir in testdirs
-          push!(imgs, load(joinpath(scratchpath,testdir,root,file)))
-          push!(shades[1+channel], unique(imgs[end]))
-          if length(imgs)>1
-            @test all(imgs[end-1] .== imgs[end])
-            idx = find(imgs[end-1] .!= imgs[end])
-            if length(idx)>0
-              largest_diff = round.(Int, 1/eps(eltype(imgs[end]))*maximum(abs.(
-                    convert(Array{Float64}, imgs[end-1][idx])-
-                    convert(Array{Float64}, imgs[end][idx]))))
-              warn(joinpath(testdir,root,file)," off by ",length(idx),
-                    " voxel(s).  largest difference is ", largest_diff, " shade(s)")
-            end
-          end
+    isempty(files) && continue
+    img = load_tif_or_h5(root)
+    isempty(img) && continue
+    nimages+=size(img,4)
+    while length(shades)<size(img,4)
+      push!(shades, Set{UInt16}())
+    end
+    imgs=Any[img]
+    for ichannel=1:size(imgs[end],4)
+      push!(shades[ichannel], unique(imgs[end][:,:,:,ichannel])...)
+    end
+    for testdir in testdirs[2:end]
+      push!(imgs, load_tif_or_h5(joinpath(scratchpath,testdir,"results",root)))
+      for ichannel=1:size(imgs[end],4)
+        push!(shades[ichannel], unique(imgs[end][:,:,:,ichannel])...)
+      end
+      if length(imgs)>1
+        @test imgs[end-1] == imgs[end]
+        idx = find(imgs[end-1] .!= imgs[end])
+        if length(idx)>0
+          largest_diff = round.(Int, 1/eps(eltype(imgs[end]))*maximum(abs.(
+                convert(Array{Float64}, imgs[end-1][idx])-
+                convert(Array{Float64}, imgs[end][idx]))))
+          warn(joinpath(testdir,root,file)," off by ",length(idx),
+                " voxel(s).  largest difference is ", largest_diff, " shade(s)")
         end
       end
     end
   end
-  @test ntiffs == correct_ntiffs
+  @test nimages == correct_nimages
   @test length(shades) == correct_nchannels
   if black_and_white
-    for shade in shades
-      @test all(x->length(x).<=2, shade)
-    end
+    @test all([length(x)<=2 for x in shades])
   else
-    for shade in shades
-      @test any(x->length(x).>2, shade)
-    end
+    @test any([length(x)>2 for x in shades])
   end
   shades
 end

@@ -8,29 +8,28 @@ generate an octree for viewing with the Janelia Workstation.
 Requirements
 ============
 
-Julia, version 6, plus the YAML package.
+Julia, version 6, plus the YAML, Images, and HDF5 packages.
 
-Nathan Clack's nd, tilebase, and mltk-bary libraries.
+Nathan Clack's tilebase and mltk-bary libraries.
 
-Tested with Julia v0.6.0, YAML v0.2.1, nd master (branch) / ef492383 (commit),
-ndio-series use-tre/fdfe30a7, ndio-tiff ndio-format-context/df46d485, ndio-hdf5
-ndio-format-context/0c7ac77c, tilebase master/cc171869, mltk-bary
-master/84e15364, and mylib stream/0ca27aae.
+Tested with Julia v0.6.0, YAML v0.2.1, Images v0.13.0+, ImageMagick v0.5.1+,
+HDF5 v0.8.8+, tilebase master/cc171869, mltk-bary master/84e15364, and
+mylib stream/0ca27aae.
 
 
 Installation
 ============
 
-Install nd, tilebase, and mltk-bary libraries using make.sh.  Be sure
+Install tilebase, and mltk-bary libraries using make.sh.  Be sure
 to edit ```rootdir``` and ```installdir``` therein appropriately.
 
-Install Julia by downloading a precompiled binary of the latest point
-release of version 5.  Install the YAML package by starting Julia on the
-unix command line and executing Pkg.add("YAML").  If desired, use the
-bash environment variable JULIA_PKGDIR to place it somewhere other than
-your home directory.  For example, somewhere on Julia's LOAD_PATH, like
-<julia-install-dir>/share/julia/site, would permit others to use the
-pipeline without having to install this package themselves.
+Install Julia by downloading a precompiled binary of the latest point release
+of version 5.  Install the YAML, Images, and HDF5 packages by starting Julia
+on the unix command line and executing map(Pkg.add,["YAML","Images","HDF5"]).
+If desired, use the bash environment variable JULIA_PKGDIR to place it
+somewhere other than your home directory.  For example, somewhere on Julia's
+LOAD_PATH, like <julia-install-dir>/share/julia/site, would permit others
+to use the pipeline without having to install this package themselves.
 
 Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, and ```JULIA```
 in ```render```, ```monitor```, and ```savelogs``` are all

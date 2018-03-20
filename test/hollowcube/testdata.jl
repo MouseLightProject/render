@@ -1,4 +1,4 @@
-using Base.Test, Images
+using Base.Test, Images, HDF5
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
 
@@ -13,56 +13,102 @@ function check_permissions(basepath)
   end
 end
 
-#ndio-tiff is not compatible with ImageMagick.  0x7fff = 0x7f7f, hence the .>>8
 function check_toplevel_images(basepath, nchannels)
-  for nchannel=0:(nchannels-1)
-    img = load(joinpath(basepath,"default.$(nchannel).tif"))
-    rightanswer = zeros(UInt16,48);  rightanswer[3:end-1]=0xffff>>nchannel
-    @test all(squeeze(maximum(rawview(channelview(img)),(1,2)),(1,2)).>>8 .== rightanswer.>>8)
-    rightanswer = zeros(UInt16,48);  rightanswer[6:end-4]=0xffff>>nchannel
-    @test all(squeeze(maximum(rawview(channelview(img)),(1,3)),(1,3)).>>8 .== rightanswer.>>8)
-    rightanswer = zeros(UInt16,48);  rightanswer[4:end-2]=0xffff>>nchannel
-    @test all(squeeze(maximum(rawview(channelview(img)),(2,3)),(2,3)).>>8 .== rightanswer.>>8)
+  img = load_tif_or_h5(basepath)
+  @test size(img,4)==nchannels
+  for ichannel=0:(nchannels-1)
+    img_channel=img[:,:,:,ichannel+1]
+    rightanswer = zeros(UInt16,48);  rightanswer[3:end-1]=0xffff>>ichannel
+    @test squeeze(maximum(img_channel,(1,2)),(1,2)) == rightanswer
+    rightanswer = zeros(UInt16,48);  rightanswer[4:end-2]=0xffff>>ichannel
+    @test squeeze(maximum(img_channel,(1,3)),(1,3)) == rightanswer
+    rightanswer = zeros(UInt16,48);  rightanswer[6:end-4]=0xffff>>ichannel
+    @test squeeze(maximum(img_channel,(2,3)),(2,3)) == rightanswer
   end
+end
+
+function check_projection_logfiles(basepath)
+  logfiledump = readstring(`tar xzfO $(basepath)/logs.tar.gz`)
+
+  # any problems reported in the log files?
+  @test !contains(String(logfiledump), "ERR")
+  @test !contains(String(logfiledump), "Segmentation")
+end
+
+function check_toplevel_projection_images(basepath)
+  img_color = load(joinpath(basepath,"projection-192x192.tif"))
+  img = rawview(channelview(img_color))
+  @test size(img)==(192,192)
+  rightanswer = zeros(UInt16,192);  rightanswer[10:end-8]=0x8000
+  @test squeeze(maximum(img,1),1) == rightanswer
+  rightanswer = zeros(UInt16,192);  rightanswer[19:end-17]=0x8000
+  @test squeeze(maximum(img,2),2) == rightanswer
+end
+
+function check_projection_images(scratchpath, testdirs, correct_nimages)
+  # results directories identical?
+  filess=[]
+  for testdir in testdirs
+    push!(filess, readdir(joinpath(scratchpath,testdir)))
+    length(filess)>1 || continue
+    @test filess[end-1]==filess[end]
+  end
+
+  # correct number of images, and identical?
+  nimages=0
+  shades=Set{UInt16}[]
+  for file in filess[1]
+    endswith(file,".tif") || continue
+    img = load(joinpath(scratchpath,testdirs[1],file))
+    nimages+=1
+    imgs=Any[img]
+    for testdir in testdirs[2:end]
+      push!(imgs, load(joinpath(scratchpath,testdir,file)))
+      if length(imgs)>1
+        @test imgs[end-1] == imgs[end]
+      end
+    end
+  end
+  @test nimages == correct_nimages
 end
 
 scratchpath = joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch")
 
 @testset "hollowcube" begin
 
-@testset "onechannel-$v" for v in ["local", "cluster"]
+@testset "onechannel-$v" for v in ["local", "cluster", "hdf5"]
   check_permissions(joinpath(scratchpath,"onechannel-$v","results"))
   check_logfiles(joinpath(scratchpath,"onechannel-$v","results","logs.tar.gz"), 1)
   check_toplevel_images(joinpath(scratchpath,"onechannel-$v","results"),1)
 end
 
-@testset "onechannel local-vs-cluster" begin
-  check_images(scratchpath, ["onechannel-local/results", "onechannel-cluster/results"], 1, 64+8+1, true)
+@testset "onechannel local-vs-cluster-vs-hdf5" begin
+  check_images(scratchpath, ["onechannel-local", "onechannel-cluster", "onechannel-hdf5"], 1, 64+8+1, true)
 end
 
-@testset "threechannel-$v" for v in ["local", "cluster"]
+@testset "threechannel-$v" for v in ["local", "cluster", "hdf5"]
   check_permissions(joinpath(scratchpath,"threechannel-$v","results"))
   check_logfiles(joinpath(scratchpath,"threechannel-$v","results","logs.tar.gz"), 1)
-  check_toplevel_images(joinpath(scratchpath,"threechannel-$v","results"),2)
+  check_toplevel_images(joinpath(scratchpath,"threechannel-$v","results"),3)
 end
 
-@testset "threechannel local-vs-cluster" begin
-  shades = check_images(scratchpath, ["threechannel-local/results", "threechannel-cluster/results"], 3, 3*(64+8+1), true)
+@testset "threechannel local-vs-cluster-vs-hdf5" begin
+  shades = check_images(scratchpath, ["threechannel-local", "threechannel-cluster", "threechannel-hdf5"], 3, 3*(64+8+1), true)
   @test max(map(maximum, shades[1])...) > max(map(maximum, shades[2])...) > max(map(maximum, shades[3])...)
 end
 
 @testset "linearinterp" begin
   check_logfiles(joinpath(scratchpath,"linearinterp-onechannel","results","logs.tar.gz"), 1)
-  check_images(scratchpath, ["linearinterp-onechannel/results"], 1, 64+8+1, false)
+  check_images(scratchpath, ["linearinterp-onechannel"], 1, 64+8+1, false)
   check_logfiles(joinpath(scratchpath,"linearinterp-threechannel","results","logs.tar.gz"), 1)
   check_logfiles(joinpath(scratchpath,"linearinterp-threechannel-cpu","results","logs.tar.gz"), 1)
-  check_images(scratchpath, ["linearinterp-threechannel/results","linearinterp-threechannel-cpu/results"], 3, 3*(64+8+1), false)
+  check_images(scratchpath, ["linearinterp-threechannel","linearinterp-threechannel-cpu"], 3, 3*(64+8+1), false)
   info("it is normal to have 68 avx images each have ~1000 voxels be 257 shades different compared to cpu")
 end
 
 @testset "nslots" begin
   check_logfiles(joinpath(scratchpath,"nslots","results","logs.tar.gz"), 1)
-  check_images(scratchpath, ["onechannel-cluster/results", "nslots/results"], 1, 64+8+1, true)
+  check_images(scratchpath, ["onechannel-cluster", "nslots"], 1, 64+8+1, true)
   check_toplevel_images(joinpath(scratchpath,"nslots","results"),1)
 
   function nslots(scratchpath, rightanswer)
@@ -91,13 +137,21 @@ end
   check_permissions(joinpath(scratchpath,"keepscratch","results"))
   check_permissions(joinpath(scratchpath,"keepscratch","shared_scratch"))
   check_logfiles(joinpath(scratchpath,"keepscratch","results","logs.tar.gz"), 1)
-  check_images(scratchpath, ["onechannel-local/results", "keepscratch/results"], 1, 64+8+1, true)
+  check_images(scratchpath, ["onechannel-local", "keepscratch"], 1, 64+8+1, true)
   check_toplevel_images(joinpath(scratchpath,"keepscratch","results"),1)
 
   @test !isdir(joinpath(scratchpath,"onechannel-local","shared_scratch"))
   @test !isdir(joinpath(scratchpath,"onechannel-cluster","shared_scratch"))
   @test isdir(joinpath(scratchpath,"keepscratch","shared_scratch"))
   @test length(collect(walkdir(joinpath(scratchpath,"keepscratch","shared_scratch")))) == 73
+end
+
+@testset "projection" begin
+  check_projection_logfiles(joinpath(scratchpath,"projection-coronal-local"))
+  check_projection_logfiles(joinpath(scratchpath,"projection-coronal-cluster"))
+  check_toplevel_projection_images(joinpath(scratchpath,"projection-coronal-local"))
+  check_toplevel_projection_images(joinpath(scratchpath,"projection-coronal-cluster"))
+  check_projection_images(scratchpath, ["projection-coronal-local","projection-coronal-cluster"], 5)
 end
 
 end

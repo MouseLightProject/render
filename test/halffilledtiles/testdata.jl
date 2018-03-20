@@ -1,29 +1,28 @@
-using Base.Test, Images
+using Base.Test, Images, HDF5
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
 
 function check_toplevel_images(basepath)
-  img = load(joinpath(basepath,"default.0.tif"))
+  img = load_tif_or_h5(basepath)
   rightanswer = zeros(UInt16,64);  rightanswer[36:end]=0xffff
-  @test all(squeeze(maximum(rawview(channelview(img)),(1,2)),(1,2)) .== rightanswer)
-  rightanswer = zeros(UInt16,640);  rightanswer[2:438]=0xffff
-  @test all(squeeze(maximum(rawview(channelview(img)),(2,3)),(2,3)) .== rightanswer)
+  @test all(squeeze(maximum(img,(1,2)),(1,2)) .== rightanswer)
   rightanswer = zeros(UInt16,454);  rightanswer[[2:94;143:233]]=0xffff
-  @test all(squeeze(maximum(rawview(channelview(img)),(1,3)),(1,3)) .== rightanswer)
+  @test all(squeeze(maximum(img,(2,3)),(2,3)) .== rightanswer)
+  rightanswer = zeros(UInt16,640);  rightanswer[2:438]=0xffff
+  @test all(squeeze(maximum(img,(1,3)),(1,3)) .== rightanswer)
 end
 
 scratchpath = joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledtiles/scratch")
 
 @testset "halffilledtiles" begin
 
-@testset "$v" for v in ["cpu", "avx", "localscratch"]
+@testset "$v" for v in ["cpu", "avx", "localscratch", "hdf5"]
   check_logfiles( joinpath(scratchpath,"$v","results","logs.tar.gz"), 512+1)
   check_toplevel_images(joinpath(scratchpath,"$v","results"))
 end
 
-@testset "cpu-vs-avx-vs-localscratch" begin
-  check_images(scratchpath, ["cpu/results","avx/results","localscratch/results"], 1, 155, true)
-  info("it is normal to have 7 avx images be off by 1 voxel each compared to cpu")
+@testset "cpu-vs-avx-vs-localscratch-hdf5" begin
+  check_images(scratchpath, ["cpu","avx","localscratch","hdf5"], 1, 155, true)
 end
 
 @testset "localscratch" begin

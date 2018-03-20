@@ -15,7 +15,6 @@ include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 const jobname = ARGS[2]
 const tiles = TileBaseOpen(source)
 tile_shape = TileShape(TileBaseIndex(tiles,1))
-const tile_type = ndtype(tile_shape)
 const nchannels = ndshapeJ(tile_shape)[4]
 
 # delete scratch
@@ -61,7 +60,6 @@ open("$destination/calculated_parameters.jl","w") do f
   println(f,"const voxelsize_used_um = [",
         voxelsize_used_um[1], ',', voxelsize_used_um[2], ',', voxelsize_used_um[3], ']')
   println(f,"const origin_nm = [",join(map(string,tiles_bbox[2]),","),"]")
-  println(f,"const tile_type = convert(Cint,$tile_type)")
   for repo in ["render", "mltk-bary", "tilebase", "nd", "ndio-series", "ndio-tiff", "ndio-hdf5", "mylib"]
     println(f,"const $(replace(repo,'-','_'))_version = \"",git_version(joinpath(ENV["RENDER_PATH"],"src",repo)),"\"")
   end
