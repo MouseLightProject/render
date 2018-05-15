@@ -41,7 +41,7 @@ for tile in unique([split(x,'.')[1] for x in tif_files])
   projection_img[ix,iy] = transpose(rawview(channelview(img)));
 end
 
-out_path = joinpath(topath, "projection-$(projection_size[1])x$(projection_size[2])")
+out_path = joinpath(topath, "tiles", "projection-$(projection_size[1])x$(projection_size[2])")
 info("saving to ",out_path)
 flip = projection_size[1]>projection_size[2]
 save(out_path*'.'*file_format_save, flip ? transpose(projection_img) : projection_img)
