@@ -6,12 +6,11 @@
 
 # julia peon.jl parameters.jl in_tile origin_str solo_out_tiles hostname port nxlims xlims nylims ylims nzlims zlims dims[1:3] transform[1-3*2*(n+1)^2]
 
-using Images, HDF5
+using Images, HDF5, Morton
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
-include(joinpath(ENV["RENDER_PATH"],"src/render/src/morton.jl"))
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
 const origin_str = ARGS[3]

@@ -6,13 +6,12 @@
 
 const parameters_file = ARGS[1]
 
+using Images, Morton
+
 include(parameters_file)
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
-include(joinpath(ENV["RENDER_PATH"],"src/render/src/morton.jl"))
 include(joinpath(frompath,"calculated_parameters.jl"))
 include(joinpath(frompath,"set_parameters.jl"))
-
-using Images
 
 shape_tile_px = shape_leaf_px[setdiff(1:3,axis)]
 
@@ -34,10 +33,12 @@ for tile in unique([split(x,'.')[1] for x in tif_files])
     quadtree_path[quadtree_path.==5] = 3
     quadtree_path[quadtree_path.==6] = 4
   end
-  cartesian_box = tree2cartesian(quadtree_path, 0, projection_size[1], 0, projection_size[2])
-  cartesian_box_adjusted = [round(Int,x) for x in cartesian_box] + [1,0,1,0]
-  ix = colon(cartesian_box_adjusted[1:2]...)
-  iy = colon(cartesian_box_adjusted[3:4]...)
+  cartesian_coord = tree2cartesian(quadtree_path)
+  cartesian_coord_pix = round.(Int, cartesian_coord/2^length(quadtree_path).*projection_size)
+  cartesian_box = repeat(cartesian_coord_pix; inner=2) -
+                         [-1+shape_tile_px[1], 0, -1+shape_tile_px[2], 0]
+  ix = colon(cartesian_box[1:2]...)
+  iy = colon(cartesian_box[3:4]...)
   projection_img[ix,iy] = transpose(rawview(channelview(img)));
 end
 

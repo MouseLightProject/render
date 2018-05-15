@@ -8,12 +8,12 @@ generate an octree for viewing with the Janelia Workstation.
 Requirements
 ============
 
-Julia, version 6, plus the YAML, Images, and HDF5 packages.
+Julia, version 6, plus the YAML, Images, HDF5, and Morton packages.
 
 Nathan Clack's tilebase and mltk-bary libraries.
 
 Tested with Julia v0.6.0, YAML v0.2.1, Images v0.13.0+, ImageMagick v0.5.1+,
-HDF5 v0.8.8+, tilebase master/cc171869, mltk-bary master/84e15364, and
+HDF5 v0.8.8+, Morton v0.0.1, tilebase master/cc171869, mltk-bary master/84e15364, and
 mylib stream/0ca27aae.
 
 
@@ -24,8 +24,8 @@ Install tilebase, and mltk-bary libraries using make.sh.  Be sure
 to edit ```rootdir``` and ```installdir``` therein appropriately.
 
 Install Julia by downloading a precompiled binary of the latest point release
-of version 5.  Install the YAML, Images, and HDF5 packages by starting Julia
-on the unix command line and executing map(Pkg.add,["YAML","Images","HDF5"]).
+of version 6.  Install the YAML, Images, and HDF5 packages by starting Julia
+on the unix command line and executing map(Pkg.add,["YAML","Images","HDF5","Morton"]).
 If desired, use the bash environment variable JULIA_PKGDIR to place it
 somewhere other than your home directory.  For example, somewhere on Julia's
 LOAD_PATH, like <julia-install-dir>/share/julia/site, would permit others
