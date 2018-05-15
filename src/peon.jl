@@ -6,7 +6,7 @@
 
 # julia peon.jl parameters.jl in_tile origin_str solo_out_tiles hostname port nxlims xlims nylims ylims nzlims zlims dims[1:3] transform[1-3*2*(n+1)^2]
 
-using Images, HDF5, Morton
+using Images, HDF5, YAML, Morton
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
@@ -73,7 +73,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
       info("processing output tile ",out_tile_path_next, prefix="PEON: ")
 
       t0=time()
-      const origin_nm = AABBGetJ(cboxes[imorton])[2]
+      const origin_nm = AABBGet(cboxes[imorton])[1]
       const transform = (sub_transform_nm .- origin_nm) ./ (voxelsize_used_um*um2nm)
 
       if !haskey(out_tiles,out_tile_path_next)
@@ -164,8 +164,6 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
         time_saving+=(time()-t0)
       end
     end
-
-    AABBFree(cboxes[imorton])
   end
 end
 
@@ -177,17 +175,15 @@ function process_input_tile()
   tiles = TileBaseOpen(source)
   global tile = TileBaseIndex(tiles, in_tile_idx)
 
-  info("processing input tile $in_tile_idx: ",unsafe_string(TilePath(tile)), prefix="PEON: ")
+  info("processing input tile $in_tile_idx: ",TilePath(tile), prefix="PEON: ")
 
   local in_tile::Array{UInt16,4}, in_subtile::Array{UInt16,4}
   t1=time()
-  tmp = TileShape(tile)
-  shape_intile = ndshapeJ(tmp)
-  tmp=split(unsafe_string(TilePath(tile)),"/")
-  push!(tmp, string(tmp[end],'-',file_infix))
-  in_tile = load_tile("/"*joinpath(tmp...),file_format_load,shape_intile)
+  shape_intile = TileShape(tile)
+  tile_path=TilePath(tile)
+  tile_fullpath=joinpath(TileBasePath(tiles)*tile_path, string(basename(tile_path),'-',file_infix))
+  in_tile = load_tile(tile_fullpath, file_format_load, shape_intile)
   info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec", prefix="PEON: ")
-  filename = "/"*joinpath(tmp...)
 
   global in_subtiles_aabb = calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
 
@@ -218,9 +214,6 @@ function process_input_tile()
         in_subtiles_aabb[ix,iy,iz])
   end
 
-  #TileFree(tile)
-  TileBaseClose(tiles)
-
   if has_avx2 && use_avx
     BarycentricAVXrelease(resampler)
   else
@@ -232,8 +225,6 @@ function process_input_tile()
   info("saving output tiles for input tile ",in_tile_idx," took ",round(Int,time_saving)," sec", prefix="PEON: ")
   info("waiting for manager for input tile ",in_tile_idx," took ",round(Int,time_waiting)," sec", prefix="PEON: ")
   info("input tile ",in_tile_idx," took ",round(Int,time()-t0)," sec overall", prefix="PEON: ")
-
-  map(AABBFree,in_subtiles_aabb)
 end
 
 if !dry_run

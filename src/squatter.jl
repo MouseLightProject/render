@@ -4,6 +4,8 @@
 
 # julia squatter.jl parameters.jl hostname port
 
+using YAML
+
 include(ARGS[1])
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 

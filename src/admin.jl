@@ -53,60 +53,84 @@ end
 has_avx2 = contains(readstring("/proc/cpuinfo"),"avx2")
 
 
-# interface to tilebase
+# port of tilebase
 
-const libtilebase = ENV["RENDER_PATH"]*"/env/lib/libtilebase.so"
+TileBaseOpen(source) = YAML.load_file(joinpath(source,"tilebase.cache.yml"))
+TileBaseIndex(tiles, idx) = tiles["tiles"][idx]
+TileBaseCount(tiles) = length(tiles["tiles"])
+TileBasePath(tiles) = tiles["path"]
 
-TileBaseOpen(source) = ccall((:TileBaseOpen, libtilebase), Ptr{Void}, (Ptr{UInt8},Ptr{UInt8}), source, C_NULL)
-TileBaseClose(tiles) = ccall((:TileBaseClose, libtilebase), Void, (Ptr{Void},), tiles)
-TileBaseAABB(tiles) = ccall((:TileBaseAABB, libtilebase), Ptr{Void}, (Ptr{Void},), tiles)
-TileBaseCount(tiles) = ccall((:TileBaseCount, libtilebase), Csize_t, (Ptr{Void},), tiles)
-TileBaseIndex(tiles, idx) = ccall((:TileBaseIndex, libtilebase), Ptr{Void}, (Ptr{Void},Cuint), tiles,idx-1)
+function TileBaseAABB(tiles)
+  out = nothing
+  for tile in tiles["tiles"]
+    out = AABBUnion(out,TileAABB(tile))
+  end
+  out
+end
 
-TileAABB(tile) = ccall((:TileAABB, libtilebase), Ptr{Void}, (Ptr{Void},), tile)
-TileShape(tile) = ccall((:TileShape, libtilebase), Ptr{Void}, (Ptr{Void},), tile)
-TileFile(tile) = ccall((:TileFile, libtilebase), Ptr{Void}, (Ptr{Void},), tile)
-TilePath(tile) = ccall((:TilePath, libtilebase), Ptr{UInt8}, (Ptr{Void},), tile)
-TileFree(tile) = ccall((:TileFree, libtilebase), Ptr{Void}, (Ptr{Void},), tile)
+TileShape(tile) = tile["shape"]["dims"]
+TileAABB(tile) = tile["aabb"]
+TilePath(tile) =  tile["path"]
+TileFree(tile) = nothing
 
-AABBMake(ndim) = ccall((:AABBMake, libtilebase), Ptr{Void}, (Csize_t,), ndim)
-AABBFree(bbox) = ccall((:AABBFree, libtilebase), Void, (Ptr{Void},), bbox)
-AABBGet(bbox,ndim,ori,shape) = ccall((:AABBGet, libtilebase),
-    Ptr{Void}, (Ptr{Void},Ptr{Csize_t},Ptr{Ptr{Int}},Ptr{Ptr{Int}}), bbox,ndim,ori,shape)
-AABBSet(bbox,ndim,ori,shape) = ccall((:AABBSet, libtilebase),
-    Ptr{Void}, (Ptr{Void},Csize_t,Ptr{Int},Ptr{Int}), bbox,ndim,ori,shape)
-AABBVolume(bbox) = ccall((:AABBVolume, libtilebase), Cdouble, (Ptr{Void},), bbox)
-AABBNDim(bbox) = ccall((:AABBNDim, libtilebase), Csize_t, (Ptr{Void},), bbox)
-AABBHit(bbox1,bbox2) = 1==ccall((:AABBHit, libtilebase), Cint, (Ptr{Void},Ptr{Void}), bbox1,bbox2)
-AABBUnionIP(bbox1,bbox2) =
-    ccall((:AABBUnionIP, libtilebase), Ptr{Void}, (Ptr{Void},Ptr{Void}), bbox1,bbox2)
-AABBIntersectIP(bbox1,bbox2) =
-    ccall((:AABBIntersectIP, libtilebase), Ptr{Void}, (Ptr{Void},Ptr{Void}), bbox1,bbox2)
-AABBCopy(bbox1,bbox2) =
-    ccall((:AABBCopy, libtilebase), Ptr{Void}, (Ptr{Void},Ptr{Void}), bbox1,bbox2)
+function AABBHit(bbox1,bbox2)
+  @assert length(bbox1["ori"])==length(bbox2["ori"])
+  for i=1:length(bbox1["ori"])
+    mnmx = bbox1["ori"][i] + bbox1["shape"][i]
+    mxmn = bbox1["ori"][i]
+    mnmx = min(mnmx, bbox2["ori"][i] + bbox2["shape"][i])
+    mxmn = max(mxmn, bbox2["ori"][i])
+    mnmx<=mxmn && return false
+  end
+  return true
+end
+
+AABBMake(ndim) = Dict("ori"=>Vector{Int}(ndim), "shape"=>Vector{Int}(ndim))
+AABBGet(bbox) = bbox["ori"], bbox["shape"]
+AABBVolume(bbox) = prod(bbox["shape"])
+
+function AABBSet(bbox, ori, shape)
+  if ori!=nothing
+    bbox["ori"]=ori
+  end
+  if shape!=nothing
+    bbox["shape"]=shape
+  end
+end
+
+function AABBUnion(bbox1,bbox2)
+  if bbox1==nothing
+    bbox1 = deepcopy(bbox2)
+  end
+  @assert length(bbox1["ori"])==length(bbox2["ori"])
+  os = max.(bbox1["ori"]+bbox1["shape"], bbox2["ori"]+bbox2["shape"])
+  o = min.(bbox1["ori"],bbox2["ori"])
+  AABBSet(bbox1, o, os-o)
+  bbox1
+end
 
 function AABBBinarySubdivision(bbox)
-  cboxes = fill(C_NULL, 8)
-  ccall((:AABBBinarySubdivision, libtilebase), Ptr{Void}, (Ptr{Void},Cuint,Ptr{Void}), cboxes,8,bbox)
-  cboxes
+  out=Vector{Dict}(8)
+  for i=1:8
+    out[i]=deepcopy(bbox)
+    for d=1:3
+      s=out[i]["shape"][d]
+      h=s>>1
+      r=s-h<<1
+      out[i]["shape"][d]=h
+      if ((i-1)>>(d-1))&1==1
+        out[i]["ori"][d]+=h
+        out[i]["shape"][d]+=r
+      end
+    end
+  end
+  return out
 end
 
-function AABBGetJ(bbox)
-  ndim = Ref{Csize_t}(0)
-  origin = Ref{Ptr{Int64}}(0)
-  shape = Ref{Ptr{Int64}}(0)
-  ccall((:AABBGet, libtilebase),
-    Ptr{Void}, (Ptr{Void},Ref{Csize_t},Ref{Ptr{Int64}},Ref{Ptr{Int64}}), bbox,ndim,origin,shape)
-  ndim[], unsafe_wrap(Array,origin[],ndim[]), unsafe_wrap(Array,shape[],ndim[])
-end
 
-
-# interface to nd
-
-function ndshapeJ(tile_shape)
-  ndim = unsafe_load(Ptr{Csize_t}(tile_shape),1)
-  ptr_shape = unsafe_load(Ptr{Csize_t}(tile_shape),2)
-  [unsafe_load(Ptr{Csize_t}(ptr_shape),i) for i=1:ndim]
+function isleaf(bbox)
+  c = AABBVolume(bbox) / (prod(voxelsize_used_um)*um2nm^3)
+  c < max_pixels_per_leaf
 end
 
 
@@ -146,12 +170,6 @@ for f = ("source", "destination", "result")
           r,src) !=1 && throw(BarycentricException())
 end
 
-# port some of tilebase/app/render
-
-function isleaf(bbox)
-  c = AABBVolume(bbox) / (prod(voxelsize_used_um)*um2nm^3)
-  c < max_pixels_per_leaf
-end
 
 # below used by director, manager, render, merge, ...
 
@@ -162,14 +180,14 @@ subtile_corner_indices(ix,iy,iz) =
          )[1] for b=0:7 ]
 
 function calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
-  in_subtiles_aabb = Array{Ptr{Void}}(length(xlims)-1, length(ylims)-1, length(zlims)-1)
-  origin, shape = AABBGetJ(TileAABB(tile))[2:3]
+  in_subtiles_aabb = Array{Dict}(length(xlims)-1, length(ylims)-1, length(zlims)-1)
+  origin, shape = AABBGet(TileAABB(tile))
   for ix=1:length(xlims)-1, iy=1:length(ylims)-1, iz=1:length(zlims)-1
     it = subtile_corner_indices(ix,iy,iz)
-    sub_origin = minimum(transform_nm[:,it],2)
-    sub_shape =  maximum(transform_nm[:,it],2) - sub_origin
+    sub_origin = squeeze(minimum(transform_nm[:,it],2),2)
+    sub_shape =  squeeze(maximum(transform_nm[:,it],2),2) - sub_origin
     in_subtiles_aabb[ix,iy,iz] = AABBMake(3)
-    AABBSet(in_subtiles_aabb[ix,iy,iz], 3, sub_origin, sub_shape)
+    AABBSet(in_subtiles_aabb[ix,iy,iz], sub_origin, sub_shape)
   end
   in_subtiles_aabb
 end

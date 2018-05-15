@@ -6,7 +6,7 @@
 
 const parameters_file = ARGS[1]
 
-using Images, Morton
+using Images, YAML, Morton
 
 include(parameters_file)
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))

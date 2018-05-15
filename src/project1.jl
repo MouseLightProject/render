@@ -7,12 +7,12 @@
 const parameters_file = ARGS[1]
 const face_leaf_path_idx = parse(Int,ARGS[2]) - 1
 
+using Images, YAML
+
 include(parameters_file)
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 include(joinpath(frompath,"calculated_parameters.jl"))
 include(joinpath(frompath,"set_parameters.jl"))
-
-using Images
 
 face_leaf_path_init = base(4,face_leaf_path_idx,nlevels)
 if axis==1

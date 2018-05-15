@@ -13,6 +13,8 @@ info(readchomp(`date`), prefix="MANAGER: ")
 proc_num = nothing
 try;  global proc_num = ENV["LSB_JOBINDEX"];  end
 
+using YAML
+
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
@@ -32,7 +34,7 @@ info("AVX2 = ",has_avx2, prefix="MANAGER: ")
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
 const manager_bbox = AABBMake(3)  # process all input tiles whose origins are within this bbox
-AABBSet(manager_bbox, 3, map(x->parse(Int,x),origin_strs), map(x->parse(Int,x),shape_strs))
+AABBSet(manager_bbox, map(x->parse(Int,x),origin_strs), map(x->parse(Int,x),shape_strs))
 const tiles = TileBaseOpen(source)
 
 # delete /dev/shm and local_scratch
@@ -61,19 +63,19 @@ end
 # get input tiles assigned to this manager, and
 # precalculate input subtiles' bounding boxes
 in_tiles_idx = Int[]
-in_subtiles_aabb = Array{Ptr{Void},3}[]
-manager_aabb = C_NULL  # unioned bbox of assigned input tiles
+in_subtiles_aabb = Array{Dict,3}[]
+manager_aabb = nothing  # unioned bbox of assigned input tiles
 for i = 1:TileBaseCount(tiles)
   global in_subtiles_aabb, manager_aabb
   tile = TileBaseIndex(tiles, i)
   tile_aabb = TileAABB(tile)
   if AABBHit(tile_aabb, manager_bbox) &&
-        (include_origins_outside_roi || (all(AABBGetJ(tile_aabb)[2] .>= AABBGetJ(manager_bbox)[2])))
+        (include_origins_outside_roi || (all(AABBGet(tile_aabb)[1] .>= AABBGet(manager_bbox)[1])))
     push!(in_tiles_idx, i)
     push!(in_subtiles_aabb, calc_in_subtiles_aabb(tile,xlims,ylims,zlims[i],
         reshape(transform[i],3,length(xlims)*length(ylims)*length(zlims[i]))) )
     #TileFree(tile)  -> causes TileBaseAABB(tiles) below to segfault
-    manager_aabb = AABBUnionIP(manager_aabb, AABBCopy(C_NULL, tile_aabb))
+    manager_aabb = AABBUnion(manager_aabb, tile_aabb)
   end
 end
 
@@ -93,7 +95,6 @@ function depth_first_traverse(bbox,out_tile_path)
     cboxes = AABBBinarySubdivision(bbox)
     for i=1:8
       depth_first_traverse(cboxes[i], [out_tile_path...,i])
-      AABBFree(cboxes[i])
     end
   end
 end
@@ -112,10 +113,6 @@ info("allocated RAM for ",ncache," output tiles", prefix="MANAGER: ")
 locality_idx = Int[]
 depth_first_traverse(TileBaseAABB(tiles),Int[])
 solo_out_tiles = setdiff( String[x[2][1]==1 ? x[1] : "" for x in merge_count] ,[""])
-AABBFree(manager_bbox)
-AABBFree(manager_aabb)
-map(x->map(AABBFree,x), in_subtiles_aabb)
-TileBaseClose(tiles)
 
 isempty(locality_idx) && warn("coordinates of input subtiles aren't within bounding box")
 

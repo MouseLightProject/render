@@ -24,19 +24,18 @@
 parameters_file=$1
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
-export LD_LIBRARY_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/env/lib:/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
+export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.6.0/bin/julia
 export JULIA_PKGDIR=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.6.0/share/julia/site
-
-parameters_file=$1
 
 umask 002
 
 # get vars from parameters.jl file
-expr="include(\"${RENDER_PATH}/src/render/src/admin.jl\");
+expr="using YAML;
+      include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       tiles = TileBaseOpen(source);
       tile_shape = TileShape(TileBaseIndex(tiles,1));
-      nchannels = ndshapeJ(tile_shape)[4];
+      nchannels = tile_shape[4];
       print(join([destination,shared_scratch,logfile_scratch,delete_scratch,notify_addr,bill_userid,
             typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),
             throttle_octree_njobs,throttle_octree_njobs_per_machine,throttle_octree_ncores_per_job,
@@ -130,9 +129,9 @@ fi
 
 # downsample the octree
 if [ "$nlevels" -gt "2" ]; then
-  expr="import Images, HDF5;
+  expr="import Images, HDF5, YAML;
         p=addprocs(${throttle_octree_ncores_per_job});
-        @everywhere using Images, HDF5;
+        @everywhere using Images, HDF5, YAML;
         @everywhere include(\"${destination}/set_parameters.jl\");
         @everywhere include(\"${destination}/calculated_parameters.jl\");
         @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
@@ -170,9 +169,9 @@ if [ "$nlevels" -gt "2" ]; then
   hold="-w done(${jobname}2)"
 fi
 
-expr="import Images, HDF5;
+expr="import Images, HDF5, YAML;
       p=addprocs(${throttle_octree_ncores_per_job});
-      @everywhere using Images, HDF5;
+      @everywhere using Images, HDF5, YAML;
       @everywhere include(\"${destination}/set_parameters.jl\");
       @everywhere include(\"${destination}/calculated_parameters.jl\");
       @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");

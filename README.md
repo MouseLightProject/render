@@ -10,18 +10,17 @@ Requirements
 
 Julia, version 6, plus the YAML, Images, HDF5, and Morton packages.
 
-Nathan Clack's tilebase and mltk-bary libraries.
+Nathan Clack's mltk-bary library.
 
 Tested with Julia v0.6.0, YAML v0.2.1, Images v0.13.0+, ImageMagick v0.5.1+,
-HDF5 v0.8.8+, Morton v0.0.1, tilebase master/cc171869, mltk-bary master/84e15364, and
-mylib stream/0ca27aae.
+HDF5 v0.8.8+, Morton v0.0.1, mltk-bary master/84e15364.
 
 
 Installation
 ============
 
-Install tilebase, and mltk-bary libraries using make.sh.  Be sure
-to edit ```rootdir``` and ```installdir``` therein appropriately.
+Install the mltk-bary library using make.sh.  Be sure to edit ```rootdir```
+and ```installdir``` therein appropriately.
 
 Install Julia by downloading a precompiled binary of the latest point release
 of version 6.  Install the YAML, Images, and HDF5 packages by starting Julia
@@ -31,9 +30,9 @@ somewhere other than your home directory.  For example, somewhere on Julia's
 LOAD_PATH, like <julia-install-dir>/share/julia/site, would permit others
 to use the pipeline without having to install this package themselves.
 
-Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, and ```JULIA```
-in ```render```, ```monitor```, and ```savelogs``` are all
-set appropriately.
+Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, ```JULIA```,
+and ```JULIA_PKGDIR``` in ```render```, ```monitor```, and ```savelogs```
+are all set appropriately.
 
 
 Basic Usage

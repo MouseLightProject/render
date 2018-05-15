@@ -3,7 +3,7 @@
 # usage: src/project <copy_of_parameters.jl>
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
-export LD_LIBRARY_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/env/lib:/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
+export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.6.0/bin/julia
 export JULIA_PKGDIR=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.6.0/share/julia/site
 
