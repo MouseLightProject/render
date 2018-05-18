@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# usage: src/projection <copy_of_parameters.jl>
+# usage: src/project <copy_of_parameters.jl>
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
 export LD_LIBRARY_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/env/lib:/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
@@ -29,8 +29,8 @@ if [ -d $topath ] ; then
 fi
 mkdir -p $topath/logs
 
-date >> ${topath}/logs/projection.log
-hostname >> ${topath}/logs/projection.log
+date >> ${topath}/logs/project.log
+hostname >> ${topath}/logs/project.log
 
 # copy parameters to <destination>
 cp $1 $topath/set_parameters.jl
@@ -38,20 +38,20 @@ chmod g+rw $topath/set_parameters.jl
 
 # create a probably-unique job name
 jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
-echo jobname = $jobname >> ${topath}/logs/projection.log
+echo jobname = $jobname >> ${topath}/logs/project.log
 
 cmd="umask 002;
      date;
      hostname;
-     $JULIA ${RENDER_PATH}/src/render/src/projection1.jl ${topath}/set_parameters.jl \$LSB_JOBINDEX;
+     $JULIA ${RENDER_PATH}/src/render/src/project1.jl ${topath}/set_parameters.jl \$LSB_JOBINDEX;
      date"
-echo $cmd &>> ${topath}/logs/projection.log
+echo $cmd &>> ${topath}/logs/project.log
 nface_leafs=$((4**nlevels))
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | bsub -P $bill_userid \
         -J ${jobname}1[1-$nface_leafs]%$throttle \
         -n 2 \
-        -o ${topath}/logs/projection%I.log
+        -o ${topath}/logs/project%I.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH;
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
@@ -59,24 +59,24 @@ else
         export JULIA_PKGDIR=$JULIA_PKGDIR;
         export HOSTNAME=$HOSTNAME;
         export LSB_JOBINDEX={};
-        $cmd &> ${topath}/logs/projection{}.log"
-  parallel -S $which_cluster $pcmd ::: `seq 1 $nface_leafs` &>> ${topath}/logs/projection.log
+        $cmd &> ${topath}/logs/project{}.log"
+  parallel -S $which_cluster $pcmd ::: `seq 1 $nface_leafs` &>> ${topath}/logs/project.log
 fi
 
 cmd="umask 002;
      date;
      hostname;
-     $JULIA ${RENDER_PATH}/src/render/src/projection2.jl ${topath}/set_parameters.jl;
+     $JULIA ${RENDER_PATH}/src/render/src/project2.jl ${topath}/set_parameters.jl;
      date"
-echo $cmd &>> ${topath}/logs/projection.log
+echo $cmd &>> ${topath}/logs/project.log
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | bsub -P $bill_userid \
         -J ${jobname}2 \
         -n 4 \
-        -W 60 -o ${topath}/logs/projection.log \
+        -W 60 -o ${topath}/logs/project.log \
         -w ${jobname}1
 else
-  eval $cmd &>> ${topath}/logs/projection.log
+  eval $cmd &>> ${topath}/logs/project.log
 fi
 
 if [ $delete_scratch == 'yes' ]; then
@@ -87,14 +87,14 @@ if [ $delete_scratch == 'yes' ]; then
        echo deleting scratch = ${topath}/tiles;
        rm -rf ${topath}/tiles;
        date"
-  echo $cmd &>> ${topath}/logs/projection.log
+  echo $cmd &>> ${topath}/logs/project.log
   if [ $which_cluster == 'janelia' ]; then
     echo $cmd | bsub -P $bill_userid \
           -J ${jobname}3 \
-          -W 60 -o ${topath}/logs/projection.log \
+          -W 60 -o ${topath}/logs/project.log \
           -w ${jobname}2
   else
-    eval $cmd &>> ${topath}/logs/projection.log
+    eval $cmd &>> ${topath}/logs/project.log
   fi
 fi
 
@@ -107,7 +107,7 @@ cmd="date;
      echo deleting ${topath}/logs;
      rm -rf ${topath}/logs;
      date"
-echo $cmd &>> ${topath}/logs/projection.log
+echo $cmd &>> ${topath}/logs/project.log
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | bsub -P $bill_userid -J ${jobname}4 \
         -w "done(${jobname}3)" \

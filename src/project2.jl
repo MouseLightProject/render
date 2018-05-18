@@ -1,8 +1,8 @@
 # abut and downsample 2D quadtree to single image
 
-# src/projection2.jl <full-path-to-parameters-file>
+# src/project2.jl <full-path-to-parameters-file>
 
-# e.g. src/projection2.jl /home/arthurb/projects/mouselight/src/render/projection-parameters.jl
+# e.g. src/project2.jl /home/arthurb/projects/mouselight/src/render/project-parameters.jl
 
 const parameters_file = ARGS[1]
 

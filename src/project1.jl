@@ -1,8 +1,8 @@
 # project 3D octree to 2D quadtree at full resolution
 
-# src/projection1.jl <full-path-to-parameters-file> <face_leaf_path_idx>
+# src/project1.jl <full-path-to-parameters-file> <face_leaf_path_idx>
 
-# e.g. src/projection1.jl /home/arthurb/projects/mouselight/src/render/projection-parameters.jl 1024
+# e.g. src/project1.jl /home/arthurb/projects/mouselight/src/render/project-parameters.jl 1024
 
 const parameters_file = ARGS[1]
 const face_leaf_path_idx = parse(Int,ARGS[2]) - 1
