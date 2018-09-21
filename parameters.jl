@@ -1,4 +1,4 @@
-const notify_addr = "<yourId>@janelia.hhmi.org"
+const notify_addr = "<yourId>@hhmi.org"
 const bill_userid = "mouselight"
 
 const source="/groups/mousebrainmicro/stitch/..."  # path to tilebase.cache.yml
@@ -63,27 +63,32 @@ const include_origins_outside_roi=false   # set to true to render all of small t
 const max_pixels_per_leaf=120e6  # maximum number of pixels in output tiles
 const leaf_dim_divisible_by=8    # each dim of leafs should be divisible by this
 
-const max_tilechannels_per_job=500  # maximum number of input tiles * nchannels per cluster job
+const max_tilechannels_per_job=1800  # maximum number of input tiles * nchannels per cluster job
 # larger is more efficient with file i/o; smaller is more parallel computation
 
 
 const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
-const throttle_leaf_nmachines = 96  # maximum number of compute nodes to use to render leafs
-# for which_cluster=="janelia" set to 96 (max is 96)
+const ncores_incluster = 48*32
+
+const throttle_leaf_njobs = 64  # maximum number of jobs to use to render leafs
+# for which_cluster=="janelia" set to 64 (max is ncores_incluster/throttle_leaf_ncores_per_job)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
+const throttle_leaf_ncores_per_job = 16
+# for which_cluster=="janelia" set based on memory and load utilization (max is 48)
+
 const throttle_octree_njobs = 256  # maximum number of compute nodes to use to downsample octree
-# for which_cluster=="janelia" set to 256 (max is 512)
+# for which_cluster=="janelia" set to 256 (max is ncores_incluster/throttle_octree_ncores_per_job)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
 const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
 # ignored when which_cluster=="janelia"
 # otherwise set to ncores per machine for small data sets
 
-const throttle_octree_ncores_per_job = 9
-# for which_cluster=="janelia" set to 9 (max is 16)
+const throttle_octree_ncores_per_job = 4
+# for which_cluster=="janelia" set to 4 (max is 9)
 # otherwise set to 1 for small data sets
 
 const short_queue = false  # rendering MUST take less than 1 hour

@@ -8,7 +8,7 @@
 #   watch -n 120 tail -n 40 <destination>/monitor.log
 
 # data are temporarily logged in <logfile_scratch>/{director,monitor,squatter1-N,merge1-M}.log,
-# where N=throttle_leaf_nmachines from parameters.jl, and M~throttle_octree_njobs, and then
+# where N=throttle_leaf_njobs from parameters.jl, and M~throttle_octree_njobs, and then
 # tar'd into <destination>/logs.tar.gz.  manual queries into these log files are informative:
 #   tar xzfO <destination>/logs.tar.gz render.log 
 #   tar xzfO <destination>/logs.tar.gz | grep "ERROR"

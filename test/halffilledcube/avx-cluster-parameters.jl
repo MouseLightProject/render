@@ -70,7 +70,12 @@ const max_tilechannels_per_job=500  # maximum number of input tiles * nchannels 
 const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
-const throttle_leaf_nmachines = 96  # maximum number of compute nodes to use to render leafs
+const ncores_incluster = 48*32
+ 
+const throttle_leaf_ncores_per_job = 16
+# for which_cluster=="janelia" set based on memory and load utilization (max is 48)
+
+const throttle_leaf_njobs = 96  # maximum number of compute nodes to use to render leafs
 # for which_cluster=="janelia" set to 96 (max is 96)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 

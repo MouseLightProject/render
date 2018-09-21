@@ -125,8 +125,8 @@ TileBaseClose(tiles)
 
 # initialize tcp communication with squatters
 nnodes = min( length(job_aabbs),
-              throttle_leaf_nmachines,
-              which_cluster=="janelia" ? 96 : length(which_cluster) )
+              throttle_leaf_njobs,
+              which_cluster=="janelia" ? round(Int,ncores_incluster/throttle_leaf_ncores_per_job) : length(which_cluster) )
 info("number of cluster nodes used = $nnodes", prefix="DIRECTOR: ")
 events = Array{Condition}(nnodes,2)
 hostname = readchomp(`hostname`)
@@ -181,6 +181,17 @@ t0=time()
       else
         while isopen(sock)
           jobidx = nextidx()
+          if which_cluster=="janelia"
+            njobs_remaining = min(0, length(job_aabbs)-jobidx)
+            bjobs_nlines = chomp(readstring(pipeline(`bjobs -p $jobid`,`wc -l`)))
+            nnodes_pending = min(0, (parse(Int,bjobs_nlines)-1)>>1)
+            nnodes_tokill = nnodes_pending - njobs_remaining
+            if nnodes_tokill>0
+              info(njobs_remaining, " jobs remaining", prefix="DIRECTOR: ")
+              info(nnodes_pending, " nodes pending", prefix="DIRECTOR: ")
+              map((x)->notify(events[x,1], nothing), nnodes-nnodes_tokill+1 : nnodes)
+            end
+          end
           if jobidx > length(job_aabbs)
             cmd = "squatter $p terminate"
             println(sock, cmd)
@@ -204,7 +215,7 @@ t0=time()
   cmd = `umask 002 \;
          $(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/squatter.jl $(ARGS[1]) $hostname $port`
   if which_cluster=="janelia"
-    queue = short_queue ? `-W 60 -n 16` : `-W 10080 -n 32`
+    queue = short_queue ? `-W 60 -n 16` : `-W 10080 -n $(throttle_leaf_ncores_per_job)`
     pcmd = pipeline(`echo $cmd`, `bsub -P $bill_userid $queue -J $(jobname)1\[1-$nnodes\]
           -R"select[avx2]" -o $logfile_scratch/squatter%I.log`)
     info(pcmd, prefix="DIRECTOR: ")
