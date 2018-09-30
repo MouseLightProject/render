@@ -33,6 +33,11 @@ const throttle_octree_ncores_per_job = 9
 
 const short_queue = false  # rendering leaf nodes MUST take less than 1 hour
 
+const overall_time_limit = short_queue ? 60 : 4320  # three days
+const leaf_time_limit    = short_queue ? 60 : 2880  # two days
+const octree_time_limit  = 480   # eight hours
+const cleanup_time_limit = 60    # one hour
+
 const source="/home/arthurb/projects/mouselight/src/render/test/regression"  # path to tilebase.cache.yml
 const destination="/nrs/mouselight/arthurb/987roiprod"  # path to octree
 

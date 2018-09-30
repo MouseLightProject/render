@@ -36,7 +36,9 @@ expr="include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       print(join([destination,shared_scratch,logfile_scratch,delete_scratch,notify_addr,bill_userid,
             typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),
             throttle_octree_njobs,throttle_octree_njobs_per_machine,throttle_octree_ncores_per_job,
-            nchannels,short_queue],' '))"
+            nchannels,short_queue,
+            overall_time_limit, leaf_time_limit, octree_time_limit, cleanup_time_limit],' '))"
+
 read -a tmp <<< $($JULIA -L $1 -e "$expr")
 destination=${tmp[0]}
 shared_scratch=${tmp[1]}
@@ -50,12 +52,11 @@ throttle_octree_njobs_per_machine=${tmp[8]}
 throttle_octree_ncores_per_job=${tmp[9]}
 nchannels=${tmp[10]}
 short_queue=${tmp[11]}
+overall_time_limit=${tmp[12]}
+leaf_time_limit=${tmp[13]}
+octree_time_limit=${tmp[14]}
+cleanup_time_limit=${tmp[15]}
 
-if [ "$short_queue" = "true" ] ; then
-  time_limit=60   # an hour
-else
-  time_limit=10080  # a week
-fi
 
 # delete <logfile_scratch> and <destination> if they exist
 if [ -d $logfile_scratch ] ; then
@@ -85,7 +86,7 @@ cmd="umask 002;
      $JULIA ${RENDER_PATH}/src/render/src/director.jl $destination/set_parameters.jl $jobname"
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | bsub -P $bill_userid -J $jobname -W $time_limit \
+  echo $cmd | bsub -P $bill_userid -J $jobname -W $overall_time_limit \
         -o $logfile_scratch/director.log
 else
   eval $cmd &> $logfile_scratch/director.log
@@ -123,7 +124,7 @@ if [ "$nlevels" -gt "2" ]; then
   if [ $which_cluster == 'janelia' ]; then
     echo $cmd | bsub -P $bill_userid -J ${jobname}2[1-512]%${throttle_octree_njobs} \
           -n $throttle_octree_ncores_per_job \
-          -w "done($jobname)" -W $time_limit -o $logfile_scratch/merge%I.log
+          -w "done($jobname)" -W $octree_time_limit -o $logfile_scratch/merge%I.log
   else
     pcmd="export RENDER_PATH=$RENDER_PATH;
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
@@ -157,7 +158,7 @@ echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | bsub -P $bill_userid -J ${jobname}3 \
         -n $throttle_octree_ncores_per_job \
-        $hold -W $time_limit -o $logfile_scratch/merge513.log
+        $hold -W $octree_time_limit -o $logfile_scratch/merge513.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH;
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
@@ -187,7 +188,7 @@ if [ $delete_scratch != 'never' ]; then
   echo $cmd &>> $logfile_scratch/render.log
   if [ $which_cluster == 'janelia' ]; then
     echo $cmd | bsub -P $bill_userid -J ${jobname}4 \
-          -w "done(${jobname}3)" -W $time_limit \
+          -w "done(${jobname}3)" -W $cleanup_time_limit \
           -o ${destination}/delete.log
   else
     eval $cmd &> ${destination}/delete.log
@@ -210,7 +211,7 @@ cmd="date;
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | bsub -P $bill_userid -J ${jobname}5 \
-        -w "done(${jobname}3)" -W $time_limit \
+        -w "done(${jobname}3)" -W $cleanup_time_limit \
         -o ${destination}/tar-profile.log
 else
   eval $cmd &> ${destination}/tar-profile.log

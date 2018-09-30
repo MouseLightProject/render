@@ -215,9 +215,9 @@ t0=time()
   cmd = `umask 002 \;
          $(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/squatter.jl $(ARGS[1]) $hostname $port`
   if which_cluster=="janelia"
-    queue = short_queue ? `-W 60 -n 16` : `-W 10080 -n $(throttle_leaf_ncores_per_job)`
-    pcmd = pipeline(`echo $cmd`, `bsub -P $bill_userid $queue -J $(jobname)1\[1-$nnodes\]
-          -R"select[avx2]" -o $logfile_scratch/squatter%I.log`)
+    pcmd = pipeline(`echo $cmd`, `bsub -P $bill_userid -J $(jobname)1\[1-$nnodes\]
+          -R"select[avx2]" -W $leaf_time_limit -n $(throttle_leaf_ncores_per_job)
+          -o $logfile_scratch/squatter%I.log`)
     info(pcmd, prefix="DIRECTOR: ")
     jobid = match(r"(?<=Job <)[0-9]*", readchomp(pcmd)).match
   else

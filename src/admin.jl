@@ -28,8 +28,10 @@ function retry2(f::Function, retry_on::Function=DEFAULT_RETRY_ON;
                 end
             end
             jittered_delay = delay * (1.0 + (rand() * jitter_factor))
-            message=="" || warn("try #",i," failed.  will retry in ",
-                  jittered_delay," seconds.  ",message)
+            if message!=""
+              warn("try #",i," failed.  will retry in ", jittered_delay," seconds.  ",message)
+              flush(STDOUT);  flush(STDERR)
+            end
             sleep(jittered_delay)
             delay = min(delay * growth_factor, max_delay)
         end
