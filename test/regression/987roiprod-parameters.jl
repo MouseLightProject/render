@@ -67,6 +67,7 @@ const interpolation = "nearest"  # "nearest" or "linear"
 
 const raw_compression_ratios = [] # or e.g. [10,80]
 const octree_compression_ratios = []
+const downsample_from_existing_leaves=false
 
 const dry_run = false
 

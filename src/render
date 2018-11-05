@@ -21,6 +21,8 @@
 #   transform.txt
 #   render.log
 
+parameters_file=$1
+
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4
 export LD_LIBRARY_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/env/lib:/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric4/julia-0.6.0/bin/julia
@@ -37,9 +39,10 @@ expr="include(\"${RENDER_PATH}/src/render/src/admin.jl\");
             typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),
             throttle_octree_njobs,throttle_octree_njobs_per_machine,throttle_octree_ncores_per_job,
             nchannels,short_queue,
-            overall_time_limit, leaf_time_limit, octree_time_limit, cleanup_time_limit],' '))"
+            overall_time_limit, leaf_time_limit, octree_time_limit, cleanup_time_limit,
+            source,downsample_from_existing_leaves],' '))"
 
-read -a tmp <<< $($JULIA -L $1 -e "$expr")
+read -a tmp <<< $($JULIA -L $parameters_file -e "$expr")
 destination=${tmp[0]}
 shared_scratch=${tmp[1]}
 logfile_scratch=${tmp[2]}
@@ -56,6 +59,8 @@ overall_time_limit=${tmp[12]}
 leaf_time_limit=${tmp[13]}
 octree_time_limit=${tmp[14]}
 cleanup_time_limit=${tmp[15]}
+source_path=${tmp[16]}
+downsample_from_existing_leaves=${tmp[17]}
 
 
 # delete <logfile_scratch> and <destination> if they exist
@@ -74,30 +79,52 @@ date >> $logfile_scratch/render.log
 hostname >> $logfile_scratch/render.log
 
 # copy parameters to <destination>
-cp $1 $destination/set_parameters.jl
+cp $parameters_file $destination/set_parameters.jl
 chmod g+rw $destination/set_parameters.jl
 
 # create a probably-unique job name
 jobname=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 7)
 echo jobname = $jobname >> $logfile_scratch/render.log
 
+# copy files
+if [ $downsample_from_existing_leaves == 'true' ]; then
+  cmd="cp ${source_path}/{calculated_parameters.jl,tilebase.cache.yml,transform.txt} $destination"
+  echo $cmd &>> $logfile_scratch/render.log
+  eval $cmd &>> $logfile_scratch/render.log
+fi
+
 # create the leaf nodes
-cmd="umask 002;
-     $JULIA ${RENDER_PATH}/src/render/src/director.jl $destination/set_parameters.jl $jobname"
-echo $cmd &>> $logfile_scratch/render.log
-if [ $which_cluster == 'janelia' ]; then
-  echo $cmd | bsub -P $bill_userid -J $jobname -W $overall_time_limit \
-        -o $logfile_scratch/director.log
-else
-  eval $cmd &> $logfile_scratch/director.log
+hold=''
+if [ $downsample_from_existing_leaves == 'false' ]; then
+  cmd="umask 002;
+       $JULIA ${RENDER_PATH}/src/render/src/director.jl $destination/set_parameters.jl $jobname"
+  echo $cmd &>> $logfile_scratch/render.log
+  if [ $which_cluster == 'janelia' ]; then
+    echo $cmd | bsub -P $bill_userid -J $jobname -W $overall_time_limit \
+          -o $logfile_scratch/director.log
+    hold="-w done($jobname)"
+  else
+    eval $cmd &> $logfile_scratch/director.log
+  fi
 fi
 
 # get nlevels from calculated_parameters.jl file
 while [ ! -f ${destination}/calculated_parameters.jl ]; do sleep 2; done
 expr="include(joinpath(destination,\"calculated_parameters.jl\"));
       print(nlevels)"
-read -a tmp <<< $($JULIA -L $1 -e "$expr")
+read -a tmp <<< $($JULIA -L $parameters_file -e "$expr")
 nlevels=${tmp[0]}
+
+# link to the leaf nodes
+if [ $downsample_from_existing_leaves == 'true' ]; then
+  echo symlinking leaf nodes &>> $logfile_scratch/render.log
+  cd $source_path
+  for i in `seq 1 8` ; do
+    find $i -mindepth $nlevels -name '*.tif' | xargs -n 1 -I{} bash -c "foo={}; source=$source_path; destination=$destination;"' mkdir -p ${destination}/${foo%/*}; ln -s ${source}/${foo} ${destination}/${foo}' &
+  done
+  wait
+  cd -
+fi
 
 # downsample the octree
 if [ "$nlevels" -gt "2" ]; then
@@ -108,10 +135,11 @@ if [ "$nlevels" -gt "2" ]; then
         t=time();
         id=parse(Int,ENV[\"LSB_JOBINDEX\"]);
         oct1,oct2,oct3 = ((id-1)&0x1c0)>>6+1, ((id-1)&0x38)>>3+1, ((id-1)&0x7)+1;
-        if isdir(joinpath(shared_scratch,string(oct1),string(oct2),string(oct3)))
-          merge_output_tiles(shared_scratch, destination, \"default\", file_format,
-                string(oct1)*\"/\"*string(oct2)*\"/\"*string(oct3),
-                true, true, delete_scratch==\"as-you-go\" ? true : false);
+        frompath = downsample_from_existing_leaves ? destination : shared_scratch;
+        delete_flag = !downsample_from_existing_leaves && delete_scratch==\"as-you-go\";
+        if isdir(joinpath(frompath,string(oct1),string(oct2),string(oct3)))
+          merge_output_tiles(frompath, destination, \"default\", file_format,
+                string(oct1)*\"/\"*string(oct2)*\"/\"*string(oct3), true, true, delete_flag);
           info(\"merging took \",string(round(Int,time()-t)),\" sec\");
         end;
         rmprocs(p);"
@@ -124,7 +152,7 @@ if [ "$nlevels" -gt "2" ]; then
   if [ $which_cluster == 'janelia' ]; then
     echo $cmd | bsub -P $bill_userid -J ${jobname}2[1-512]%${throttle_octree_njobs} \
           -n $throttle_octree_ncores_per_job \
-          -w "done($jobname)" -W $octree_time_limit -o $logfile_scratch/merge%I.log
+          $hold -W $octree_time_limit -o $logfile_scratch/merge%I.log
   else
     pcmd="export RENDER_PATH=$RENDER_PATH;
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
@@ -136,8 +164,6 @@ if [ "$nlevels" -gt "2" ]; then
     parallel -S $which_cluster -j $throttle_octree_njobs_per_machine $pcmd ::: `seq 1 512` &>> $logfile_scratch/render.log
   fi
   hold="-w done(${jobname}2)"
-else
-  hold="-w done($jobname)"
 fi
 
 expr="p=addprocs(${throttle_octree_ncores_per_job});
@@ -145,8 +171,9 @@ expr="p=addprocs(${throttle_octree_ncores_per_job});
       @everywhere include(\"${destination}/calculated_parameters.jl\");
       @everywhere include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       t=time();
-      merge_output_tiles(nlevels>2 ? destination : shared_scratch, destination, \"default\", file_format,
-            \"\", true, true, delete_scratch==\"as-you-go\" ? true : false);
+      frompath = (nlevels>2 || downsample_from_existing_leaves) ? destination : shared_scratch;
+      delete_flag = !downsample_from_existing_leaves && delete_scratch==\"as-you-go\";
+      merge_output_tiles(frompath, destination, \"default\", file_format, \"\", true, true, delete_flag);
       info(\"merging took \",string(round(Int,time()-t)),\" sec\");
       rmprocs(p);"
 cmd="umask 002;

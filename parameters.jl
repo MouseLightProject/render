@@ -20,6 +20,8 @@ const interpolation = "nearest"  # "nearest" or "linear"
 const raw_compression_ratios = [] # or e.g. [10,80]
 const octree_compression_ratios = []
 
+const downsample_from_existing_leaves=false
+
 
 # build the octree with a function below.  should return UInt16
 
@@ -44,6 +46,26 @@ downsampling_function(arg::Array{UInt16,3}) = (@inbounds return arg[1,1,1])
 #    end
 #  end
 #  m1
+#end
+
+# 4. Nth brightest non-zero of the 8 pixels
+#function downsampling_function(arg::Array{UInt16,3})
+#  n=5
+#  m = fill(0x0000,n)
+#  for i = 1:8
+#    @inbounds tmp::UInt16 = arg[i]
+#    for i=1:n
+#      if tmp>m[i]
+#        m[i+1:n]=m[i:n-1]
+#        m[i]=tmp
+#        break
+#      end
+#    end
+#  end
+#  for i=n:-1:1
+#    m[i]==0 || return m[i]
+#  end
+#  return 0x0000
 #end
 
 
