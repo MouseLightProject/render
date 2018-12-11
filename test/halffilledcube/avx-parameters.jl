@@ -1,15 +1,16 @@
 const notify_addr = "arthurb@hhmi.org"
 const bill_userid = "scicompsoft"
 
-const source=joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube") # path to tilebase.cache.yml
-const destination=joinpath(source,"scratch","avx","results")  # path to octree
+scratch_path = joinpath(ENV["RENDER_PATH"],"src","render","test","halffilledcube","scratch")
+const source=joinpath(scratch_path,"data") # path to tilebase.cache.yml
+const destination=joinpath(scratch_path,"avx","results")  # path to octree
 
 const file_infix="halffilledcube"
 const file_format_load="tif"  # "tif" or "h5"
 const file_format_save="tif"  # "tif" or "h5"
 
-const shared_scratch=joinpath(source,"scratch","avx","shared_scratch")
-const logfile_scratch=joinpath(source,"scratch","avx","logfile_scratch")  # should be on /groups
+const shared_scratch=joinpath(scratch_path,"avx","shared_scratch")
+const logfile_scratch=joinpath(scratch_path,"avx","logfile_scratch")  # should be on /groups
 const delete_scratch="as-you-go"   # "never", "at-end" or "as-you-go"
 
 const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size
