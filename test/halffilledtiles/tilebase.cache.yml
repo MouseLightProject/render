@@ -1,4 +1,4 @@
-path: RENDER_PATH/src/render/test/halffilledcube/scratch/data
+path: RENDER_PATH/src/render/test/halffilledtiles/scratch/data
 tiles:
 - path: /00/00001
   aabb:

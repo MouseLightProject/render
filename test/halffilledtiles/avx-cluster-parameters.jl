@@ -1,16 +1,16 @@
 const notify_addr = "arthurb@hhmi.org"
 const bill_userid = "scicompsoft"
 
-scratch_path = joinpath(ENV["RENDER_PATH"],"src","render","test","halffilledcube","scratch")
+scratch_path = joinpath(ENV["RENDER_PATH"],"src","render","test","halffilledtiles","scratch")
 const source=joinpath(scratch_path,"data") # path to tilebase.cache.yml
-const destination=joinpath(scratch_path,"avx","results")  # path to octree
+const destination=joinpath(scratch_path,"avx-cluster","results")  # path to octree
 
-const file_infix="halffilledcube"
+const file_infix="halffilledtiles"
 const file_format_load="tif"  # "tif" or "h5"
 const file_format_save="tif"  # "tif" or "h5"
 
-const shared_scratch=joinpath(scratch_path,"avx","shared_scratch")
-const logfile_scratch=joinpath(scratch_path,"avx","logfile_scratch")  # should be on /groups
+const shared_scratch=joinpath(scratch_path,"avx-cluster","shared_scratch")
+const logfile_scratch=joinpath(scratch_path,"avx-cluster","logfile_scratch")  # should be on /groups
 const delete_scratch="as-you-go"   # "never", "at-end" or "as-you-go"
 
 const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size
@@ -67,7 +67,7 @@ const max_tilechannels_per_job=500  # maximum number of input tiles * nchannels 
 # larger is more efficient with file i/o; smaller is more parallel computation
 
 
-const which_cluster = [ENV["HOSTNAME"]] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
+const which_cluster = "janelia" # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
 const ncores_incluster = 48*32
@@ -87,7 +87,7 @@ const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
 # ignored when which_cluster=="janelia"
 # otherwise set to ncores per machine for small data sets
 
-const throttle_octree_ncores_per_job = 1
+const throttle_octree_ncores_per_job = 9
 # for which_cluster=="janelia" set to 9 (max is 16)
 # otherwise set to 1 for small data sets
 

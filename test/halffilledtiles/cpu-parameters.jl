@@ -1,11 +1,11 @@
 const notify_addr = "arthurb@hhmi.org"
 const bill_userid = "scicompsoft"
 
-scratch_path = joinpath(ENV["RENDER_PATH"],"src","render","test","halffilledcube","scratch")
+scratch_path = joinpath(ENV["RENDER_PATH"],"src","render","test","halffilledtiles","scratch")
 const source=joinpath(scratch_path,"data") # path to tilebase.cache.yml
 const destination=joinpath(scratch_path,"cpu","results")  # path to octree
 
-const file_infix="halffilledcube"
+const file_infix="halffilledtiles"
 const file_format_load="tif"  # "tif" or "h5"
 const file_format_save="tif"  # "tif" or "h5"
 

@@ -12,9 +12,9 @@ function check_toplevel_images(basepath)
   @test all(squeeze(maximum(rawview(channelview(img)),(1,3)),(1,3)) .== rightanswer)
 end
 
-scratchpath = joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube/scratch")
+scratchpath = joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledtiles/scratch")
 
-@testset "halffilledcube" begin
+@testset "halffilledtiles" begin
 
 @testset "$v" for v in ["cpu", "avx", "localscratch"]
   check_logfiles( joinpath(scratchpath,"$v","results","logs.tar.gz"), 512+1)
