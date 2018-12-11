@@ -7,8 +7,6 @@ const datapath = joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledcube/scr
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 
-using Base.Test
-
 in_tile_jl = zeros(UInt16,shape_leaf_px...)
 in_tile_jl[1+(end>>1):end, :, :] = 0xffff
 for i=1:21

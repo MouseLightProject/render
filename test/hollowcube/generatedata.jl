@@ -7,8 +7,6 @@ const datapath = joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 
-using Base.Test
-
 inset = 4
 in_tile_1_jl = zeros(UInt16,shape_leaf_px...,nchannels)
 
