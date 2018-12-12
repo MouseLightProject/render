@@ -95,8 +95,12 @@ const throttle_leaf_njobs = 64  # maximum number of jobs to use to render leafs
 # for which_cluster=="janelia" set to 64 (max is ncores_incluster/throttle_leaf_ncores_per_job)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_leaf_ncores_per_job = 16
+const leaf_ncores_per_job = 16
 # for which_cluster=="janelia" set based on memory and load utilization (max is 48)
+
+const leaf_nthreads_per_process = 8  # should match barycentricCPU.c
+
+const leaf_process_oversubscription = 2
 
 const throttle_octree_njobs = 256  # maximum number of compute nodes to use to downsample octree
 # for which_cluster=="janelia" set to 256 (max is ncores_incluster/throttle_octree_ncores_per_job)
@@ -106,7 +110,7 @@ const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
 # ignored when which_cluster=="janelia"
 # otherwise set to ncores per machine for small data sets
 
-const throttle_octree_ncores_per_job = 4
+const octree_ncores_per_job = 4
 # for which_cluster=="janelia" set to 4 (max is 9)
 # otherwise set to 1 for small data sets
 

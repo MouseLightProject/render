@@ -124,7 +124,7 @@ include_origins_outside_roi && length(job_aabbs)>1 &&
 # initialize tcp communication with squatters
 nnodes = min( length(job_aabbs),
               throttle_leaf_njobs,
-              which_cluster=="janelia" ? round(Int,ncores_incluster/throttle_leaf_ncores_per_job) : length(which_cluster) )
+              which_cluster=="janelia" ? round(Int,ncores_incluster/leaf_ncores_per_job) : length(which_cluster) )
 info("number of cluster nodes used = $nnodes", prefix="DIRECTOR: ")
 events = Array{Condition}(nnodes,2)
 hostname = readchomp(`hostname`)
@@ -214,7 +214,7 @@ t0=time()
          $(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/squatter.jl $(ARGS[1]) $hostname $port`
   if which_cluster=="janelia"
     pcmd = pipeline(`echo $cmd`, `bsub -P $bill_userid -J $(jobname)1\[1-$nnodes\]
-          -R"select[avx2]" -W $leaf_time_limit -n $(throttle_leaf_ncores_per_job)
+          -R"select[avx2]" -W $leaf_time_limit -n $(leaf_ncores_per_job)
           -o $logfile_scratch/squatter%I.log`)
     info(pcmd, prefix="DIRECTOR: ")
     jobid = match(r"(?<=Job <)[0-9]*", readchomp(pcmd)).match

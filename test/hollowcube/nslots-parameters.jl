@@ -72,8 +72,12 @@ const bad_nodes = []  # e.g. ["h09u20"]
 
 const ncores_incluster = 48*32
  
-const throttle_leaf_ncores_per_job = 32
+const leaf_ncores_per_job = 32
 # for which_cluster=="janelia" set based on memory and load utilization (max is 48)
+
+const leaf_nthreads_per_process = 8  # should match barycentricCPU.c
+
+const leaf_process_oversubscription = 2
 
 const throttle_leaf_njobs = 96  # maximum number of compute nodes to use to render leafs
 # for which_cluster=="janelia" set to 96 (max is 96)
@@ -87,7 +91,7 @@ const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
 # ignored when which_cluster=="janelia"
 # otherwise set to ncores per machine for small data sets
 
-const throttle_octree_ncores_per_job = 9
+const octree_ncores_per_job = 9
 # for which_cluster=="janelia" set to 9 (max is 16)
 # otherwise set to 1 for small data sets
 

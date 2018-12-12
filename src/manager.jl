@@ -25,9 +25,8 @@ const hostname_director = ARGS[8]
 const port_director = parse(Int,ARGS[9])
 
 # how many peons
-nthreads = 8  # should match barycentricCPU.c
 ncores = haskey(ENV,"LSB_DJOB_NUMPROC") ? parse(Int,ENV["LSB_DJOB_NUMPROC"]) : Sys.CPU_CORES
-num_procs = div(ncores,nthreads)
+num_procs = leaf_process_oversubscription*div(ncores,leaf_nthreads_per_process)
 info(ncores," CPUs present which can collectively process ",num_procs," tiles simultaneously", prefix="MANAGER: ")
 
 info("AVX2 = ",has_avx2, prefix="MANAGER: ")

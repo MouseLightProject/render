@@ -38,7 +38,7 @@ expr="using YAML;
       nchannels = tile_shape[4];
       print(join([destination,shared_scratch,logfile_scratch,delete_scratch,notify_addr,bill_userid,
             typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),
-            throttle_octree_njobs,throttle_octree_njobs_per_machine,throttle_octree_ncores_per_job,
+            throttle_octree_njobs,throttle_octree_njobs_per_machine,octree_ncores_per_job,
             nchannels,short_queue,
             overall_time_limit, leaf_time_limit, octree_time_limit, cleanup_time_limit,
             source,downsample_from_existing_leaves],' '))"
@@ -53,7 +53,7 @@ bill_userid=${tmp[5]}
 which_cluster=${tmp[6]}
 throttle_octree_njobs=${tmp[7]}
 throttle_octree_njobs_per_machine=${tmp[8]}
-throttle_octree_ncores_per_job=${tmp[9]}
+octree_ncores_per_job=${tmp[9]}
 nchannels=${tmp[10]}
 short_queue=${tmp[11]}
 overall_time_limit=${tmp[12]}
@@ -130,7 +130,7 @@ fi
 # downsample the octree
 if [ "$nlevels" -gt "2" ]; then
   expr="import Images, HDF5, YAML;
-        p=addprocs(${throttle_octree_ncores_per_job});
+        p=addprocs(${octree_ncores_per_job});
         @everywhere using Images, HDF5, YAML;
         @everywhere include(\"${destination}/set_parameters.jl\");
         @everywhere include(\"${destination}/calculated_parameters.jl\");
@@ -154,7 +154,7 @@ if [ "$nlevels" -gt "2" ]; then
   echo $cmd &>> $logfile_scratch/render.log
   if [ $which_cluster == 'janelia' ]; then
     echo $cmd | bsub -P $bill_userid -J ${jobname}2[1-512]%${throttle_octree_njobs} \
-          -n $throttle_octree_ncores_per_job \
+          -n $octree_ncores_per_job \
           $hold -W $octree_time_limit -o $logfile_scratch/merge%I.log
   else
     pcmd="export RENDER_PATH=$RENDER_PATH;
@@ -170,7 +170,7 @@ if [ "$nlevels" -gt "2" ]; then
 fi
 
 expr="import Images, HDF5, YAML;
-      p=addprocs(${throttle_octree_ncores_per_job});
+      p=addprocs(${octree_ncores_per_job});
       @everywhere using Images, HDF5, YAML;
       @everywhere include(\"${destination}/set_parameters.jl\");
       @everywhere include(\"${destination}/calculated_parameters.jl\");
@@ -189,7 +189,7 @@ cmd="umask 002;
 echo $cmd &>> $logfile_scratch/render.log
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | bsub -P $bill_userid -J ${jobname}3 \
-        -n $throttle_octree_ncores_per_job \
+        -n $octree_ncores_per_job \
         $hold -W $octree_time_limit -o $logfile_scratch/merge513.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH;
