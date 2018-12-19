@@ -1,4 +1,4 @@
-using Base.Test, Images, HDF5
+using Test, Images, HDF5
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
 
@@ -28,11 +28,11 @@ function check_toplevel_images(basepath, nchannels)
 end
 
 function check_projection_logfiles(basepath)
-  logfiledump = readstring(`tar xzfO $(basepath)/logs.tar.gz`)
+  logfiledump = read(`tar xzfO $(basepath)/logs.tar.gz`, String)
 
   # any problems reported in the log files?
-  @test !contains(String(logfiledump), "ERR")
-  @test !contains(String(logfiledump), "Segmentation")
+  @test !occursin("ERR", String(logfiledump))
+  @test !occursin("Segmentation", String(logfiledump))
 end
 
 function check_toplevel_projection_images(basepath)
@@ -103,7 +103,7 @@ end
   check_logfiles(joinpath(scratchpath,"linearinterp-threechannel","results","logs.tar.gz"), 1)
   check_logfiles(joinpath(scratchpath,"linearinterp-threechannel-cpu","results","logs.tar.gz"), 1)
   check_images(scratchpath, ["linearinterp-threechannel","linearinterp-threechannel-cpu"], 3, 3*(64+8+1), false)
-  info("it is normal to have 68 avx images each have ~1000 voxels be 257 shades different compared to cpu")
+  @info("it is normal to have 68 avx images each have ~1000 voxels be 257 shades different compared to cpu")
 end
 
 @testset "nslots" begin
@@ -114,7 +114,7 @@ end
   function nslots(scratchpath, rightanswer)
     r = "MANAGER: $rightanswer CPUs"
     logfilepath = joinpath(scratchpath,"results","logs.tar.gz")
-    squatters = filter(file->contains(file,"squatter"), readlines(`tar tvzf $logfilepath`))
+    squatters = filter(file->occursin("squatter", file), readlines(`tar tvzf $logfilepath`))
     ncache = []
     for squatter in squatters
       squatter_file = split(squatter,' ')[end]

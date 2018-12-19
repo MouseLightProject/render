@@ -23,14 +23,14 @@ function retry2(f::Function, retry_on::Function=DEFAULT_RETRY_ON;
             try
                 return f(args...)
             catch e
-                if i > n || try retry_on(e) end !== true
+                if i > n || try retry_on(e) catch; end !== true
                     rethrow(e)
                 end
             end
             jittered_delay = delay * (1.0 + (rand() * jitter_factor))
             if message!=""
               warn("try #",i," failed.  will retry in ", jittered_delay," seconds.  ",message)
-              flush(STDOUT);  flush(STDERR)
+              flush(stdout);  flush(stderr)
             end
             sleep(jittered_delay)
             delay = min(delay * growth_factor, max_delay)
@@ -50,7 +50,7 @@ function get_available_port(default_port)
   end
 end
 
-has_avx2 = contains(readstring("/proc/cpuinfo"),"avx2")
+has_avx2 = occursin("avx2", read("/proc/cpuinfo", String))
 
 
 # port of tilebase
@@ -110,7 +110,7 @@ function AABBUnion(bbox1,bbox2)
 end
 
 function AABBBinarySubdivision(bbox)
-  out=Vector{Dict}(8)
+  out=Vector{Dict}(undef, 8)
   for i=1:8
     out[i]=deepcopy(bbox)
     for d=1:3
@@ -140,33 +140,33 @@ const libengine = ENV["RENDER_PATH"]*"/env/build/mltk-bary/libengine.so"
 
 #closelibs() = Libdl.dlclose(h)
 
-type BarycentricException <: Exception end
+mutable struct BarycentricException <: Exception end
 
 BarycentricCPUinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricCPUinit, libengine),
-      Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
+      Int, (Ptr{Ptr{Cvoid}},Ptr{Cuint},Ptr{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
 BarycentricAVXinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricAVXinit, libengine),
-      Int, (Ptr{Ptr{Void}},Ptr{Cuint},Ptr{Cuint},Cuint),
+      Int, (Ptr{Ptr{Cvoid}},Ptr{Cuint},Ptr{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
 BarycentricCPUresample(r,cube,orientation,interpolation) =
-      ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint,Cint),
+      ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Cvoid}},Ptr{Cfloat},Cint,Cint),
       r,cube,orientation,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
 
 BarycentricAVXresample(r,cube,orientation,interpolation) =
-      ccall((:BarycentricAVXresample, libengine), Int, (Ptr{Ptr{Void}},Ptr{Cfloat},Cint,Cint),
+      ccall((:BarycentricAVXresample, libengine), Int, (Ptr{Ptr{Cvoid}},Ptr{Cfloat},Cint,Cint),
       r,cube,orientation,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
 
-BarycentricCPUrelease(r) = ccall((:BarycentricCPUrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
-BarycentricAVXrelease(r) = ccall((:BarycentricAVXrelease, libengine), Void, (Ptr{Ptr{Void}},), r)
+BarycentricCPUrelease(r) = ccall((:BarycentricCPUrelease, libengine), Cvoid, (Ptr{Ptr{Cvoid}},), r)
+BarycentricAVXrelease(r) = ccall((:BarycentricAVXrelease, libengine), Cvoid, (Ptr{Ptr{Cvoid}},), r)
 
 for f = ("source", "destination", "result")
   @eval $(Symbol("BarycentricCPU"*f))(r,src) =
-      ccall(($("BarycentricCPU"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
+      ccall(($("BarycentricCPU"*f), libengine), Int, (Ptr{Ptr{Cvoid}},Ptr{UInt16}),
           r,src) !=1 && throw(BarycentricException())
   @eval $(Symbol("BarycentricAVX"*f))(r,src) =
-      ccall(($("BarycentricAVX"*f), libengine), Int, (Ptr{Ptr{Void}},Ptr{UInt16}),
+      ccall(($("BarycentricAVX"*f), libengine), Int, (Ptr{Ptr{Cvoid}},Ptr{UInt16}),
           r,src) !=1 && throw(BarycentricException())
 end
 
@@ -199,7 +199,7 @@ load_tile(filename,ext,shape) = retry2(() -> _load_tile(filename,ext,shape),
 function _load_tile(filename,ext,shape)
   if ext=="tif"
     regex = Regex("$(basename(filename))\.[0-9]\.$ext")
-    files = filter(x->ismatch(regex,x), readdir(dirname(filename)))
+    files = filter(x->occursin(regex,x), readdir(dirname(filename)))
     @assert length(files)==shape[end]
     img = Array{UInt16}(shape...)
     for (c,file) in enumerate(files)
@@ -335,7 +335,7 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
     time_single_file=(time()-t0)
   elseif length(in_tiles)>1
     t0=time()
-    info("merging:")
+    @info("merging:")
     t1=time()
     fill!(merge1, 0x0000)
     time_clear_files=(time()-t1)
@@ -480,26 +480,26 @@ function merge_output_tiles(source, destination, prefix, suffix, out_tile_path,
   accumulate_times(fetch(merge_across_filesystems(
         source, destination, prefix, suffix, out_tile_path, recurse, octree, delete)))
 
-  info("copying / moving single files took ",signif(time_single_file,4)," sec")
-  info("merging multiple files took ",signif(time_many_files,4)," sec")
-  info("  clearing multiple files took ",signif(time_clear_files,4)," sec")
-  info("  reading multiple files took ",signif(time_read_files,4)," sec")
-  info("  max'ing multiple files took ",signif(time_max_files,4)," sec")
-  info("  deleting multiple files took ",signif(time_delete_files,4)," sec")
-  info("  writing multiple files took ",signif(time_write_files,4)," sec")
+  info("copying / moving single files took ",round(time_single_file, sigdigits=4)," sec")
+  info("merging multiple files took ",round(time_many_files, sigdigits=4)," sec")
+  info("  clearing multiple files took ",round(time_clear_files, sigdigits=4)," sec")
+  info("  reading multiple files took ",round(time_read_files, sigdigits=4)," sec")
+  info("  max'ing multiple files took ",round(time_max_files, sigdigits=4)," sec")
+  info("  deleting multiple files took ",round(time_delete_files, sigdigits=4)," sec")
+  info("  writing multiple files took ",round(time_write_files, sigdigits=4)," sec")
 
   if octree
-    info("clearing octree took ",signif(time_octree_clear,4)," sec")
-    info("reading octree took ",signif(time_octree_read,4)," sec")
-    info("downsampling octree took ",signif(time_octree_down,4)," sec")
-    info("saving octree took ",signif(time_octree_save,4)," sec")
+    info("clearing octree took ",round(time_octree_clear, sigdigits=4)," sec")
+    info("reading octree took ",round(time_octree_read, sigdigits=4)," sec")
+    info("downsampling octree took ",round(time_octree_down, sigdigits=4)," sec")
+    info("saving octree took ",round(time_octree_save, sigdigits=4)," sec")
   end
 end
 
 function rmcontents(dir, available, prefix)
   function get_available(dir,msg)
     free = parse(Int,split(readchomp(ignorestatus(`df $dir`)))[11])
-    info(signif(free/1024/1024,4)," GB available on ",dir," at ",msg, prefix=prefix)
+    info(round(free/1024/1024, sigdigits=4)," GB available on ",dir," at ",msg, prefix=prefix)
     free
   end
   available=="before" && (free=get_available(dir,"end"))

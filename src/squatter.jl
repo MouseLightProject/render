@@ -20,11 +20,11 @@ split(readchomp(`hostname`),".")[1] in bad_nodes && exit(1)
 sock = connect(ARGS[2],parse(Int,ARGS[3]))
 println(sock,"squatter ",proc_num," is ready on ",readchomp(`hostname`))
 
-while isopen(sock) || nb_available(sock)>0
+while isopen(sock) || bytesavailable(sock)>0
   tmp = chomp(readline(sock,chomp=false))
   length(tmp)==0 && continue
   info(tmp, prefix="SQUATTER<DIRECTOR: ")
-  if ismatch(dole_out,tmp)
+  if occursin(dole_out,tmp)
     cmd=`$(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/manager.jl $(split(tmp)[6:end])`
     info(cmd, prefix="SQUATTER: ")
     try
@@ -35,7 +35,7 @@ while isopen(sock) || nb_available(sock)>0
     msg = "squatter $proc_num is finished"
     println(sock,msg)
     info(msg, prefix="SQUATTER>DIRECTOR: ")
-  elseif ismatch(terminate,tmp)
+  elseif occursin(terminate,tmp)
     msg = "squatter $proc_num is terminating"
     println(sock,msg)
     info(msg, prefix="SQUATTER>DIRECTOR: ")

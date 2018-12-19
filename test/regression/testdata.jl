@@ -1,4 +1,4 @@
-using Base.Test, Images
+using Test, Images
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
 

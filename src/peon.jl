@@ -15,7 +15,7 @@ include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 const local_scratch="/scratch/"*readchomp(`whoami`)
 const origin_str = ARGS[3]
 const in_tile_idx = parse(Int,ARGS[2])
-const solo_out_tiles = eval(parse(ARGS[4]))
+const solo_out_tiles = eval(Meta.parse(ARGS[4]))
 idx = 7
 const nxlims = parse(Int,ARGS[idx])
 const xlims = [parse(Int,x) for x in ARGS[idx+(1:nxlims)]]
@@ -54,7 +54,7 @@ const out_tiles = Dict{String,Array{UInt16,4}}()
 const merge_count = Dict{String,Array{UInt8,1}}()
 
 # 2 -> sizeof(UInt16), 20e3 -> .tif metadata size, 15 -> max # possible concurrent saves, need to generalize
-enough_free(path) = parse(Int,split(readstring(`df $path`))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
+enough_free(path) = parse(Int,split(read(`df $path`, String))[11])*1024 > 15*((prod(shape_leaf_px)*2 + 20e3))
 
 function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_str,
         sub_transform_nm, orientation, in_subtile_aabb)
@@ -73,8 +73,8 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
       info("processing output tile ",out_tile_path_next, prefix="PEON: ")
 
       t0=time()
-      const origin_nm = AABBGet(cboxes[imorton])[1]
-      const transform = (sub_transform_nm .- origin_nm) ./ (voxelsize_used_um*um2nm)
+      origin_nm = AABBGet(cboxes[imorton])[1]
+      transform = (sub_transform_nm .- origin_nm) ./ (voxelsize_used_um*um2nm)
 
       if !haskey(out_tiles,out_tile_path_next)
         out_tiles[out_tile_path_next] = zeros(UInt16, shape_leaf_px..., nchannels)
@@ -125,7 +125,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
               @inbounds local_out_tile[i1,i2,i3,i4] =
                     max(local_out_tile[i1,i2,i3,i4], out_tile_from_manager[i1,i2,i3,i4])
             end
-            out_tile_from_manager = Array{UInt16}(0,0,0,0)
+            out_tile_from_manager = Array{UInt16}(undef, 0,0,0,0)
             gc()
             save_tile(shared_scratch, out_tile_path_next, origin_str, file_format_save,
                   out_tiles[out_tile_path_next])
@@ -198,7 +198,7 @@ function process_input_tile()
     t1=time()
     in_subtile = in_tile[1+(xlims[ix]:xlims[ix+1]),1+(ylims[iy]:ylims[iy+1]),1+(zlims[iz]:zlims[iz+1]),:]
     shape_in_subtile = convert(Array{Cuint,1},[size(in_subtile)...])
-    global resampler = Ptr{Void}[0]
+    global resampler = Ptr{Cvoid}[0]
     if has_avx2 && use_avx
       BarycentricAVXinit(resampler, shape_in_subtile, shape_leaf_nchannels, 4)
       BarycentricAVXsource(resampler, in_subtile)

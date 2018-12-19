@@ -11,7 +11,7 @@ info(readchomp(`hostname`), prefix="MANAGER: ")
 info(readchomp(`date`), prefix="MANAGER: ")
 
 proc_num = nothing
-try;  global proc_num = ENV["LSB_JOBINDEX"];  end
+try;  global proc_num = ENV["LSB_JOBINDEX"];  catch; end
 
 using YAML
 
@@ -44,7 +44,7 @@ info("deleting /dev/shm and local_scratch = ",local_scratch," at start took ",ro
 
 # read in the transform parameters
 using YAML
-const meta = YAML.load(replace(readstring(source*"/tilebase.cache.yml"),['[',',',']'],""))
+const meta = YAML.load(replace(read(source*"/tilebase.cache.yml", String),['[',',',']'] =>""))
 const dims = [map(x->parse(Int,x), split(x["shape"]["dims"]))[1:3] for x in meta["tiles"]]
 const xlims = map(x->parse(Int,x), split(meta["tiles"][1]["grid"]["xlims"]))
 const ylims = map(x->parse(Int,x), split(meta["tiles"][1]["grid"]["ylims"]))
@@ -87,8 +87,8 @@ function depth_first_traverse(bbox,out_tile_path)
     sum(btile)>0 || return
     merge_count[join(out_tile_path, Base.Filesystem.path_separator)] = UInt16[sum(btile), 0, 0, 0]
     info("output tile ",join(out_tile_path, Base.Filesystem.path_separator),
-         " overlaps with input tiles ",join(in_tiles_idx[find(btile)],", "), prefix="MANAGER: ")
-    dtile = setdiff(find(btile), locality_idx)
+         " overlaps with input tiles ",join(in_tiles_idx[findall(btile)],", "), prefix="MANAGER: ")
+    dtile = setdiff(findall(btile), locality_idx)
     isempty(dtile) || push!(locality_idx, dtile...)
   else
     cboxes = AABBBinarySubdivision(bbox)
@@ -113,7 +113,7 @@ locality_idx = Int[]
 depth_first_traverse(TileBaseAABB(tiles),Int[])
 solo_out_tiles = setdiff( String[x[2][1]==1 ? x[1] : "" for x in merge_count] ,[""])
 
-isempty(locality_idx) && warn("coordinates of input subtiles aren't within bounding box")
+isempty(locality_idx) && @warn("coordinates of input subtiles aren't within bounding box")
 
 info("assigned ",length(in_tiles_idx)," input tiles", prefix="MANAGER: ")
 length(in_tiles_idx)==0 && quit()
@@ -123,6 +123,7 @@ try
   global sock_director = connect(hostname_director,port_director)
   println(sock_director,"manager ",proc_num," is starting job ",join(origin_strs,'.'),
         " on ",readchomp(`hostname`), " for ",length(in_tiles_idx)," input tiles")
+catch
 end
 
 const ready_msg = r"(peon for input tile )([0-9]*)( has output tile )([1-8/]*)( ready)"
@@ -132,12 +133,12 @@ const saved_msg = r"(peon for input tile )([0-9]*)( saved output tile )([1-8/]*)
 const finished_msg = r"(?<=peon for input tile )[0-9]*(?= is finished)"
 
 function wrangle_peon(sock)
-  while isopen(sock) || nb_available(sock)>0
+  while isopen(sock) || bytesavailable(sock)>0
     msg_from_peon = chomp(readline(sock,chomp=false))
     length(msg_from_peon)==0 && continue
     info(msg_from_peon, prefix="MANAGER<PEON: ")
     local in_tile_num::AbstractString, out_tile_path::AbstractString, out_tile::Array{UInt16,4}
-    if ismatch(ready_msg, msg_from_peon)
+    if occursin(ready_msg, msg_from_peon)
       in_tile_num, out_tile_path = match(ready_msg,msg_from_peon).captures[[2,4]]
       merge_count[out_tile_path][2]+=1
       if merge_count[out_tile_path][4]==0
@@ -177,10 +178,10 @@ function wrangle_peon(sock)
           info(msg, prefix="MANAGER>PEON: ")
         end
       end
-    elseif ismatch(wrote_msg, msg_from_peon)
+    elseif occursin(wrote_msg, msg_from_peon)
       out_tile_path = match(wrote_msg,msg_from_peon).captures[4]
       merge_count[out_tile_path][3]+=1
-    elseif ismatch(sent_msg, msg_from_peon)
+    elseif occursin(sent_msg, msg_from_peon)
       out_tile_path = match(sent_msg,msg_from_peon).captures[4]
       out_tile = deserialize(sock)
       merge_count[out_tile_path][3]+=1
@@ -195,15 +196,15 @@ function wrangle_peon(sock)
         end
       end
       time_max_files=time()-t1
-      info("max'ing multiple files took ",signif(time_max_files,4)," sec", prefix="MANAGER: ")
-    elseif ismatch(saved_msg, msg_from_peon)
+      info("max'ing multiple files took ",round(time_max_files, sigdigits=4)," sec", prefix="MANAGER: ")
+    elseif occursin(saved_msg, msg_from_peon)
       out_tile_path = match(saved_msg,msg_from_peon).captures[4]
       merge_used[merge_count[out_tile_path][4]] = false
-    elseif ismatch(finished_msg, msg_from_peon)
+    elseif occursin(finished_msg, msg_from_peon)
       break
     end
   end
-  out_tile = Array{UInt16}(0,0,0,0)
+  out_tile = Array{UInt16}(undef, 0,0,0,0)
   gc()
 end
 
@@ -266,8 +267,9 @@ info("deleting local_scratch = ",local_scratch," at end took ",round(Int,time()-
 # keep boss informed
 try
   println(sock_director,"manager ",proc_num," has finished job ",join(origin_strs,'.')," on ",
-        readchomp(`hostname`), " using ",signif((scratch0-scratch1)/1024/1024,4)," GB of local_scratch")
+        readchomp(`hostname`), " using ",round((scratch0-scratch1)/1024/1024, sigdigits=4)," GB of local_scratch")
   close(sock_director)
+catch
 end
 
 info(readchomp(`date`), prefix="MANAGER: ")

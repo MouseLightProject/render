@@ -18,7 +18,7 @@ shape_tile_px = shape_leaf_px[setdiff(1:3,axis)]
 projection_size = [shape_tile_px*(2^nlevels)...]
 projection_img = fill(0x0000, projection_size...);
 
-tif_files = filter(x->ismatch(r"^[1-8].*\.tif",x), readdir(joinpath(topath,"tiles")));
+tif_files = filter(x->occursin(r"^[1-8].*\.tif",x), readdir(joinpath(topath,"tiles")));
 for tile in unique([split(x,'.')[1] for x in tif_files])
   info(tile)
   in_path = joinpath(topath,"tiles",tile)

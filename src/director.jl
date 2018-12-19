@@ -35,7 +35,7 @@ const nlevels = max(0, ceil(Int,
 shape_leaf_px_initial = round.(Int, round.(shape_tiles_nm./um2nm./voxelsize_um./2^nlevels, -1, 2))
 # ensure that the leaf volume is divisible by 32*32*4 (for GPU), and
 # that each leaf dimension is divisible by leaf_dim_divisible_by (for chunking)
-xyz=Array{Int}(3)
+xyz=Array{Int}(undef, 3)
 cost=Inf32
 const shape_leaf_dim_search_range = -20:2:20
 for x=shape_leaf_dim_search_range, y=shape_leaf_dim_search_range, z=shape_leaf_dim_search_range
@@ -63,7 +63,7 @@ open("$destination/calculated_parameters.jl","w") do f
         voxelsize_used_um[1], ',', voxelsize_used_um[2], ',', voxelsize_used_um[3], ']')
   println(f,"const origin_nm = [",join(map(string,tiles_bbox[1]),","),"]")
   for repo in ["render", "mltk-bary", "tilebase", "nd", "ndio-series", "ndio-tiff", "ndio-hdf5", "mylib"]
-    println(f,"const $(replace(repo,'-','_'))_version = \"",git_version(joinpath(ENV["RENDER_PATH"],"src",repo)),"\"")
+    println(f,"const $(replace(repo,'-' =>'_'))_version = \"",git_version(joinpath(ENV["RENDER_PATH"],"src",repo)),"\"")
   end
 end
 open("$destination/transform.txt","w") do f  # for large volume viewer
@@ -85,7 +85,7 @@ info("voxel dimensions used to make output tile shape even and volume divisible 
 function AABBHalveSubdivision(bbox)
   bbox1 = deepcopy(bbox)
   bbox2 = deepcopy(bbox)
-  idx = indmax(bbox[2])
+  idx = argmax(bbox[2])
   bbox1[2][idx] = floor(bbox1[2][idx]/2)
   bbox2[2][idx] = ceil(bbox2[2][idx]/2)
   bbox2[1][idx] += bbox1[2][idx]
@@ -115,11 +115,11 @@ tiles_bbox[2][:] = round.(Int,tiles_bbox[2][:] .* region_of_interest[2])
 get_job_aabbs(tiles_bbox)
 sort!(job_aabbs; lt=(x,y)->x[2]<y[2], rev=true)
 roi_vol = prod(region_of_interest[2])
-info(TileBaseCount(tiles),(roi_vol<1 ? "*"*string(roi_vol): ""),
+info(TileBaseCount(tiles),(roi_vol<1 ? "*"*string(roi_vol) : ""),
       " input tiles each with ",nchannels," channels split into ",length(job_aabbs)," jobs", prefix="DIRECTOR: ")
 
 include_origins_outside_roi && length(job_aabbs)>1 &&
-      warn("include_origins_outside_roi should be true only when there is just one job")
+      @warn("include_origins_outside_roi should be true only when there is just one job")
 
 # initialize tcp communication with squatters
 nnodes = min( length(job_aabbs),
@@ -172,7 +172,7 @@ t0=time()
         info("deleting squatter ",p, prefix="DIRECTOR: ")
         if which_cluster=="janelia"
           cmd = `bkill $(jobid)\[$p\]`
-          try;  run(cmd);  end
+          try;  run(cmd);  catch; end
         else
           kill(proc[p])
         end

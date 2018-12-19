@@ -15,5 +15,5 @@ end
 
 yml_file = joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledtiles/tilebase.cache.yml")
 yml_data = read(yml_file)
-yml_data = replace(String(yml_data),"RENDER_PATH",ENV["RENDER_PATH"])
+yml_data = replace(String(yml_data),"RENDER_PATH" =>ENV["RENDER_PATH"])
 write(joinpath(datapath,"tilebase.cache.yml"),yml_data)

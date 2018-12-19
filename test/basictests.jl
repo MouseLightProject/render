@@ -6,12 +6,12 @@ function check_logfiles(logfilepath, correct_nmergelogs)
   @test any(x->endswith(x,"director.log"), logfiles)
   #@test any(x->endswith(x,"monitor.log"), logfiles)
   @test any(x->endswith(x,"squatter1.log"), logfiles)
-  @test sum(map(x->contains(x, "merge"), logfiles)) == correct_nmergelogs
+  @test sum(map(x->occursin("merge", x), logfiles)) == correct_nmergelogs
 
   # any errors reported in the log files?
-  log = readlines(pipeline(`tar xvzfO $logfilepath`, stderr=DevNull))
+  log = readlines(pipeline(`tar xvzfO $logfilepath`, stderr=devnull))
   for err in ["ERR","Err","WAR","War","Segmentation"]
-    badlines = filter(x->contains(x,err) && !contains(x,"can't delete"), log)
+    badlines = filter(x->occursin(err, x) && !occursin("can't delete", x), log)
     @test length(badlines)==0
     for badline in badlines
       println(badline)
@@ -21,7 +21,7 @@ end
 
 function load_tif_or_h5(basepath)
   if isfile(joinpath(basepath,"default.0.tif"))
-    files = filter(x->ismatch(r"default.[0-9].tif",x), readdir(basepath))
+    files = filter(x->occursin(r"default.[0-9].tif",x), readdir(basepath))
     img_raw = load(joinpath(basepath,"default.0.tif"))
     img = Array{UInt16}(size(img_raw)...,length(files))
     img[:,:,:,1] = rawview(channelview(img_raw))
@@ -76,7 +76,7 @@ function check_images(scratchpath, testdirs, correct_nchannels, correct_nimages,
       end
       if length(imgs)>1
         @test imgs[end-1] == imgs[end]
-        idx = find(imgs[end-1] .!= imgs[end])
+        idx = findall(imgs[end-1] .!= imgs[end])
         if length(idx)>0
           largest_diff = round.(Int, 1/eps(eltype(imgs[end]))*maximum(abs.(
                 convert(Array{Float64}, imgs[end-1][idx])-

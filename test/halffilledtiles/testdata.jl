@@ -1,4 +1,4 @@
-using Base.Test, Images, HDF5
+using Test, Images, HDF5
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
 
@@ -29,7 +29,7 @@ end
   logfilepath = joinpath(scratchpath,"localscratch","results","logs.tar.gz")
   log = readlines(`tar xvzfO $logfilepath squatter1.log`)
   @test any(log.=="MANAGER: allocated RAM for 1 output tiles")
-  @test any(line->contains(line,"to local_scratch"), log)
+  @test any(line->occursin("to local_scratch", line), log)
 end
 
 end

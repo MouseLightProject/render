@@ -44,8 +44,8 @@ run(`rsync --exclude \*\[12\].tif -r $(joinpath(datapath,"threechannel","00")) $
 
 yml_file1 = joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/onechannel-tilebase.cache.yml")
 yml_data1 = read(yml_file1)
-yml_data1 = replace(String(yml_data1),"RENDER_PATH",ENV["RENDER_PATH"])
+yml_data1 = replace(String(yml_data1),"RENDER_PATH" =>ENV["RENDER_PATH"])
 write(joinpath(datapath,"onechannel/tilebase.cache.yml"),yml_data1)
-yml_data3 = replace(String(yml_data1),"onechannel","threechannel")
-yml_data3 = replace(String(yml_data3),"[16, 32, 64, 1]","[16, 32, 64, 3]")
+yml_data3 = replace(String(yml_data1),"onechannel" =>"threechannel")
+yml_data3 = replace(String(yml_data3),"[16, 32, 64, 1]" =>"[16, 32, 64, 3]")
 write(joinpath(datapath,"threechannel/tilebase.cache.yml"),yml_data3)

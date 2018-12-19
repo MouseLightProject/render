@@ -16,11 +16,11 @@ include(joinpath(frompath,"set_parameters.jl"))
 
 face_leaf_path_init = base(4,face_leaf_path_idx,nlevels)
 if axis==1
-  remap(x) = replace(replace(replace(replace(x, '3','7'), '2','5'), '1','3'), '0','1')
+  remap(x) = replace(replace(replace(replace(x, '3' =>'7'), '2' =>'5'), '1' =>'3'), '0' =>'1')
 elseif axis==2
-  remap(x) = replace(replace(replace(replace(x, '3','6'), '2','5'), '1','2'), '0','1')
+  remap(x) = replace(replace(replace(replace(x, '3' =>'6'), '2' =>'5'), '1' =>'2'), '0' =>'1')
 elseif axis==3
-  remap(x) = replace(replace(replace(replace(x, '3','4'), '2','3'), '1','2'), '0','1')
+  remap(x) = replace(replace(replace(replace(x, '3' =>'4'), '2' =>'3'), '1' =>'2'), '0' =>'1')
 end
 face_leaf_path = [Int(x)-Int('0') for x in remap(face_leaf_path_init)] 
 info("face_leaf_path = ", face_leaf_path)
@@ -43,7 +43,7 @@ info("length(leaf_paths) = ", length(leaf_paths))
 isempty(leaf_paths) && exit()
 
 
-crop_range = Vector{Int}(2)
+crop_range = Vector{Int}(undef, 2)
 if crop_um[1]==-Inf
   crop_from = 1
 else
