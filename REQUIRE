@@ -1,0 +1,7 @@
+julia 0.7
+YAML
+Images
+HDF5
+Gadfly
+Colors
+Morton

@@ -8,12 +8,12 @@ generate an octree for viewing with the Janelia Workstation.
 Requirements
 ============
 
-Julia, version 6, plus the YAML, Images, HDF5, and Morton packages.
+Julia, version 0.7, plus the YAML, Images, HDF5, Morton, and Gadfly packages.
 
 Nathan Clack's mltk-bary library.
 
-Tested with Julia v0.6.0, YAML v0.2.1, Images v0.13.0+, ImageMagick v0.5.1+,
-HDF5 v0.8.8+, Morton v0.0.1, mltk-bary master/84e15364.
+Tested with Julia v0.6.0, YAML v0.3.2, Images v0.17.0, HDF5 v0.10.3, Morton
+v0.0.1, Gadfly v1.0.1, and mltk-bary master/84e15364.
 
 
 Installation
@@ -22,13 +22,10 @@ Installation
 Install the mltk-bary library using make.sh.  Be sure to edit ```rootdir```
 and ```installdir``` therein appropriately.
 
-Install Julia by downloading a precompiled binary of the latest point release
-of version 6.  Install the YAML, Images, and HDF5 packages by starting Julia
-on the unix command line and executing map(Pkg.add,["YAML","Images","HDF5","Morton"]).
-If desired, use the bash environment variable JULIA_PKGDIR to place it
-somewhere other than your home directory.  For example, somewhere on Julia's
-LOAD_PATH, like <julia-install-dir>/share/julia/site, would permit others
-to use the pipeline without having to install this package themselves.
+Download a precompiled binary of of version 0.7.  Install the required
+packages by changing to the directory of the repository, starting Julia on
+the unix command line, entering Pkg mode by pressing `]`, and then invoking
+the `instantiate` and `precompile` commands.
 
 Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, ```JULIA```,
 and ```JULIA_PKGDIR``` in ```render```, ```monitor```, and ```savelogs```
