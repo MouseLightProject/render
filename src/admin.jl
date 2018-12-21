@@ -1,48 +1,12 @@
+using Distributed, Serialization, SharedArrays
+
 const um2nm=1e3
-
-# from julia PR #19331
-
-const DEFAULT_RETRY_N = 1
-const DEFAULT_RETRY_ON = e->true
-const DEFAULT_RETRY_MAX_DELAY = 10.0
-const DEFAULT_RETRY_FIRST_DELAY = 0.05
-const DEFAULT_RETRY_GROWTH_FACTOR = 5
-const DEFAULT_RETRY_JITTER_FACTOR = 0.1
-const DEFAULT_RETRY_MESSAGE = ""
-
-function retry2(f::Function, retry_on::Function=DEFAULT_RETRY_ON;
-            n=DEFAULT_RETRY_N,
-            max_delay=DEFAULT_RETRY_MAX_DELAY,
-            first_delay=DEFAULT_RETRY_FIRST_DELAY,
-            growth_factor=DEFAULT_RETRY_GROWTH_FACTOR,
-            jitter_factor=DEFAULT_RETRY_JITTER_FACTOR,
-            message=DEFAULT_RETRY_MESSAGE)
-    (args...) -> begin
-        delay = min(first_delay, max_delay)
-        for i = 1:n+1
-            try
-                return f(args...)
-            catch e
-                if i > n || try retry_on(e) catch; end !== true
-                    rethrow(e)
-                end
-            end
-            jittered_delay = delay * (1.0 + (rand() * jitter_factor))
-            if message!=""
-              warn("try #",i," failed.  will retry in ", jittered_delay," seconds.  ",message)
-              flush(stdout);  flush(stderr)
-            end
-            sleep(jittered_delay)
-            delay = min(delay * growth_factor, max_delay)
-        end
-    end
-end
 
 function get_available_port(default_port)
   port = default_port
   while true
     try
-      server = listen(port)
+      server = listen(IPv4(0),port)
       return server, port
     catch
       port+=1
@@ -85,7 +49,7 @@ function AABBHit(bbox1,bbox2)
   return true
 end
 
-AABBMake(ndim) = Dict("ori"=>Vector{Int}(ndim), "shape"=>Vector{Int}(ndim))
+AABBMake(ndim) = Dict("ori"=>Vector{Int}(undef, ndim), "shape"=>Vector{Int}(undef, ndim))
 AABBGet(bbox) = bbox["ori"], bbox["shape"]
 AABBVolume(bbox) = prod(bbox["shape"])
 
@@ -143,19 +107,19 @@ const libengine = ENV["RENDER_PATH"]*"/env/build/mltk-bary/libengine.so"
 mutable struct BarycentricException <: Exception end
 
 BarycentricCPUinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricCPUinit, libengine),
-      Int, (Ptr{Ptr{Cvoid}},Ptr{Cuint},Ptr{Cuint},Cuint),
+      Int, (Ptr{Ptr{Cvoid}},Ref{Cuint},Ref{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
 BarycentricAVXinit(r,src_shape,dst_shape,ndims) = ccall((:BarycentricAVXinit, libengine),
-      Int, (Ptr{Ptr{Cvoid}},Ptr{Cuint},Ptr{Cuint},Cuint),
+      Int, (Ptr{Ptr{Cvoid}},Ref{Cuint},Ref{Cuint},Cuint),
       r,src_shape,dst_shape,ndims) !=1 && throw(BarycentricException())
 
 BarycentricCPUresample(r,cube,orientation,interpolation) =
-      ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Cvoid}},Ptr{Cfloat},Cint,Cint),
+      ccall((:BarycentricCPUresample, libengine), Int, (Ptr{Ptr{Cvoid}},Ref{Cfloat},Cint,Cint),
       r,cube,orientation,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
 
 BarycentricAVXresample(r,cube,orientation,interpolation) =
-      ccall((:BarycentricAVXresample, libengine), Int, (Ptr{Ptr{Cvoid}},Ptr{Cfloat},Cint,Cint),
+      ccall((:BarycentricAVXresample, libengine), Int, (Ptr{Ptr{Cvoid}},Ref{Cfloat},Cint,Cint),
       r,cube,orientation,interpolation=="nearest" ? 0 : 1) !=1 && throw(BarycentricException())
 
 BarycentricCPUrelease(r) = ccall((:BarycentricCPUrelease, libengine), Cvoid, (Ptr{Ptr{Cvoid}},), r)
@@ -163,10 +127,10 @@ BarycentricAVXrelease(r) = ccall((:BarycentricAVXrelease, libengine), Cvoid, (Pt
 
 for f = ("source", "destination", "result")
   @eval $(Symbol("BarycentricCPU"*f))(r,src) =
-      ccall(($("BarycentricCPU"*f), libengine), Int, (Ptr{Ptr{Cvoid}},Ptr{UInt16}),
+      ccall(($("BarycentricCPU"*f), libengine), Int, (Ptr{Ptr{Cvoid}},Ref{UInt16}),
           r,src) !=1 && throw(BarycentricException())
   @eval $(Symbol("BarycentricAVX"*f))(r,src) =
-      ccall(($("BarycentricAVX"*f), libengine), Int, (Ptr{Ptr{Cvoid}},Ptr{UInt16}),
+      ccall(($("BarycentricAVX"*f), libengine), Int, (Ptr{Ptr{Cvoid}},Ref{UInt16}),
           r,src) !=1 && throw(BarycentricException())
 end
 
@@ -174,34 +138,34 @@ end
 # below used by director, manager, render, merge, ...
 
 subtile_corner_indices(ix,iy,iz) =
-    Int[ (1+
+    Int[ (1 .+
           [ix-1+b&1  iy-1+(b>>1)&1  iz-1+(b>>2)&1]*
           [1, length(xlims), length(xlims)*length(ylims)]
          )[1] for b=0:7 ]
 
 function calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
-  in_subtiles_aabb = Array{Dict}(length(xlims)-1, length(ylims)-1, length(zlims)-1)
+  in_subtiles_aabb = Array{Dict}(undef, length(xlims)-1, length(ylims)-1, length(zlims)-1)
   origin, shape = AABBGet(TileAABB(tile))
   for ix=1:length(xlims)-1, iy=1:length(ylims)-1, iz=1:length(zlims)-1
     it = subtile_corner_indices(ix,iy,iz)
-    sub_origin = squeeze(minimum(transform_nm[:,it],2),2)
-    sub_shape =  squeeze(maximum(transform_nm[:,it],2),2) - sub_origin
+    sub_origin = dropdims(minimum(transform_nm[:,it], dims=2), dims=2)
+    sub_shape =  dropdims(maximum(transform_nm[:,it], dims=2), dims=2) - sub_origin
     in_subtiles_aabb[ix,iy,iz] = AABBMake(3)
     AABBSet(in_subtiles_aabb[ix,iy,iz], sub_origin, sub_shape)
   end
   in_subtiles_aabb
 end
 
-load_tile(filename,ext,shape) = retry2(() -> _load_tile(filename,ext,shape),
-    n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
-    message="load_tile($filename,$ext,$shape)")()
+load_tile(filename,ext,shape) = retry(() -> _load_tile(filename,ext,shape),
+    delays=ExponentialBackOff(n=10, first_delay=60, factor=3, max_delay=60*60*24),
+    check=(s,e)->(@info string("load_tile($filename,$ext,$shape) failed.  will retry."); true))()
 
 function _load_tile(filename,ext,shape)
   if ext=="tif"
-    regex = Regex("$(basename(filename))\.[0-9]\.$ext")
+    regex = Regex("$(basename(filename)).[0-9].$ext")
     files = filter(x->occursin(regex,x), readdir(dirname(filename)))
     @assert length(files)==shape[end]
-    img = Array{UInt16}(shape...)
+    img = Array{UInt16}(undef, shape...)
     for (c,file) in enumerate(files)
       img[:,:,:,c] = PermutedDimsArray(rawview(channelview(
             load(string(filename,'.',c-1,'.',ext)))), (2,1,3))
@@ -213,16 +177,16 @@ function _load_tile(filename,ext,shape)
   end 
 end
 
-save_tile(filesystem, path, basename, ext, data) = retry2(
+save_tile(filesystem, path, basename, ext, data) = retry(
     () -> _save_tile(filesystem, path, basename, ext, data),
-    n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
-    message="save_tile($filesystem,$path,$basename,$ext)")()
+    delays=ExponentialBackOff(n=10, first_delay=60, factor=3, max_delay=60*60*24),
+    check=(s,e)->(@info string("save_tile($filesystem,$path,$basename,$ext).  will retry."); true))()
 
 function _save_tile(filesystem, path, basename, ext, data)
   filepath = joinpath(filesystem,path)
-  retry2(()->mkpath(filepath),
-      n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
-      message="mkpath(\"$filepath\")")()
+  retry(()->mkpath(filepath),
+      delays=ExponentialBackOff(n=10, first_delay=60, factor=3, max_delay=60*60*24),
+      check=(s,e)->(@info string("mkpath(\"$filepath\").  will retry."); true))()
   if ext=="tif"
     for c=1:size(data,4)
       save(string(joinpath(filepath,basename),'.',c-1,'.',ext),
@@ -277,9 +241,9 @@ end
 # by merge to combine multiple previous renders       (recurse=either, octree=false, delete=false)
 
 function downsample(out_tile, coord, shape_leaf_px, nchannels, scratch)
-  ix = ((coord-1)>>0)&1 * shape_leaf_px[1]>>1
-  iy = ((coord-1)>>1)&1 * shape_leaf_px[2]>>1
-  iz = ((coord-1)>>2)&1 * shape_leaf_px[3]>>1
+  ix = ((coord-1)>>0)&1 * (shape_leaf_px[1]>>1)
+  iy = ((coord-1)>>1)&1 * (shape_leaf_px[2]>>1)
+  iz = ((coord-1)>>2)&1 * (shape_leaf_px[3]>>1)
   for c=1:nchannels
     for z=1:2:shape_leaf_px[3]-1
       tmpz = iz + (z+1)>>1
@@ -296,12 +260,12 @@ end
 
 function mv_or_cp(from_file, to_file, delete)
   if delete
-    info("moving from ",from_file)
-    info("  to ",to_file)
+    @info string("moving from ",from_file)
+    @info string("  to ",to_file)
     mv(from_file,to_file)
   else
-    info("copying from ",from_file)
-    info("  to ",to_file)
+    @info string("copying from ",from_file)
+    @info string("  to ",to_file)
     cp(from_file,to_file)
   end
 end
@@ -312,11 +276,11 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
   time_single_file = time_many_files = time_clear_files = 0.0
   time_read_files = time_max_files = time_delete_files = time_write_files = 0.0
 
-  merge1 = Array{UInt16}(shape_leaf_px...,nchannels)
+  merge1 = Array{UInt16}(undef, shape_leaf_px...,nchannels)
 
-  retry2(()->mkpath(joinpath(destination,out_tile_path)),
-        n=10, first_delay=60, growth_factor=3, max_delay=60*60*24,
-        message="mkpath(\"$(joinpath(destination,out_tile_path))\")")()
+  retry(()->mkpath(joinpath(destination,out_tile_path)),
+        delays=ExponentialBackOff(n=10, first_delay=60, factor=3, max_delay=60*60*24),
+        check=(s,e)->(@info string("mkpath(\"$(joinpath(destination,out_tile_path))\").  will retry."); true))()
   destination2 = joinpath(destination, out_tile_path, prefix)
 
   if length(in_tiles)==1 && !startswith(destination2,in_tiles[1])
@@ -335,12 +299,12 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
     time_single_file=(time()-t0)
   elseif length(in_tiles)>1
     t0=time()
-    @info("merging:")
+    @info string("merging:")
     t1=time()
     fill!(merge1, 0x0000)
     time_clear_files=(time()-t1)
     for in_tile in in_tiles
-      info("  reading ",in_tile,".%.",suffix)
+      @info string("  reading ",in_tile,".%.",suffix)
       t1=time()
       merge2 = load_tile(in_tile, suffix, (shape_leaf_px...,nchannels))
       time_read_files+=(time()-t1)
@@ -354,18 +318,18 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
         if suffix=="tif"
           for c=1:nchannels
             from_file = string(in_tile,'.',c-1,'.',suffix)
-            info("  deleting ",from_file)
+            @info string("  deleting ",from_file)
             rm(from_file)
           end
         else
           from_file = string(in_tile,'.',suffix)
-          info("  deleting ",from_file)
+          @info string("  deleting ",from_file)
           rm(from_file)
         end
       end
       time_delete_files+=(time()-t1)
     end
-    info("  copying to ",destination2)
+    @info string("  copying to ",destination2)
     t1=time()
     save_tile(destination, out_tile_path, prefix, suffix, merge1)
     time_write_files=(time()-t1)
@@ -379,13 +343,13 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
       time_octree_read+=(time()-t0)
     elseif length(in_tiles)==0
       t0=time()
-      info("saving output tile ",out_tile_path," to ",destination2)
+      @info string("saving output tile ",out_tile_path," to ",destination2)
       save_tile(destination, out_tile_path, prefix, suffix, out_tile_img)
       time_octree_save=(time()-t0)
     end
     if flag
       t0=time()
-      info("downsampling output tile ",out_tile_path)
+      @info string("downsampling output tile ",out_tile_path)
       last_morton_coord = parse(Int,out_tile_path[end])
       scratch::Array{UInt16,4} = length(in_tiles)==0 ? out_tile_img : merge1
       downsample(out_tile_img_down, last_morton_coord, shape_leaf_px, nchannels, scratch)
@@ -480,26 +444,26 @@ function merge_output_tiles(source, destination, prefix, suffix, out_tile_path,
   accumulate_times(fetch(merge_across_filesystems(
         source, destination, prefix, suffix, out_tile_path, recurse, octree, delete)))
 
-  info("copying / moving single files took ",round(time_single_file, sigdigits=4)," sec")
-  info("merging multiple files took ",round(time_many_files, sigdigits=4)," sec")
-  info("  clearing multiple files took ",round(time_clear_files, sigdigits=4)," sec")
-  info("  reading multiple files took ",round(time_read_files, sigdigits=4)," sec")
-  info("  max'ing multiple files took ",round(time_max_files, sigdigits=4)," sec")
-  info("  deleting multiple files took ",round(time_delete_files, sigdigits=4)," sec")
-  info("  writing multiple files took ",round(time_write_files, sigdigits=4)," sec")
+  @info string("copying / moving single files took ",round(time_single_file, sigdigits=4)," sec")
+  @info string("merging multiple files took ",round(time_many_files, sigdigits=4)," sec")
+  @info string("  clearing multiple files took ",round(time_clear_files, sigdigits=4)," sec")
+  @info string("  reading multiple files took ",round(time_read_files, sigdigits=4)," sec")
+  @info string("  max'ing multiple files took ",round(time_max_files, sigdigits=4)," sec")
+  @info string("  deleting multiple files took ",round(time_delete_files, sigdigits=4)," sec")
+  @info string("  writing multiple files took ",round(time_write_files, sigdigits=4)," sec")
 
   if octree
-    info("clearing octree took ",round(time_octree_clear, sigdigits=4)," sec")
-    info("reading octree took ",round(time_octree_read, sigdigits=4)," sec")
-    info("downsampling octree took ",round(time_octree_down, sigdigits=4)," sec")
-    info("saving octree took ",round(time_octree_save, sigdigits=4)," sec")
+    @info string("clearing octree took ",round(time_octree_clear, sigdigits=4)," sec")
+    @info string("reading octree took ",round(time_octree_read, sigdigits=4)," sec")
+    @info string("downsampling octree took ",round(time_octree_down, sigdigits=4)," sec")
+    @info string("saving octree took ",round(time_octree_save, sigdigits=4)," sec")
   end
 end
 
 function rmcontents(dir, available, prefix)
   function get_available(dir,msg)
     free = parse(Int,split(readchomp(ignorestatus(`df $dir`)))[11])
-    info(round(free/1024/1024, sigdigits=4)," GB available on ",dir," at ",msg, prefix=prefix)
+    @info string(prefix,round(free/1024/1024, sigdigits=4)," GB available on ",dir," at ",msg)
     free
   end
   available=="before" && (free=get_available(dir,"end"))
@@ -507,7 +471,7 @@ function rmcontents(dir, available, prefix)
     try
       rm(joinpath(dir,file), recursive=true)
     catch e
-      warn("can't delete",joinpath(dir,file),": ",e)
+      @warn string("can't delete",joinpath(dir,file),": ",e)
     end
   end
   available=="after" && (free=get_available(dir,"start"))

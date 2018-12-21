@@ -8,12 +8,13 @@ generate an octree for viewing with the Janelia Workstation.
 Requirements
 ============
 
-Julia, version 0.7, plus the YAML, Images, HDF5, Morton, and Gadfly packages.
+Julia, version 0.7, plus the YAML, Images, HDF5, Morton, Gadfly, Colors, and
+Cairo packages.
 
 Nathan Clack's mltk-bary library.
 
 Tested with Julia v0.6.0, YAML v0.3.2, Images v0.17.0, HDF5 v0.10.3, Morton
-v0.0.1, Gadfly v1.0.1, and mltk-bary master/84e15364.
+v0.0.1, Gadfly v1.0.1, Colors v0.9.5, Cairo v0.5.6 and mltk-bary master/84e15364.
 
 
 Installation

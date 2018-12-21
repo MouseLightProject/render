@@ -12,32 +12,32 @@ include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 inset = 4
 in_tile_1 = zeros(UInt16,shape_leaf_px...,nchannels)
 
-in_tile_1[inset:end, inset:end, inset    , :] = 0xffff
-in_tile_1[inset:end, inset,     inset:end, :] = 0xffff
-in_tile_1[inset,     inset:end, inset:end, :] = 0xffff
+in_tile_1[inset:end, inset:end, inset    , :] .= 0xffff
+in_tile_1[inset:end, inset,     inset:end, :] .= 0xffff
+in_tile_1[inset,     inset:end, inset:end, :] .= 0xffff
 in_tile_1[:,:,:,2].>>=1
 in_tile_1[:,:,:,3].>>=2
 save_tile(joinpath(datapath,"threechannel"), "00/00001", "00001-hollowcube", "tif", in_tile_1)
 
-in_tile_2 = flipdim(in_tile_1, 1)
+in_tile_2 = reverse(in_tile_1, dims=1)
 save_tile(joinpath(datapath,"threechannel"), "00/00002", "00002-hollowcube", "tif", in_tile_2)
 
-in_tile_3 = flipdim(in_tile_1, 2)
+in_tile_3 = reverse(in_tile_1, dims=2)
 save_tile(joinpath(datapath,"threechannel"), "00/00003", "00003-hollowcube", "tif", in_tile_3)
 
-in_tile_4 = flipdim(in_tile_3, 1)
+in_tile_4 = reverse(in_tile_3, dims=1)
 save_tile(joinpath(datapath,"threechannel"), "00/00004", "00004-hollowcube", "tif", in_tile_4)
 
-in_tile_5 = flipdim(in_tile_1, 3)
+in_tile_5 = reverse(in_tile_1, dims=3)
 save_tile(joinpath(datapath,"threechannel"), "00/00005", "00005-hollowcube", "tif", in_tile_5)
 
-in_tile_6 = flipdim(in_tile_5, 1)
+in_tile_6 = reverse(in_tile_5, dims=1)
 save_tile(joinpath(datapath,"threechannel"), "00/00006", "00006-hollowcube", "tif", in_tile_6)
 
-in_tile_7 = flipdim(in_tile_5, 2)
+in_tile_7 = reverse(in_tile_5, dims=2)
 save_tile(joinpath(datapath,"threechannel"), "00/00007", "00007-hollowcube", "tif", in_tile_7)
 
-in_tile_8 = flipdim(in_tile_7, 1)
+in_tile_8 = reverse(in_tile_7, dims=1)
 save_tile(joinpath(datapath,"threechannel"), "00/00008", "00008-hollowcube", "tif", in_tile_8)
 
 run(`rsync --exclude \*\[12\].tif -r $(joinpath(datapath,"threechannel","00")) $(joinpath(datapath,"onechannel"))`)

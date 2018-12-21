@@ -57,7 +57,7 @@ else
   pcmd="export RENDER_PATH=$RENDER_PATH;
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
         export JULIA=$JULIA;
-        export JULIA_PKGDIR=$JULIA_PKGDIR;
+        export JULIA_PROJECT=$JULIA_PROJECT;
         export HOSTNAME=$HOSTNAME;
         export LSB_JOBINDEX={};
         $cmd &> ${topath}/logs/project{}.log"

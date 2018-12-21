@@ -52,8 +52,8 @@ const region_of_interest=([0,0,0], [1,1,1])  # e.g. ([0,0.5,0], [0.5,0.5,0.5]) =
 # or use the following code to convert morton order to origin & shape
 #morton_order = [8,1,7,3]
 #const region_of_interest = (
-#    squeeze(sum(
-#        [(((morton_order[depth]-1)>>xyz)&1)/2^depth for xyz=0:2, depth=1:length(morton_order)] ,2),2),
+#    dropdims(sum(
+#        [(((morton_order[depth]-1)>>xyz)&1)/2^depth for xyz=0:2, depth=1:length(morton_order)] ,dims=2),dims=2),
 #    fill(0.5^length(morton_order),3) )
 
 const include_origins_outside_roi=false   # set to true to render all of small test ROI
@@ -77,7 +77,7 @@ const throttle_octree_njobs = 256  # maximum number of compute nodes to use to d
 # for which_cluster=="janelia" set to 256 (max is 512)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
-const throttle_octree_njobs_per_machine = min(8,Sys.CPU_CORES)
+const throttle_octree_njobs_per_machine = min(8,Sys.CPU_THREADS)
 # ignored when which_cluster=="janelia"
 # otherwise set to ncores per machine for small data sets
 

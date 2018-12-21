@@ -6,7 +6,8 @@
 
 # julia peon.jl parameters.jl in_tile origin_str solo_out_tiles hostname port nxlims xlims nylims ylims nzlims zlims dims[1:3] transform[1-3*2*(n+1)^2]
 
-using Images, HDF5, YAML, Morton
+import ImageMagick
+using Images, HDF5, YAML, Sockets, Morton
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
@@ -18,15 +19,15 @@ const in_tile_idx = parse(Int,ARGS[2])
 const solo_out_tiles = eval(Meta.parse(ARGS[4]))
 idx = 7
 const nxlims = parse(Int,ARGS[idx])
-const xlims = [parse(Int,x) for x in ARGS[idx+(1:nxlims)]]
+const xlims = [parse(Int,x) for x in ARGS[idx.+(1:nxlims)]]
 idx += nxlims+1
 const nylims = parse(Int,ARGS[idx])
-const ylims = [parse(Int,x) for x in ARGS[idx+(1:nylims)]]
+const ylims = [parse(Int,x) for x in ARGS[idx.+(1:nylims)]]
 idx += nylims+1
 const nzlims = parse(Int,ARGS[idx])
-const zlims = [parse(Int,x) for x in ARGS[idx+(1:nzlims)]]
+const zlims = [parse(Int,x) for x in ARGS[idx.+(1:nzlims)]]
 idx += nzlims+1
-const dims = -1+[parse(Int,x) for x in ARGS[idx:idx+2]]
+const dims = -1 .+ [parse(Int,x) for x in ARGS[idx:idx+2]]
 idx += length(dims)
 const transform_nm = reshape([parse(Int,x) for x in ARGS[idx:end]], 3, nxlims*nylims*nzlims)
 
@@ -70,11 +71,12 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
       depth_first_traverse_over_output_tiles(cboxes[imorton], out_tile_path_next, sub_tile_str,
            sub_transform_nm, orientation, in_subtile_aabb)
     else
-      info("processing output tile ",out_tile_path_next, prefix="PEON: ")
+      @info string("PEON: processing output tile ",out_tile_path_next)
 
       t0=time()
       origin_nm = AABBGet(cboxes[imorton])[1]
       transform = (sub_transform_nm .- origin_nm) ./ (voxelsize_used_um*um2nm)
+      transform32 = convert(Array{Float32}, transform)
 
       if !haskey(out_tiles,out_tile_path_next)
         out_tiles[out_tile_path_next] = zeros(UInt16, shape_leaf_px..., nchannels)
@@ -84,11 +86,11 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
 
       if has_avx2 && use_avx
         BarycentricAVXdestination(resampler, out_tiles[out_tile_path_next])
-        BarycentricAVXresample(resampler, convert(Array{Float32}, transform), orientation, interpolation)
+        BarycentricAVXresample(resampler, transform32, orientation, interpolation)
         BarycentricAVXresult(resampler, out_tiles[out_tile_path_next])
       else
         BarycentricCPUdestination(resampler, out_tiles[out_tile_path_next])
-        BarycentricCPUresample(resampler, convert(Array{Float32}, transform), orientation, interpolation)
+        BarycentricCPUresample(resampler, transform32, orientation, interpolation)
         BarycentricCPUresult(resampler, out_tiles[out_tile_path_next])
       end
       time_transforming+=(time()-t0)
@@ -99,24 +101,27 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
         if out_tile_path_next in solo_out_tiles
           save_tile(shared_scratch, out_tile_path_next, origin_str, file_format_save,
               out_tiles[out_tile_path_next])
-          info("transfered output tile ",out_tile_path_next," from RAM to shared_scratch", prefix="PEON: ")
+          @info string("PEON: transfered output tile ",out_tile_path_next,
+                       " from RAM to shared_scratch")
         else
           msg_to_manager =
-                string("peon for input tile ",in_tile_idx," has output tile ",out_tile_path_next," ready")
+                string("peon for input tile ",in_tile_idx,
+                       " has output tile ",out_tile_path_next," ready")
           println(sock, msg_to_manager)
-          info(msg_to_manager, prefix="PEON: ")
+          @info string("PEON: ",msg_to_manager)
           t1=time()
           local msg_from_manager::String
           while true
-            msg_from_manager = chomp(readline(sock,chomp=false))
+            msg_from_manager = chomp(readline(sock,keep=true))
             length(msg_from_manager)==0 || break
           end
           time_waiting+=(time()-t1)
-          info(msg_from_manager, prefix="PEON<MANAGER: ")
+          @info string("PEON<MANAGER: ",msg_from_manager)
           if startswith(msg_from_manager, send_msg)
-            msg = string("peon for input tile ",in_tile_idx," will send output tile ",out_tile_path_next)
+            msg = string("peon for input tile ",in_tile_idx,
+                         " will send output tile ",out_tile_path_next)
             println(sock,msg)
-            info(msg, prefix="PEON: ")
+            @info string("PEON: ",msg)
             serialize(sock, out_tiles[out_tile_path_next])
           elseif startswith(msg_from_manager, receive_msg)
             out_tile_from_manager::Array{UInt16,4} = deserialize(sock)
@@ -126,12 +131,13 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
                     max(local_out_tile[i1,i2,i3,i4], out_tile_from_manager[i1,i2,i3,i4])
             end
             out_tile_from_manager = Array{UInt16}(undef, 0,0,0,0)
-            gc()
+            GC.gc()
             save_tile(shared_scratch, out_tile_path_next, origin_str, file_format_save,
                   out_tiles[out_tile_path_next])
-            msg = string("peon for input tile ",in_tile_idx," saved output tile ",out_tile_path_next)
+            msg = string("peon for input tile ",in_tile_idx,
+                         " saved output tile ",out_tile_path_next)
             println(sock,msg)
-            info(msg, prefix="PEON: ")
+            @info string("PEON: ",msg)
           elseif startswith(msg_from_manager, write_msg) || startswith(msg_from_manager, merge_msg)
             if enough_free(local_scratch)
               save_tile(local_scratch, out_tile_path_next,
@@ -140,7 +146,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
               msg = string("peon for input tile ",in_tile_idx,
                     " wrote output tile ",out_tile_path_next," to local_scratch")
               println(sock,msg)
-              info(msg, prefix="PEON: ")
+              @info string("PEON: ",msg)
             else
               save_tile(shared_scratch, out_tile_path_next,
                     string(origin_str,'.',in_tile_idx,'.',sub_tile_str), file_format_save,
@@ -148,15 +154,16 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
               msg = string("peon for input tile ",in_tile_idx,
                     " wrote output tile ",out_tile_path_next," to shared_scratch")
               println(sock,msg)
-              warn(msg)
+              @warn(msg)
             end
             if startswith(msg_from_manager, merge_msg)
               merge_output_tiles(local_scratch, shared_scratch,
                     origin_str, file_format_save, out_tile_path_next, false, false, true)
               msg = string("peon for input tile ",in_tile_idx,
-                    " merged output tile ",out_tile_path_next," from local_scratch to shared_scratch")
+                           " merged output tile ",out_tile_path_next,
+                           " from local_scratch to shared_scratch")
               #println(sock,msg)  # not captured by manager
-              info(msg, prefix="PEON: ")
+              @info string("PEON: ",msg)
             end
           end
         end
@@ -175,7 +182,7 @@ function process_input_tile()
   tiles = TileBaseOpen(source)
   global tile = TileBaseIndex(tiles, in_tile_idx)
 
-  info("processing input tile $in_tile_idx: ",TilePath(tile), prefix="PEON: ")
+  @info string("PEON: processing input tile $in_tile_idx: ",TilePath(tile))
 
   local in_tile::Array{UInt16,4}, in_subtile::Array{UInt16,4}
   t1=time()
@@ -183,7 +190,7 @@ function process_input_tile()
   tile_path=TilePath(tile)
   tile_fullpath=joinpath(TileBasePath(tiles)*tile_path, string(basename(tile_path),'-',file_infix))
   in_tile = load_tile(tile_fullpath, file_format_load, shape_intile)
-  info("reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec", prefix="PEON: ")
+  @info string("PEON: reading input tile ",in_tile_idx," took ",round(Int,time()-t1)," sec")
 
   global in_subtiles_aabb = calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
 
@@ -193,15 +200,18 @@ function process_input_tile()
     ix,iy,iz = morton3cartesian(m)
     (ix>nxlims-1 || iy>nylims-1 || iz>nzlims-1) && continue
 
-    info("processing transform ",xlims[ix:ix+1],"-",ylims[iy:iy+1],"-",zlims[iz:iz+1],
-          " for input tile ",in_tile_idx, prefix="PEON: ")
+    @info string("PEON: processing transform ",xlims[ix:ix+1],"-",ylims[iy:iy+1],"-",zlims[iz:iz+1],
+          " for input tile ",in_tile_idx)
     t1=time()
-    in_subtile = in_tile[1+(xlims[ix]:xlims[ix+1]),1+(ylims[iy]:ylims[iy+1]),1+(zlims[iz]:zlims[iz+1]),:]
+    in_subtile = in_tile[1 .+ (xlims[ix]:xlims[ix+1]),
+                         1 .+ (ylims[iy]:ylims[iy+1]),
+                         1 .+ (zlims[iz]:zlims[iz+1]), :]
     shape_in_subtile = convert(Array{Cuint,1},[size(in_subtile)...])
     global resampler = Ptr{Cvoid}[0]
     if has_avx2 && use_avx
       BarycentricAVXinit(resampler, shape_in_subtile, shape_leaf_nchannels, 4)
       BarycentricAVXsource(resampler, in_subtile)
+@info in_subtile[1]  ### hack or the image is garbled.  wtf
     else
       BarycentricCPUinit(resampler, shape_in_subtile, shape_leaf_nchannels, 4)
       BarycentricCPUsource(resampler, in_subtile)
@@ -220,20 +230,25 @@ function process_input_tile()
     BarycentricCPUrelease(resampler)
   end
 
-  info("initializing input tile ",in_tile_idx, " took ",round(Int,time_initing)," sec", prefix="PEON: ")
-  info("transforming input tile ",in_tile_idx," took ",round(Int,time_transforming)," sec", prefix="PEON: ")
-  info("saving output tiles for input tile ",in_tile_idx," took ",round(Int,time_saving)," sec", prefix="PEON: ")
-  info("waiting for manager for input tile ",in_tile_idx," took ",round(Int,time_waiting)," sec", prefix="PEON: ")
-  info("input tile ",in_tile_idx," took ",round(Int,time()-t0)," sec overall", prefix="PEON: ")
+  @info string("PEON: initializing input tile ",in_tile_idx,
+               " took ",round(Int,time_initing)," sec")
+  @info string("PEON: transforming input tile ",in_tile_idx,
+               " took ",round(Int,time_transforming)," sec")
+  @info string("PEON: saving output tiles for input tile ",in_tile_idx,
+               " took ",round(Int,time_saving)," sec")
+  @info string("PEON: waiting for manager for input tile ",in_tile_idx,
+               " took ",round(Int,time_waiting)," sec")
+  @info string("PEON: input tile ",in_tile_idx,
+               " took ",round(Int,time()-t0)," sec overall")
 end
 
 if !dry_run
   process_input_tile()
 
   for (k,v) in merge_count
-    v[1]>1 && v[1]!=v[2] && warn("not all input subtiles processed for output tile ",k," : ",v)
+    v[1]>1 && v[1]!=v[2] && @warn string("not all input subtiles processed for output tile ",k," : ",v)
   end
-  #info(merge_count, prefix="PEON: ")  ### causes seg faults
+  #@info string("PEON: ",merge_count)  ### causes seg faults
 end
 
 #closelibs()
@@ -241,5 +256,5 @@ end
 # keep boss informed
 msg = string("peon for input tile ",in_tile_idx," is finished")
 println(sock,msg)
-info(msg, prefix="PEON: ")
+@info string("PEON: ",msg)
 close(sock)

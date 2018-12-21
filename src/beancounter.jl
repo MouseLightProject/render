@@ -4,7 +4,8 @@
 
 const destination = ARGS[1]
 
-using Gadfly, Colors
+using Gadfly, Colors, Statistics
+import Cairo
 
 log_tar_gz = joinpath(destination,"logs.tar.gz")
 
@@ -13,7 +14,7 @@ data = String[]
 open(`ls`)  ### hack for julia 0.6
 open(`tar xzfO $log_tar_gz`) do stream 
   while ~eof(stream)
-    line = readline(stream,chomp=false)
+    line = readline(stream,keep=true)
     occursin("took", line) && push!(data,line)
   end
 end
@@ -59,7 +60,7 @@ units = Dict('B'=>1', 'K'=>10^3, 'M'=>10^6, 'G'=>10^9)
 data = Dict{String,Matrix{Float32}}()
 open(`tar xzfO $(joinpath(destination,"logs.tar.gz")) monitor.log`) do stream 
   while ~eof(stream)
-    line = readline(stream,chomp=false)
+    line = readline(stream,keep=true)
     fields = split(line)
     length(fields)==12 || continue
     node = fields[2]

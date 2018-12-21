@@ -7,13 +7,13 @@
 
 # julia manager.jl parameters.jl originX originY originZ shapeX shapeY shapeZ hostname port
 
-info(readchomp(`hostname`), prefix="MANAGER: ")
-info(readchomp(`date`), prefix="MANAGER: ")
+@info string("MANAGER: ",readchomp(`hostname`))
+@info string("MANAGER: ",readchomp(`date`))
 
 proc_num = nothing
 try;  global proc_num = ENV["LSB_JOBINDEX"];  catch; end
 
-using YAML
+using YAML, Sockets
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")
@@ -25,11 +25,11 @@ const hostname_director = ARGS[8]
 const port_director = parse(Int,ARGS[9])
 
 # how many peons
-ncores = haskey(ENV,"LSB_DJOB_NUMPROC") ? parse(Int,ENV["LSB_DJOB_NUMPROC"]) : Sys.CPU_CORES
+ncores = haskey(ENV,"LSB_DJOB_NUMPROC") ? parse(Int,ENV["LSB_DJOB_NUMPROC"]) : Sys.CPU_THREADS
 num_procs = leaf_process_oversubscription*div(ncores,leaf_nthreads_per_process)
-info(ncores," CPUs present which can collectively process ",num_procs," tiles simultaneously", prefix="MANAGER: ")
+@info string("MANAGER: ",ncores," CPUs present which can collectively process ",num_procs," tiles simultaneously")
 
-info("AVX2 = ",has_avx2, prefix="MANAGER: ")
+@info string("MANAGER: ","AVX2 = ",has_avx2)
 
 const local_scratch="/scratch/"*readchomp(`whoami`)
 const manager_bbox = AABBMake(3)  # process all input tiles whose origins are within this bbox
@@ -40,7 +40,7 @@ const tiles = TileBaseOpen(source)
 t0=time()
 rmcontents("/dev/shm", "after", "MANAGER: ")
 scratch0 = rmcontents(local_scratch, "after", "MANAGER: ")
-info("deleting /dev/shm and local_scratch = ",local_scratch," at start took ",round(Int,time()-t0)," sec", prefix="MANAGER: ")
+@info string("MANAGER: ","deleting /dev/shm and local_scratch = ",local_scratch," at start took ",round(Int,time()-t0)," sec")
 
 # read in the transform parameters
 using YAML
@@ -86,8 +86,8 @@ function depth_first_traverse(bbox,out_tile_path)
     btile = map(in_tile->any(in_subtile->AABBHit(bbox,in_subtile),in_tile), in_subtiles_aabb)
     sum(btile)>0 || return
     merge_count[join(out_tile_path, Base.Filesystem.path_separator)] = UInt16[sum(btile), 0, 0, 0]
-    info("output tile ",join(out_tile_path, Base.Filesystem.path_separator),
-         " overlaps with input tiles ",join(in_tiles_idx[findall(btile)],", "), prefix="MANAGER: ")
+    @info string("MANAGER: ","output tile ",join(out_tile_path, Base.Filesystem.path_separator),
+         " overlaps with input tiles ",join(in_tiles_idx[findall(btile)],", "))
     dtile = setdiff(findall(btile), locality_idx)
     isempty(dtile) || push!(locality_idx, dtile...)
   else
@@ -99,15 +99,15 @@ function depth_first_traverse(bbox,out_tile_path)
 end
 
 const total_ram = parse(Int,split(readchomp(`head -1 /proc/meminfo`))[2])*1024
-ram_fraction = haskey(ENV,"LSB_DJOB_NUMPROC") ? ncores/Sys.CPU_CORES : 1
+ram_fraction = haskey(ENV,"LSB_DJOB_NUMPROC") ? ncores/Sys.CPU_THREADS : 1
 ncache = (total_ram - num_procs*peon_ram - other_ram) * ram_fraction/2/prod(shape_leaf_px)/nchannels
 ncache = max(1, floor(Int,ncache))
-const merge_array = Array{UInt16}(shape_leaf_px..., nchannels, ncache)
+const merge_array = Array{UInt16}(undef, shape_leaf_px..., nchannels, ncache)
 const merge_used = falses(ncache)
 # one entry for each output tile
 # [total # input tiles, input tiles processed so far, input tiles sent so far, index to merge_array (0=not assigned yet, Inf=use local_scratch)]
 const merge_count = Dict{String,Array{UInt16,1}}()  # expected, write cmd, write ack, RAM slot
-info("allocated RAM for ",ncache," output tiles", prefix="MANAGER: ")
+@info string("MANAGER: ","allocated RAM for ",ncache," output tiles")
 
 locality_idx = Int[]
 depth_first_traverse(TileBaseAABB(tiles),Int[])
@@ -115,7 +115,7 @@ solo_out_tiles = setdiff( String[x[2][1]==1 ? x[1] : "" for x in merge_count] ,[
 
 isempty(locality_idx) && @warn("coordinates of input subtiles aren't within bounding box")
 
-info("assigned ",length(in_tiles_idx)," input tiles", prefix="MANAGER: ")
+@info string("MANAGER: ","assigned ",length(in_tiles_idx)," input tiles")
 length(in_tiles_idx)==0 && quit()
 
 # keep boss informed
@@ -134,19 +134,19 @@ const finished_msg = r"(?<=peon for input tile )[0-9]*(?= is finished)"
 
 function wrangle_peon(sock)
   while isopen(sock) || bytesavailable(sock)>0
-    msg_from_peon = chomp(readline(sock,chomp=false))
+    msg_from_peon = chomp(readline(sock,keep=true))
     length(msg_from_peon)==0 && continue
-    info(msg_from_peon, prefix="MANAGER<PEON: ")
+    @info string("MANAGER<PEON: ",msg_from_peon)
     local in_tile_num::AbstractString, out_tile_path::AbstractString, out_tile::Array{UInt16,4}
     if occursin(ready_msg, msg_from_peon)
       in_tile_num, out_tile_path = match(ready_msg,msg_from_peon).captures[[2,4]]
       merge_count[out_tile_path][2]+=1
       if merge_count[out_tile_path][4]==0
-        idx = findfirst(merge_used,false)
-        if idx!=0
+        idx = findfirst(merge_used.==false)
+        if idx!=nothing
           merge_used[idx] = true
           merge_count[out_tile_path][4] = idx
-          info("using RAM slot ",idx," for output tile ",out_tile_path, prefix="MANAGER: ")
+          @info string("MANAGER: ","using RAM slot ",idx," for output tile ",out_tile_path)
         else
           merge_count[out_tile_path][4] = 0xffff
         end
@@ -156,26 +156,26 @@ function wrangle_peon(sock)
           msg = string("manager tells peon for input tile ",in_tile_num,
                 " to write output tile ",out_tile_path," to local_scratch")
           println(sock, msg)
-          info(msg, prefix="MANAGER>PEON: ")
+          @info string("MANAGER>PEON: ",msg)
         else
           msg = string("manager tells peon for input tile ",in_tile_num,
                 " to merge output tile ",out_tile_path," to shared_scratch")
           println(sock, msg)
-          info(msg, prefix="MANAGER>PEON: ")
+          @info string("MANAGER>PEON: ",msg)
         end
       else
         if merge_count[out_tile_path][2] < merge_count[out_tile_path][1]
           msg = string("manager tells peon for input tile ",in_tile_num,
                 " to send output tile ",out_tile_path," via tcp")
           println(sock, msg)
-          info(msg, prefix="MANAGER>PEON: ")
+          @info string("MANAGER>PEON: ",msg)
         else
           while merge_count[out_tile_path][3] < merge_count[out_tile_path][1]-1;  yield();  end
           msg = string("manager tells peon for input tile ",in_tile_num,
                 " to receive output tile ",out_tile_path," via tcp")
           println(sock, msg)
           serialize(sock, merge_array[:,:,:,:,merge_count[out_tile_path][4]])
-          info(msg, prefix="MANAGER>PEON: ")
+          @info string("MANAGER>PEON: ",msg)
         end
       end
     elseif occursin(wrote_msg, msg_from_peon)
@@ -196,7 +196,7 @@ function wrangle_peon(sock)
         end
       end
       time_max_files=time()-t1
-      info("max'ing multiple files took ",round(time_max_files, sigdigits=4)," sec", prefix="MANAGER: ")
+      @info string("MANAGER: ","max'ing multiple files took ",round(time_max_files, sigdigits=4)," sec")
     elseif occursin(saved_msg, msg_from_peon)
       out_tile_path = match(saved_msg,msg_from_peon).captures[4]
       merge_used[merge_count[out_tile_path][4]] = false
@@ -205,7 +205,7 @@ function wrangle_peon(sock)
     end
   end
   out_tile = Array{UInt16}(undef, 0,0,0,0)
-  gc()
+  GC.gc()
 end
 
 t0=time()
@@ -228,7 +228,7 @@ t0=time()
   end
 
   # dispatch input tiles to peons
-  i = 1
+  global i = 1
   nextidx() = (global i; idx=i; i+=1; idx)
   for p = 1:num_procs
     @async while true
@@ -241,7 +241,7 @@ t0=time()
             $(zlims[in_tiles_idx[locality_idx[tile_idx]]])
             $(dims[in_tiles_idx[locality_idx[tile_idx]]])
             $(transform[in_tiles_idx[locality_idx[tile_idx]]])`
-      info(cmd, prefix="MANAGER: ")
+      @info string("MANAGER: ",cmd)
       try
         run(cmd)
       catch e
@@ -250,17 +250,17 @@ t0=time()
     end
   end
 end
-info("peons took ",round(Int,time()-t0)," sec", prefix="MANAGER: ")
+@info string("MANAGER: ","peons took ",round(Int,time()-t0)," sec")
 
 for (k,v) in merge_count
-  info((k,v), prefix="MANAGER: ")
+  @info string("MANAGER: ",(k,v))
   v[1]>1 && v[1]!=v[2] && warn("not all input tiles processed for output tile ",k," : ",v)
 end
 
 # delete local_scratch
 t0=time()
 scratch1 = rmcontents(local_scratch, "before", "MANAGER: ")
-info("deleting local_scratch = ",local_scratch," at end took ",round(Int,time()-t0)," sec", prefix="MANAGER: ")
+@info string("MANAGER: ","deleting local_scratch = ",local_scratch," at end took ",round(Int,time()-t0)," sec")
 
 #closelibs()
 
@@ -272,4 +272,4 @@ try
 catch
 end
 
-info(readchomp(`date`), prefix="MANAGER: ")
+@info string("MANAGER: ",readchomp(`date`))

@@ -7,6 +7,7 @@
 const parameters_file = ARGS[1]
 const face_leaf_path_idx = parse(Int,ARGS[2]) - 1
 
+import ImageMagick
 using Images, YAML
 
 include(parameters_file)
@@ -14,7 +15,7 @@ include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 include(joinpath(frompath,"calculated_parameters.jl"))
 include(joinpath(frompath,"set_parameters.jl"))
 
-face_leaf_path_init = base(4,face_leaf_path_idx,nlevels)
+face_leaf_path_init = string(face_leaf_path_idx, base=4, pad=nlevels)
 if axis==1
   remap(x) = replace(replace(replace(replace(x, '3' =>'7'), '2' =>'5'), '1' =>'3'), '0' =>'1')
 elseif axis==2
@@ -23,13 +24,14 @@ elseif axis==3
   remap(x) = replace(replace(replace(replace(x, '3' =>'4'), '2' =>'3'), '1' =>'2'), '0' =>'1')
 end
 face_leaf_path = [Int(x)-Int('0') for x in remap(face_leaf_path_init)] 
-info("face_leaf_path = ", face_leaf_path)
+@info string("face_leaf_path = ", face_leaf_path)
 
 
 leaf_paths=[]
 crop_offset=0
 found_surface=false
 for i = 0:2^nlevels-1
+  global crop_offset, found_surface
   leaf_path = face_leaf_path + reverse([(i>>n)&1 for n in 0:nlevels-1]) * 2^(axis-1)
   in_path = joinpath(frompath, join(leaf_path,Base.Filesystem.path_separator))
   if isdir(in_path)
@@ -39,7 +41,7 @@ for i = 0:2^nlevels-1
     crop_offset+=1
   end
 end
-info("length(leaf_paths) = ", length(leaf_paths))
+@info string("length(leaf_paths) = ", length(leaf_paths))
 isempty(leaf_paths) && exit()
 
 
@@ -56,8 +58,8 @@ else
   crop_to = round(Int,(crop_um[2]-origin_nm[axis]/1000)/voxelsize_used_um[axis])
   crop_to = min(shape_leaf_px[axis]*length(leaf_paths), crop_to - crop_offset*shape_leaf_px[axis])
 end
-crop_range = colon(crop_from, crop_to)
-info("crop_range = ", crop_range)
+crop_range = (:)(crop_from, crop_to)
+@info string("crop_range = ", crop_range)
 isempty(crop_range) && exit()
 
 
@@ -67,11 +69,11 @@ tile_shape = TileShape(TileBaseIndex(tiles,1))
 tile_size = (shape_leaf_px...,nchannels)
 stack_size = [tile_size...]
 stack_size[axis] *= length(leaf_paths)
-stack = Array{UInt16}(stack_size...);
+stack = Array{UInt16}(undef, stack_size...);
 
 for ileaf in eachindex(leaf_paths)
   in_path = joinpath(frompath, join(leaf_paths[ileaf],Base.Filesystem.path_separator))
-  read_img = load_tile( string(in_path,"/default.%.",file_format_save), tile_size)
+  read_img = load_tile(string(in_path,"/default"), file_format_save, tile_size)
   stack_index = Any[:,:,:,:]
   stack_index[axis] = (ileaf-1)*tile_size[axis]+1 : ileaf*tile_size[axis]
   stack[stack_index...] = read_img
@@ -80,7 +82,7 @@ end
 permuted_stack = PermutedDimsArray(stack, [setdiff(1:3,axis)..., axis, 4]);
 
 
-projection_img = Array{UInt16}(size(permuted_stack)[1:2]...)
+projection_img = Array{UInt16}(undef, size(permuted_stack)[1:2]...)
 
 function scale_and_clamp(arg::Vector, black_level, white_level)
   signed_arg = convert(Vector{Float32}, arg)
@@ -100,5 +102,5 @@ end
 
 mkpath(joinpath(topath,"tiles"))
 out_path = joinpath(topath, "tiles", join(face_leaf_path))
-info("saving to ",out_path)
+@info string("saving to ",out_path)
 save(string(out_path,".",file_format_save), PermutedDimsArray(projection_img,(2,1)))

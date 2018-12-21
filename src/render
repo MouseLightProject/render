@@ -64,7 +64,6 @@ cleanup_time_limit=${tmp[15]}
 source_path=${tmp[16]}
 downsample_from_existing_leaves=${tmp[17]}
 
-
 # delete <logfile_scratch> and <destination> if they exist
 if [ -d $logfile_scratch ] ; then
   echo "deleting logfile_scratch = $logfile_scratch" >> $logfile_scratch/render.log
@@ -130,8 +129,11 @@ fi
 
 # downsample the octree
 if [ "$nlevels" -gt "2" ]; then
-  expr="import Images, HDF5, YAML;
+  expr="import ImageMagick;
+        import Images, HDF5, YAML;
+        using Distributed;
         p=addprocs(${octree_ncores_per_job});
+        @everywhere import ImageMagick;
         @everywhere using Images, HDF5, YAML;
         @everywhere include(\"${destination}/set_parameters.jl\");
         @everywhere include(\"${destination}/calculated_parameters.jl\");
@@ -144,7 +146,7 @@ if [ "$nlevels" -gt "2" ]; then
         if isdir(joinpath(frompath,string(oct1),string(oct2),string(oct3)))
           merge_output_tiles(frompath, destination, \"default\", file_format_save,
                 string(oct1)*\"/\"*string(oct2)*\"/\"*string(oct3), true, true, delete_flag);
-          info(\"merging took \",string(round(Int,time()-t)),\" sec\");
+          @info string(\"merging took \",string(round(Int,time()-t)),\" sec\");
         end;
         rmprocs(p);"
   cmd="umask 002;
@@ -161,7 +163,7 @@ if [ "$nlevels" -gt "2" ]; then
     pcmd="export RENDER_PATH=$RENDER_PATH;
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
           export JULIA=$JULIA;
-          export JULIA_PKGDIR=$JULIA_PKGDIR;
+          export JULIA_PROJECT=$JULIA_PROJECT;
           export HOSTNAME=$HOSTNAME;
           export LSB_JOBINDEX={};
           $cmd &> ${logfile_scratch}/merge{}.log"
@@ -170,8 +172,11 @@ if [ "$nlevels" -gt "2" ]; then
   hold="-w done(${jobname}2)"
 fi
 
-expr="import Images, HDF5, YAML;
+expr="import ImageMagick;
+      import Images, HDF5, YAML;
+      using Distributed;
       p=addprocs(${octree_ncores_per_job});
+      @everywhere import ImageMagick;
       @everywhere using Images, HDF5, YAML;
       @everywhere include(\"${destination}/set_parameters.jl\");
       @everywhere include(\"${destination}/calculated_parameters.jl\");
@@ -180,7 +185,7 @@ expr="import Images, HDF5, YAML;
       frompath = (nlevels>2 || downsample_from_existing_leaves) ? destination : shared_scratch;
       delete_flag = !downsample_from_existing_leaves && delete_scratch==\"as-you-go\";
       merge_output_tiles(frompath, destination, \"default\", file_format_save, \"\", true, true, delete_flag);
-      info(\"merging took \",string(round(Int,time()-t)),\" sec\");
+      @info string(\"merging took \",string(round(Int,time()-t)),\" sec\");
       rmprocs(p);"
 cmd="umask 002;
      date;
@@ -196,10 +201,10 @@ else
   pcmd="export RENDER_PATH=$RENDER_PATH;
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
         export JULIA=$JULIA;
-        export JULIA_PKGDIR=$JULIA_PKGDIR;
+        export JULIA_PROJECT=$JULIA_PROJECT;
         export HOSTNAME=$HOSTNAME;
         $cmd &> ${logfile_scratch}/merge513.log"
-  ssh ${which_cluster%%,*} $pcmd  &>> $logfile_scratch/render.log
+  ssh ${which_cluster%%,*} $pcmd &>> $logfile_scratch/render.log
 fi
 
 # email user

@@ -6,6 +6,7 @@
 
 const parameters_file = ARGS[1]
 
+import ImageMagick
 using Images, YAML, Morton
 
 include(parameters_file)
@@ -20,7 +21,7 @@ projection_img = fill(0x0000, projection_size...);
 
 tif_files = filter(x->occursin(r"^[1-8].*\.tif",x), readdir(joinpath(topath,"tiles")));
 for tile in unique([split(x,'.')[1] for x in tif_files])
-  info(tile)
+  @info tile
   in_path = joinpath(topath,"tiles",tile)
   img = load(in_path*'.'*file_format_save)
 
@@ -37,17 +38,18 @@ for tile in unique([split(x,'.')[1] for x in tif_files])
   cartesian_coord_pix = round.(Int, cartesian_coord/2^length(quadtree_path).*projection_size)
   cartesian_box = repeat(cartesian_coord_pix; inner=2) -
                          [-1+shape_tile_px[1], 0, -1+shape_tile_px[2], 0]
-  ix = colon(cartesian_box[1:2]...)
-  iy = colon(cartesian_box[3:4]...)
-  projection_img[ix,iy] = transpose(rawview(channelview(img)));
+  ix = (:)(cartesian_box[1:2]...)
+  iy = (:)(cartesian_box[3:4]...)
+  projection_img[ix,iy] .= transpose(rawview(channelview(img)));
 end
 
 out_path = joinpath(topath, "tiles", "projection-$(projection_size[1])x$(projection_size[2])")
-info("saving to ",out_path)
+@info string("saving to ",out_path)
 flip = projection_size[1]>projection_size[2]
 save(out_path*'.'*file_format_save, flip ? transpose(projection_img) : projection_img)
 
 for output_pixel_size_um in output_pixel_sizes_um
+  global out_path, flip
   downsample_by = output_pixel_size_um ./ voxelsize_used_um[setdiff(1:3,axis)]
   downsample_size = round.(Int, projection_size./downsample_by)
 
@@ -56,7 +58,7 @@ for output_pixel_size_um in output_pixel_sizes_um
   downsample_img = round.(UInt16, imresize(imfilter(projection_img, kern, NA()), downsample_size...))
 
   out_path = joinpath(topath, "projection-$(downsample_size[1])x$(downsample_size[2])-$(output_pixel_size_um)um")
-  info("saving to ",out_path)
+  @info string("saving to ",out_path)
   flip = downsample_size[1]>downsample_size[2]
   save(out_path*'.'*file_format_save, flip ? transpose(downsample_img) : downsample_img)
 end
