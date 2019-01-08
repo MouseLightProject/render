@@ -167,8 +167,7 @@ function _load_tile(filename,ext,shape)
     @assert length(files)==shape[end]
     img = Array{UInt16}(undef, shape...)
     for (c,file) in enumerate(files)
-      img[:,:,:,c] = PermutedDimsArray(rawview(channelview(
-            load(string(filename,'.',c-1,'.',ext)))), (2,1,3))
+      img[:,:,:,c] = rawview(channelview(load(string(filename,'.',c-1,'.',ext), false)))
     end
     return img
   else
@@ -189,8 +188,7 @@ function _save_tile(filesystem, path, basename, ext, data)
       check=(s,e)->(@info string("mkpath(\"$filepath\").  will retry."); true))()
   if ext=="tif"
     for c=1:size(data,4)
-      save(string(joinpath(filepath,basename),'.',c-1,'.',ext),
-           permutedims(data[:,:,:,c],(2,1,3)))
+      save(string(joinpath(filepath,basename),'.',c-1,'.',ext), data[:,:,:,c], false)
     end
   else
     tdata = reshape(sdata(data),(size(data)...,1))   # remove sdata() when fixed
