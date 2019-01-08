@@ -62,7 +62,7 @@ open("$destination/calculated_parameters.jl","w") do f
   println(f,"const voxelsize_used_um = [",
         voxelsize_used_um[1], ',', voxelsize_used_um[2], ',', voxelsize_used_um[3], ']')
   println(f,"const origin_nm = [",join(map(string,tiles_bbox[1]),","),"]")
-  for repo in ["render", "mltk-bary", "tilebase", "nd", "ndio-series", "ndio-tiff", "ndio-hdf5", "mylib"]
+  for repo in ["render", "mltk-bary"]
     println(f,"const $(replace(repo,'-' =>'_'))_version = \"",git_version(joinpath(ENV["RENDER_PATH"],"src",repo)),"\"")
   end
 end

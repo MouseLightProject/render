@@ -211,11 +211,11 @@ function process_input_tile()
     if has_avx2 && use_avx
       BarycentricAVXinit(resampler, shape_in_subtile, shape_leaf_nchannels, 4)
       BarycentricAVXsource(resampler, in_subtile)
-@info in_subtile[1]  ### hack or the image is garbled.  wtf
     else
       BarycentricCPUinit(resampler, shape_in_subtile, shape_leaf_nchannels, 4)
       BarycentricCPUsource(resampler, in_subtile)
     end
+@info in_subtile[1]  ### hack or the image is garbled.  wtf
     time_initing+=(time()-t1)
 
     depth_first_traverse_over_output_tiles(TileBaseAABB(tiles), "", string(ix,'x',iy,'x',iz),

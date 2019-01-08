@@ -18,6 +18,7 @@ const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size
 
 const interpolation = "nearest"  # "nearest" or "linear"
 
+const downsample_from_existing_leaves=false
 
 # build the octree with a function below.  should return UInt16
 
@@ -68,7 +69,16 @@ const max_tilechannels_per_job=500  # maximum number of input tiles * nchannels 
 const which_cluster = [ENV["HOSTNAME"]] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
-const throttle_leaf_nmachines = 96  # maximum number of compute nodes to use to render leafs
+const ncores_incluster = 48*32
+
+const leaf_ncores_per_job = 16
+# for which_cluster=="janelia" set based on memory and load utilization (max is 48)
+
+const leaf_nthreads_per_process = 8  # should match barycentricCPU.c
+
+const leaf_process_oversubscription = 2
+
+const throttle_leaf_njobs = 96  # maximum number of compute nodes to use to render leafs
 # for which_cluster=="janelia" set to 96 (max is 96)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
@@ -80,11 +90,16 @@ const throttle_octree_njobs_per_machine = min(8,Sys.CPU_THREADS)
 # ignored when which_cluster=="janelia"
 # otherwise set to ncores per machine for small data sets
 
-const throttle_octree_ncores_per_job = 1
+const octree_ncores_per_job = 1
 # for which_cluster=="janelia" set to 9 (max is 16)
 # otherwise set to 1 for small data sets
 
 const short_queue = true  # rendering MUST take less than 1 hour
+
+const overall_time_limit = short_queue ? 60 : 4320  # three days
+const leaf_time_limit    = short_queue ? 60 : 2880  # two days
+const octree_time_limit  = 480   # eight hours
+const cleanup_time_limit = 60    # one hour
 
 
 # the below are for testing purposes.  users shouldn't need to change.

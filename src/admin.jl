@@ -365,6 +365,8 @@ function accumulate_times(r)
   global time_single_file, time_many_files, time_clear_files
   global time_read_files, time_max_files, time_delete_files, time_write_files
 
+  typeof(r) <: Exception && rethrow(r)
+
   time_octree_read  += r[1]
   time_octree_down  += r[2]
   time_octree_save  += r[3]

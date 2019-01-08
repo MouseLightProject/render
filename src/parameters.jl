@@ -92,7 +92,7 @@ const bad_nodes = []  # e.g. ["h09u20"]
 const ncores_incluster = 48*32
 
 const throttle_leaf_njobs = 64  # maximum number of jobs to use to render leafs
-# for which_cluster=="janelia" set to 64 (max is ncores_incluster/throttle_leaf_ncores_per_job)
+# for which_cluster=="janelia" set to 64 (max is ncores_incluster/leaf_ncores_per_job)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
 const leaf_ncores_per_job = 16
@@ -103,7 +103,7 @@ const leaf_nthreads_per_process = 8  # should match barycentricCPU.c
 const leaf_process_oversubscription = 2
 
 const throttle_octree_njobs = 256  # maximum number of compute nodes to use to downsample octree
-# for which_cluster=="janelia" set to 256 (max is ncores_incluster/throttle_octree_ncores_per_job)
+# for which_cluster=="janelia" set to 256 (max is ncores_incluster/octree_ncores_per_job)
 # otherwise this parameter is ignored, and is taken to be length(which_cluster)
 
 const throttle_octree_njobs_per_machine = min(8,Sys.CPU_THREADS)
