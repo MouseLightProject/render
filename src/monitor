@@ -2,6 +2,8 @@
 
 # usage: ./monitor <jobname> <path_to_set_parameters.jl>
 
+# echo watch -n 60 tail -n '$((LINES-2))' $logfile_scratch/monitor.log
+
 jobname=$1
 parametersjl=$2
 
