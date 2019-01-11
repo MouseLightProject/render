@@ -9,7 +9,7 @@
 @info string("DIRECTOR: ",readchomp(`date`))
 @info string("DIRECTOR: ",readchomp(`hostname`))
 
-using YAML, Sockets
+using Sockets
 
 include(ARGS[1])
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))

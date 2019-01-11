@@ -32,8 +32,7 @@ export JULIA_PROJECT=$RENDER_PATH/src/render
 umask 002
 
 # get vars from parameters.jl file
-expr="using YAML;
-      include(\"${RENDER_PATH}/src/render/src/admin.jl\");
+expr="include(\"${RENDER_PATH}/src/render/src/admin.jl\");
       tiles = TileBaseOpen(source);
       tile_shape = TileShape(TileBaseIndex(tiles,1));
       nchannels = tile_shape[4];

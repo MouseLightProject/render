@@ -7,7 +7,7 @@
 # julia peon.jl parameters.jl in_tile origin_str solo_out_tiles hostname port nxlims xlims nylims ylims nzlims zlims dims[1:3] transform[1-3*2*(n+1)^2]
 
 import ImageMagick
-using Images, HDF5, YAML, Sockets, Morton
+using Images, HDF5, Sockets, Morton
 
 include(ARGS[1])
 include("$destination/calculated_parameters.jl")

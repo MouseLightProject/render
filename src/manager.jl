@@ -43,20 +43,19 @@ scratch0 = rmcontents(local_scratch, "after", "MANAGER: ")
 @info string("MANAGER: ","deleting /dev/shm and local_scratch = ",local_scratch," at start took ",round(Int,time()-t0)," sec")
 
 # read in the transform parameters
-using YAML
-const meta = YAML.load(replace(read(source*"/tilebase.cache.yml", String),['[',',',']'] =>""))
-const dims = [map(x->parse(Int,x), split(x["shape"]["dims"]))[1:3] for x in meta["tiles"]]
-const xlims = map(x->parse(Int,x), split(meta["tiles"][1]["grid"]["xlims"]))
-const ylims = map(x->parse(Int,x), split(meta["tiles"][1]["grid"]["ylims"]))
-const zlims = [map(x->parse(Int,x), split(x["grid"]["zlims"])) for x in meta["tiles"]]
-const transform = [map(x->parse(Int,x), split(x["grid"]["coordinates"])) for x in meta["tiles"]]
+const meta = TileBaseOpen(source)
+const dims = meta["tiles"][1]["shape"]["dims"][1:3]
+const xlims = meta["tiles"][1]["grid"]["xlims"]
+const ylims = meta["tiles"][1]["grid"]["ylims"]
+const zlims = [x["grid"]["zlims"] for x in meta["tiles"]]
+const transform = [x["grid"]["coordinates"] for x in meta["tiles"]]
 @assert all(diff(diff(xlims)).==0)
 @assert all(diff(diff(ylims)).==0)
 @assert all(zlim->all(diff(zlim).>0), zlims)
 @assert all(diff(map(length,zlims)).==0)
 for x in meta["tiles"]
-  @assert xlims == map(x->parse(Int,x), split(x["grid"]["xlims"]))
-  @assert ylims == map(x->parse(Int,x), split(x["grid"]["ylims"]))
+  @assert xlims == x["grid"]["xlims"]
+  @assert ylims == x["grid"]["ylims"]
 end
 
 # get input tiles assigned to this manager, and
@@ -239,7 +238,7 @@ t0=time()
             $hostname_manager $port_manager $(length(xlims)) $xlims $(length(ylims)) $ylims
             $(length(zlims[in_tiles_idx[locality_idx[tile_idx]]]))
             $(zlims[in_tiles_idx[locality_idx[tile_idx]]])
-            $(dims[in_tiles_idx[locality_idx[tile_idx]]])
+            $(dims)
             $(transform[in_tiles_idx[locality_idx[tile_idx]]])`
       @info string("MANAGER: ",cmd)
       try

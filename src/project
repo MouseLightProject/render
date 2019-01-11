@@ -2,6 +2,8 @@
 
 # usage: src/project <copy_of_parameters.jl>
 
+parameters_file=$1
+
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric5
 export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric5/julia-0.7.0/bin/julia
@@ -11,8 +13,10 @@ export JULIA_PROJECT=$RENDER_PATH/src/render
 umask 002
 
 # get vars from parameters.jl file
-expr="print(join([bill_userid,frompath,topath,typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),throttle,delete_scratch],' '))"
-read -a tmp <<< $($JULIA -L $1 -e "$expr")
+expr="include(\"${RENDER_PATH}/src/render/src/admin.jl\");
+      tiles = TileBaseOpen(frompath);
+      print(join([bill_userid,frompath,topath,typeof(which_cluster) <: String ? which_cluster : join(which_cluster, ','),throttle,delete_scratch],' '))"
+read -a tmp <<< $($JULIA -L $parameters_file -e "$expr")
 bill_userid=${tmp[0]}
 frompath=${tmp[1]}
 topath=${tmp[2]}
@@ -34,7 +38,7 @@ date >> ${topath}/logs/project.log
 hostname >> ${topath}/logs/project.log
 
 # copy parameters to <destination>
-cp $1 $topath/set_parameters.jl
+cp $parameters_file $topath/set_parameters.jl
 chmod g+rw $topath/set_parameters.jl
 
 # create a probably-unique job name

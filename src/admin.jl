@@ -1,4 +1,4 @@
-using Distributed, Serialization, SharedArrays
+using Distributed, Serialization, SharedArrays, YAML, JLD2
 
 const um2nm=1e3
 
@@ -19,7 +19,18 @@ has_avx2 = occursin("avx2", read("/proc/cpuinfo", String))
 
 # port of tilebase
 
-TileBaseOpen(source) = YAML.load_file(joinpath(source,"tilebase.cache.yml"))
+function TileBaseOpen(source)
+  if isfile(joinpath(source,"tilebase.cache.jld2"))
+    @load joinpath(source,"tilebase.cache.jld2") tiles
+  else
+    tiles = YAML.load_file(joinpath(source,"tilebase.cache.yml"))
+    jld2hack = tempname()  # see https://github.com/JuliaIO/JLD2.jl/issues/55
+    @save jld2hack*".jld2" tiles
+    mv(jld2hack*".jld2", joinpath(source,"tilebase.cache.jld2"))
+  end
+  return tiles
+end
+
 TileBaseIndex(tiles, idx) = tiles["tiles"][idx]
 TileBaseCount(tiles) = length(tiles["tiles"])
 TileBasePath(tiles) = tiles["path"]
