@@ -1,4 +1,5 @@
-using Distributed, Serialization, SharedArrays, YAML, JLD2
+import ImageMagick
+using Distributed, Serialization, SharedArrays, YAML, JLD2, Images, HDF5
 
 const um2nm=1e3
 
@@ -172,75 +173,41 @@ load_tile(filename,ext,shape) = retry(() -> _load_tile(filename,ext,shape),
     check=(s,e)->(@info string("load_tile($filename,$ext,$shape) failed.  will retry."); true))()
 
 function _load_tile(filename,ext,shape)
-  if ext=="tif"
-    regex = Regex("$(basename(filename)).[0-9].$ext")
-    files = filter(x->occursin(regex,x), readdir(dirname(filename)))
-    @assert length(files)==shape[end]
-    img = Array{UInt16}(undef, shape...)
-    for (c,file) in enumerate(files)
-      img[:,:,:,c] = rawview(channelview(load(string(filename,'.',c-1,'.',ext), false)))
+  regex = Regex("$(basename(filename)).[0-9].$ext")
+  files = filter(x->occursin(regex,x), readdir(dirname(filename)))
+  @assert length(files)==shape[end]
+  img = Array{UInt16}(undef, shape...)
+  for (c,file) in enumerate(files)
+    fullfilename = string(filename,'.',c-1,'.',ext)
+    if ext=="tif"
+      img[:,:,:,c] = rawview(channelview(load(fullfilename, false)))
+    else
+      h5open(fullfilename, "r") do fid
+        dataset = names(fid)[1]
+        img[:,:,:,c] = read(fid, "/"*dataset)
+      end
     end
-    return img
-  else
-    tdata = h5read(string(filename,'.',ext), "/data")
-    reshape(tdata,size(tdata)[1:end-1])
-  end 
+  end
+  return img
 end
 
-save_tile(filesystem, path, basename, ext, data) = retry(
-    () -> _save_tile(filesystem, path, basename, ext, data),
+save_tile(filesystem, path, basename0, ext, data) = retry(
+    () -> _save_tile(filesystem, path, basename0, ext, data),
     delays=ExponentialBackOff(n=10, first_delay=60, factor=3, max_delay=60*60*24),
-    check=(s,e)->(@info string("save_tile($filesystem,$path,$basename,$ext).  will retry."); true))()
+    check=(s,e)->(@info string("save_tile($filesystem,$path,$basename0,$ext).  will retry."); true))()
 
-function _save_tile(filesystem, path, basename, ext, data)
+function _save_tile(filesystem, path, basename0, ext, data)
   filepath = joinpath(filesystem,path)
   retry(()->mkpath(filepath),
       delays=ExponentialBackOff(n=10, first_delay=60, factor=3, max_delay=60*60*24),
       check=(s,e)->(@info string("mkpath(\"$filepath\").  will retry."); true))()
-  if ext=="tif"
-    for c=1:size(data,4)
-      save(string(joinpath(filepath,basename),'.',c-1,'.',ext), data[:,:,:,c], false)
+  for c=1:size(data,4)
+    fullfilename = string(joinpath(filepath,basename0),'.',c-1,'.',ext)
+    if ext=="tif"
+      save(fullfilename, data[:,:,:,c], false)
+    else
+      h5write(fullfilename, "/data", collect(sdata(data[:,:,:,c])))
     end
-  else
-    tdata = reshape(sdata(data),(size(data)...,1))   # remove sdata() when fixed
-    fn = string(joinpath(filepath,basename),'.',ext)
-    h5write(fn, "/data", tdata)
-    h5writeattr(fn, "/data", Dict("axis_tags"=>
-"""{
-  "axes": [
-    {
-      "key": "t",
-      "typeFlags": 8,
-      "resolution": 0,
-      "description": ""
-    },
-    {
-      "key": "c",
-      "typeFlags": 1,
-      "resolution": 0,
-      "description": ""
-    },
-    {
-      "key": "z",
-      "typeFlags": 2,
-      "resolution": 0,
-      "description": ""
-    },
-    {
-      "key": "y",
-      "typeFlags": 2,
-      "resolution": 0,
-      "description": ""
-    },
-    {
-      "key": "x",
-      "typeFlags": 2,
-      "resolution": 0,
-      "description": ""
-    }
-  ]
-}
-"""))
   end
 end
 
@@ -294,15 +261,9 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
 
   if length(in_tiles)==1 && !startswith(destination2,in_tiles[1])
     t0=time()
-    if suffix=="tif"
-      for c=1:nchannels
-        from_file = string(in_tiles[1],'.',c-1,'.',suffix)
-        to_file = joinpath(destination, out_tile_path, string(prefix,'.',c-1,'.',suffix))
-        mv_or_cp(from_file, to_file, delete)
-      end
-    else
-      from_file = string(in_tiles[1],'.',suffix)
-      to_file = joinpath(destination, out_tile_path, string(prefix,'.',suffix))
+    for c=1:nchannels
+      from_file = string(in_tiles[1],'.',c-1,'.',suffix)
+      to_file = joinpath(destination, out_tile_path, string(prefix,'.',c-1,'.',suffix))
       mv_or_cp(from_file, to_file, delete)
     end
     time_single_file=(time()-t0)
@@ -324,14 +285,8 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
       time_max_files+=(time()-t1)
       t1=time()
       if delete
-        if suffix=="tif"
-          for c=1:nchannels
-            from_file = string(in_tile,'.',c-1,'.',suffix)
-            @info string("  deleting ",from_file)
-            rm(from_file)
-          end
-        else
-          from_file = string(in_tile,'.',suffix)
+        for c=1:nchannels
+          from_file = string(in_tile,'.',c-1,'.',suffix)
           @info string("  deleting ",from_file)
           rm(from_file)
         end
@@ -402,8 +357,7 @@ function merge_across_filesystems(sources::Array{String,1}, destination, prefix,
     dir2 = map(entry->isdir(joinpath(source,out_tile_path,entry)), listing)
     sum(dir2)==0 || push!(dirs, listing[dir2]...)
     img_files = listing[.!dir2 .& map(entry->endswith(entry,suffix), listing)]
-    lopoff = suffix=="tif" ? 2 : 1
-    uniq_img_files = unique(map(img_file->join(split(img_file,'.')[1:end-lopoff],'.'), img_files))
+    uniq_img_files = unique(map(img_file->join(split(img_file,'.')[1:end-2],'.'), img_files))
     in_tiles2 = [joinpath(source,out_tile_path,uniq_img_file) for uniq_img_file in uniq_img_files]
     isempty(in_tiles2) || push!(in_tiles, in_tiles2...)
   end

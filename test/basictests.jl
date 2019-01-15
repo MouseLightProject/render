@@ -19,23 +19,27 @@ function check_logfiles(logfilepath, correct_nmergelogs)
   end
 end
 
-function load_tif_or_h5(basepath)
-  if isfile(joinpath(basepath,"default.0.tif"))
-    files = filter(x->occursin(r"default.[0-9].tif",x), readdir(basepath))
-    img_raw = load(joinpath(basepath,"default.0.tif"))
-    img = Array{UInt16}(size(img_raw)...,length(files))
-    img[:,:,:,1] = rawview(channelview(img_raw))
-    for ichannel=2:length(files)  
-      img_raw = load(joinpath(basepath,"default.$(ichannel-1).tif"))
-      img[:,:,:,ichannel] = rawview(channelview(img_raw))
-    end
-    permuteddimsview(img, (2,1,3,4))
-  elseif isfile(joinpath(basepath,"default.h5"))
-    img = h5read(joinpath(basepath,"default.h5"),"/data")
-    reshape(img,size(img)[1:end-1])
+function _load_tif_or_h5(filename, kind)
+  if kind == :tif
+    img = load(filename, false)
+    return rawview(channelview(img))
   else
-    []
+    img = h5read(filename,"/data")
+    return dropdims(img, dims=1)
   end
+end
+
+function load_tif_or_h5(basepath)
+  files = filter(x->occursin("default",x), readdir(basepath))
+  kind = endswith(files[1],"tif") ? :tif : :h5
+  img_raw = _load_tif_or_h5(joinpath(basepath,files[1]), kind)
+  img = Array{UInt16}(undef, size(img_raw)...,length(files))
+  img[:,:,:,1] = img_raw
+  for ichannel=2:length(files)  
+    img_raw = _load_tif_or_h5(joinpath(basepath,files[ichannel]), kind)
+    img[:,:,:,ichannel] = img_raw
+  end
+  img
 end
 
 function check_images(scratchpath, testdirs, correct_nchannels, correct_nimages, black_and_white)
