@@ -63,7 +63,7 @@ crop_range = (:)(crop_from, crop_to)
 isempty(crop_range) && exit()
 
 
-const tiles = TileBaseOpen(String(frompath))
+const tiles = TileBaseOpen(frompath)
 tile_shape = TileShape(TileBaseIndex(tiles,1))
 
 tile_size = (shape_leaf_px...,nchannels)
@@ -72,6 +72,7 @@ stack_size[axis] *= length(leaf_paths)
 stack = Array{UInt16}(undef, stack_size...);
 
 for ileaf in eachindex(leaf_paths)
+  @info ileaf
   in_path = joinpath(frompath, join(leaf_paths[ileaf],Base.Filesystem.path_separator))
   read_img = load_tile(string(in_path,"/default"), file_format_save, tile_size)
   stack_index = Any[:,:,:,:]

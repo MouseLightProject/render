@@ -42,4 +42,4 @@ const output_pixel_sizes_um = [1,3,10,30]
 const which_cluster = "janelia"  # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const throttle = 16  # maximum number of jobs to submit
 
-const delete_scratch="yes"   # "yes" or "no"
+const delete_scratch="no"   # "yes" or "no"

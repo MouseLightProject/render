@@ -27,12 +27,12 @@ for tile in unique([split(x,'.')[1] for x in tif_files])
 
   quadtree_path = [parse(Int,x) for x in tile[1:nlevels]]
   if axis==1
-    quadtree_path[quadtree_path.==3] = 2
-    quadtree_path[quadtree_path.==5] = 3
-    quadtree_path[quadtree_path.==7] = 4
+    quadtree_path[quadtree_path.==3] .= 2
+    quadtree_path[quadtree_path.==5] .= 3
+    quadtree_path[quadtree_path.==7] .= 4
   elseif axis==2
-    quadtree_path[quadtree_path.==5] = 3
-    quadtree_path[quadtree_path.==6] = 4
+    quadtree_path[quadtree_path.==5] .= 3
+    quadtree_path[quadtree_path.==6] .= 4
   end
   cartesian_coord = tree2cartesian(quadtree_path)
   cartesian_coord_pix = round.(Int, cartesian_coord/2^length(quadtree_path).*projection_size)

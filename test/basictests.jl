@@ -12,10 +12,10 @@ function check_logfiles(logfilepath, correct_nmergelogs)
   log = readlines(pipeline(`tar xvzfO $logfilepath`, stderr=devnull))
   for err in ["ERR","Err","WAR","War","Segmentation"]
     badlines = filter(x->occursin(err, x) && !occursin("can't delete", x), log)
-    @test length(badlines)==0
     for badline in badlines
       println(badline)
     end
+    @test length(badlines)==0
   end
 end
 
@@ -85,7 +85,7 @@ function check_images(scratchpath, testdirs, correct_nchannels, correct_nimages,
           largest_diff = round.(Int, 1/eps(eltype(imgs[end]))*maximum(abs.(
                 convert(Array{Float64}, imgs[end-1][idx])-
                 convert(Array{Float64}, imgs[end][idx]))))
-          warn(joinpath(testdir,root,file)," off by ",length(idx),
+          @warn string(joinpath(testdir,root,file)," off by ",length(idx),
                 " voxel(s).  largest difference is ", largest_diff, " shade(s)")
         end
       end

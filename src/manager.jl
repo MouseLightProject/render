@@ -244,7 +244,7 @@ t0=time()
       try
         run(cmd)
       catch e
-        warn("peon for input tile ",in_tiles_idx[locality_idx[tile_idx]]," might have failed: ",e)
+        @warn string("peon for input tile ",in_tiles_idx[locality_idx[tile_idx]]," might have failed: ",e)
       end
     end
   end
@@ -253,7 +253,7 @@ end
 
 for (k,v) in merge_count
   @info string("MANAGER: ",(k,v))
-  v[1]>1 && v[1]!=v[2] && warn("not all input tiles processed for output tile ",k," : ",v)
+  v[1]>1 && v[1]!=v[2] && @warn string("not all input tiles processed for output tile ",k," : ",v)
 end
 
 # delete local_scratch

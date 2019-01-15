@@ -1,3 +1,4 @@
+import ImageMagick
 using Test, Images, HDF5
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
@@ -18,12 +19,12 @@ function check_toplevel_images(basepath, nchannels)
   @test size(img,4)==nchannels
   for ichannel=0:(nchannels-1)
     img_channel=img[:,:,:,ichannel+1]
-    rightanswer = zeros(UInt16,48);  rightanswer[3:end-1]=0xffff>>ichannel
-    @test squeeze(maximum(img_channel,(1,2)),(1,2)) == rightanswer
-    rightanswer = zeros(UInt16,48);  rightanswer[4:end-2]=0xffff>>ichannel
-    @test squeeze(maximum(img_channel,(1,3)),(1,3)) == rightanswer
-    rightanswer = zeros(UInt16,48);  rightanswer[6:end-4]=0xffff>>ichannel
-    @test squeeze(maximum(img_channel,(2,3)),(2,3)) == rightanswer
+    rightanswer = zeros(UInt16,48);  rightanswer[3:end-1] .= 0xffff>>ichannel
+    @test dropdims(maximum(img_channel, dims=(1,2)), dims=(1,2)) == rightanswer
+    rightanswer = zeros(UInt16,48);  rightanswer[4:end-2] .= 0xffff>>ichannel
+    @test dropdims(maximum(img_channel, dims=(1,3)), dims=(1,3)) == rightanswer
+    rightanswer = zeros(UInt16,48);  rightanswer[6:end-4] .= 0xffff>>ichannel
+    @test dropdims(maximum(img_channel, dims=(2,3)), dims=(2,3)) == rightanswer
   end
 end
 
@@ -36,13 +37,13 @@ function check_projection_logfiles(basepath)
 end
 
 function check_toplevel_projection_images(basepath)
-  img_color = load(joinpath(basepath,"projection-192x192.tif"))
+  img_color = load(joinpath(basepath,"tiles","projection-192x192.tif"))
   img = rawview(channelview(img_color))
   @test size(img)==(192,192)
-  rightanswer = zeros(UInt16,192);  rightanswer[10:end-8]=0x8000
-  @test squeeze(maximum(img,1),1) == rightanswer
-  rightanswer = zeros(UInt16,192);  rightanswer[19:end-17]=0x8000
-  @test squeeze(maximum(img,2),2) == rightanswer
+  rightanswer = zeros(UInt16,192);  rightanswer[10:end-8] .= 0x8000
+  @test dropdims(maximum(img, dims=1), dims=1) == rightanswer
+  rightanswer = zeros(UInt16,192);  rightanswer[19:end-17] .= 0x8000
+  @test dropdims(maximum(img, dims=2), dims=2) == rightanswer
 end
 
 function check_projection_images(scratchpath, testdirs, correct_nimages)
@@ -94,7 +95,7 @@ end
 
 @testset "threechannel local-vs-cluster-vs-hdf5" begin
   shades = check_images(scratchpath, ["threechannel-local", "threechannel-cluster", "threechannel-hdf5"], 3, 3*(64+8+1), true)
-  @test max(map(maximum, shades[1])...) > max(map(maximum, shades[2])...) > max(map(maximum, shades[3])...)
+  @test maximum(shades[1]) > maximum(shades[2]) > maximum(shades[3])
 end
 
 @testset "linearinterp" begin
@@ -103,7 +104,6 @@ end
   check_logfiles(joinpath(scratchpath,"linearinterp-threechannel","results","logs.tar.gz"), 1)
   check_logfiles(joinpath(scratchpath,"linearinterp-threechannel-cpu","results","logs.tar.gz"), 1)
   check_images(scratchpath, ["linearinterp-threechannel","linearinterp-threechannel-cpu"], 3, 3*(64+8+1), false)
-  @info("it is normal to have 68 avx images each have ~1000 voxels be 257 shades different compared to cpu")
 end
 
 @testset "nslots" begin
@@ -112,7 +112,7 @@ end
   check_toplevel_images(joinpath(scratchpath,"nslots","results"),1)
 
   function nslots(scratchpath, rightanswer)
-    r = "MANAGER: $rightanswer CPUs"
+    r = "[ Info: MANAGER: $rightanswer CPUs"
     logfilepath = joinpath(scratchpath,"results","logs.tar.gz")
     squatters = filter(file->occursin("squatter", file), readlines(`tar tvzf $logfilepath`))
     ncache = []
@@ -120,8 +120,8 @@ end
       squatter_file = split(squatter,' ')[end]
       log = readlines(`tar xvzfO $logfilepath $squatter_file`)
       @test any(line->startswith(line,r), log)
-      idx = findfirst(line->startswith(line,"MANAGER: allocated RAM for"), log)
-      push!(ncache, parse(Int, split(log[idx])[5]))
+      idx = findfirst(line->startswith(line,"[ Info: MANAGER: allocated RAM for"), log)
+      push!(ncache, parse(Int, split(log[idx])[7]))
     end
     @test length(unique(ncache))==1
     ncache[1]
@@ -151,7 +151,7 @@ end
   check_projection_logfiles(joinpath(scratchpath,"projection-coronal-cluster"))
   check_toplevel_projection_images(joinpath(scratchpath,"projection-coronal-local"))
   check_toplevel_projection_images(joinpath(scratchpath,"projection-coronal-cluster"))
-  check_projection_images(scratchpath, ["projection-coronal-local","projection-coronal-cluster"], 5)
+  check_projection_images(scratchpath, ["projection-coronal-local","projection-coronal-cluster"], 4)
 end
 
 end
