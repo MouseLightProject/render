@@ -101,6 +101,9 @@ if [ $delete_scratch == 'yes' ]; then
   else
     eval $cmd &>> ${topath}/logs/project.log
   fi
+  dependency=3
+else
+  dependency=2
 fi
 
 # tar log files
@@ -115,7 +118,7 @@ cmd="date;
 echo $cmd &>> ${topath}/logs/project.log
 if [ $which_cluster == 'janelia' ]; then
   echo $cmd | bsub -P $bill_userid -J ${jobname}4 \
-        -w "done(${jobname}3)" \
+        -w "done(${jobname}${dependency})" \
         -o ${topath}/tar.log
 else
   eval $cmd &> ${topath}/tar.log
