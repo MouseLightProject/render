@@ -63,7 +63,7 @@ end
 
 AABBMake(ndim) = Dict("ori"=>Vector{Int}(undef, ndim), "shape"=>Vector{Int}(undef, ndim))
 AABBGet(bbox) = bbox["ori"], bbox["shape"]
-AABBVolume(bbox) = prod(bbox["shape"])
+AABBVolume(bbox) = prod(float(bbox["shape"]))
 
 function AABBSet(bbox, ori, shape)
   if ori!=nothing
