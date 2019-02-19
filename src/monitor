@@ -23,7 +23,7 @@ while [ -z "$outofString" ]; do
   outofString=$(grep "channels split into" ${logfile_scratch}/director.log)
 done
 outofArray=($outofString)
-outof=${outofArray[1]}
+outof=${outofArray[3]}
 
 display_it() {
   if [ -n "$2" ] ; then
