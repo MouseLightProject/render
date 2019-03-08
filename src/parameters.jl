@@ -18,7 +18,7 @@ const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size
 
 const interpolation = "nearest"  # "nearest" or "linear"
 
-const downsample_from_existing_leaves=false
+const downsample_from_existing_leaves=false  # source points to previous destination
 
 # build the octree with a function below.  should return UInt16
 
