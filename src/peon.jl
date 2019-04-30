@@ -178,7 +178,7 @@ function process_input_tile()
   global time_initing
 
   local tiles
-  tiles = TileBaseOpen(source)
+  tiles = TileBaseOpen(destination)
   global tile = TileBaseIndex(tiles, in_tile_idx)
 
   @info string("PEON: processing input tile $in_tile_idx: ",TilePath(tile))

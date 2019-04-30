@@ -34,7 +34,7 @@ num_procs = leaf_process_oversubscription*div(ncores,leaf_nthreads_per_process)
 const local_scratch="/scratch/"*readchomp(`whoami`)
 const manager_bbox = AABBMake(3)  # process all input tiles whose origins are within this bbox
 AABBSet(manager_bbox, map(x->parse(Int,x),origin_strs), map(x->parse(Int,x),shape_strs))
-const tiles = TileBaseOpen(source)
+const tiles = TileBaseOpen(destination)
 
 # delete /dev/shm and local_scratch
 t0=time()
@@ -43,17 +43,16 @@ scratch0 = rmcontents(local_scratch, "after", "MANAGER: ")
 @info string("MANAGER: ","deleting /dev/shm and local_scratch = ",local_scratch," at start took ",round(Int,time()-t0)," sec")
 
 # read in the transform parameters
-const meta = TileBaseOpen(source)
-const dims = meta["tiles"][1]["shape"]["dims"][1:3]
-const xlims = meta["tiles"][1]["grid"]["xlims"]
-const ylims = meta["tiles"][1]["grid"]["ylims"]
-const zlims = [x["grid"]["zlims"] for x in meta["tiles"]]
-const transform = [x["grid"]["coordinates"] for x in meta["tiles"]]
+const dims = tiles["tiles"][1]["shape"]["dims"][1:3]
+const xlims = tiles["tiles"][1]["grid"]["xlims"]
+const ylims = tiles["tiles"][1]["grid"]["ylims"]
+const zlims = [x["grid"]["zlims"] for x in tiles["tiles"]]
+const transform = [x["grid"]["coordinates"] for x in tiles["tiles"]]
 @assert all(diff(diff(xlims)).==0)
 @assert all(diff(diff(ylims)).==0)
 @assert all(zlim->all(diff(zlim).>0), zlims)
 @assert all(diff(map(length,zlims)).==0)
-for x in meta["tiles"]
+for x in tiles["tiles"]
   @assert xlims == x["grid"]["xlims"]
   @assert ylims == x["grid"]["ylims"]
 end

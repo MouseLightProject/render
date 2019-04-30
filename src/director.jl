@@ -76,7 +76,9 @@ open("$destination/transform.txt","w") do f  # for large volume viewer
   println(f,"nl: ",nlevels+1)
 end
 cp(joinpath(source,"tilebase.cache.yml"), joinpath(destination,"tilebase.cache.yml"))
+cp(joinpath(source,"tilebase.cache.jld2"), joinpath(destination,"tilebase.cache.jld2"))
 chmod(joinpath(destination,"tilebase.cache.yml"), 0o660)
+chmod(joinpath(destination,"tilebase.cache.jld2"), 0o660)
 @info string("DIRECTOR: number of levels = ",nlevels)
 @info string("DIRECTOR: shape of output tiles is [",join(map(string,shape_leaf_px),","),"] pixels")
 @info string("DIRECTOR: voxel dimensions used to make output tile shape even and volume divisible by 32*32*4: [",

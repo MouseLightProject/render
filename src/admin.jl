@@ -21,7 +21,8 @@ has_avx2 = occursin("avx2", read("/proc/cpuinfo", String))
 # port of tilebase
 
 function TileBaseOpen(source)
-  if isfile(joinpath(source,"tilebase.cache.jld2"))
+  if isfile(joinpath(source,"tilebase.cache.jld2")) &&
+        mtime(joinpath(source,"tilebase.cache.jld2")) > mtime(joinpath(source,"tilebase.cache.yml"))
     @load joinpath(source,"tilebase.cache.jld2") tiles
   else
     tiles = YAML.load_file(joinpath(source,"tilebase.cache.yml"))

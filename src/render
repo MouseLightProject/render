@@ -88,7 +88,7 @@ echo jobname = $jobname >> $logfile_scratch/render.log
 
 # copy files
 if [ $downsample_from_existing_leaves == 'true' ]; then
-  cmd="cp ${source_path}/{calculated_parameters.jl,tilebase.cache.yml,transform.txt} $destination"
+  cmd="cp ${source_path}/{calculated_parameters.jl,tilebase.cache.yml,tilebase.cache.jld2,transform.txt} $destination"
   echo $cmd &>> $logfile_scratch/render.log
   eval $cmd &>> $logfile_scratch/render.log
 fi
