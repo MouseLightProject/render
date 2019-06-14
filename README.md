@@ -12,7 +12,7 @@ Requirements
 Julia, version >=1.3, plus the Cairo, Colors, Gadfly, HDF5, ImageMagick,
 Images, JLD2, Morton, and YAML packages.
 
-Nathan Clack's mltk-bary library.
+Nathan Clack's [mltk-bary library](https://github.com/nclack/barry).
 
 Tested with Julia v1.7.1, Cairo v1.0.5, Colors v0.12.8, Gadfly v1.3.4, HDF5
 v0.15.7, ImageMagick v1.2.2, Images v0.25.0, JLD2 v0.4.17, Morton v0.1.1,
@@ -22,8 +22,8 @@ YAML v0.4.7, and mltk-bary master/84e15364.
 Installation
 ============
 
-Install the mltk-bary library using make.sh.  Be sure to edit ```rootdir```
-and ```installdir``` therein appropriately.
+Install the [mltk-bary library](https://github.com/nclack/barry) using make.sh.
+Be sure to edit ```rootdir``` and ```installdir``` therein appropriately.
 
 Download the latest precompiled binary of Julia.  Install
 the required packages by changing to the directory of the render repository,
