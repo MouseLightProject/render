@@ -93,6 +93,8 @@ if [ $downsample_from_existing_leaves == 'true' ]; then
   eval $cmd &>> $logfile_scratch/render.log
 fi
 
+sync
+
 # create the leaf nodes
 hold=''
 if [ $downsample_from_existing_leaves == 'false' ]; then
