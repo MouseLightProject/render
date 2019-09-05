@@ -207,10 +207,10 @@ else
 fi
 
 # email user
-echo watch -n 60 tail -n '$((LINES-2))' $logfile_scratch/monitor.log | mail -s "job $jobname started" ${notify_addr}@janelia.hhmi.org
+echo watch -n 600 tail -n '$((LINES-2))' $logfile_scratch/monitor.log | mail -s "job $jobname started" ${notify_addr}@janelia.hhmi.org
 
 # start the monitor process
-nohup sh -c "sleep 60; ${RENDER_PATH}/src/render/src/monitor $jobname $destination/set_parameters.jl &> ${logfile_scratch}/monitor.log" 2>/dev/null &
+nohup sh -c "sleep 600; ${RENDER_PATH}/src/render/src/monitor $jobname $destination/set_parameters.jl &> ${logfile_scratch}/monitor.log" 2>/dev/null &
 
 date >> $logfile_scratch/render.log
 
