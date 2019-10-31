@@ -174,7 +174,7 @@ load_tile(filename,ext,shape) = retry(() -> _load_tile(filename,ext,shape),
     check=(s,e)->(@info string("load_tile($filename,$ext,$shape) failed.  will retry."); true))()
 
 function _load_tile(filename,ext,shape)
-  regex = Regex("$(basename(filename)).[0-9].$ext")
+  regex = Regex("$(basename(filename)).[0-9].$ext\$")
   files = filter(x->occursin(regex,x), readdir(dirname(filename)))
   @assert length(files)==shape[end]
   img = Array{UInt16}(undef, shape...)
