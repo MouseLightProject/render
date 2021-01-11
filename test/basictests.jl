@@ -24,8 +24,7 @@ function _load_tif_or_h5(filename, kind)
     img = load(filename, false)
     return rawview(channelview(img))
   else
-    img = h5read(filename,"/data")
-    return dropdims(img, dims=1)
+    return h5read(filename,"/data")
   end
 end
 

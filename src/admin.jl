@@ -28,7 +28,7 @@ function TileBaseOpen(source)
     tiles = YAML.load_file(joinpath(source,"tilebase.cache.yml"))
     jld2hack = tempname()  # see https://github.com/JuliaIO/JLD2.jl/issues/55
     @save jld2hack*".jld2" tiles
-    mv(jld2hack*".jld2", joinpath(source,"tilebase.cache.jld2"))
+    mv(jld2hack*".jld2", joinpath(source,"tilebase.cache.jld2"), force=true)
   end
   return tiles
 end

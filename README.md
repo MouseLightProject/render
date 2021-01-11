@@ -9,14 +9,14 @@ generate an octree for viewing with the Janelia Workstation.
 Requirements
 ============
 
-Julia, version 0.7 (1.1 should work too), plus the YAML, JLD2, Images,
-HDF5, Morton, Gadfly, Colors, and Cairo packages.
+Julia, version >=0.7, plus the YAML, JLD2, Images, HDF5, Morton, Gadfly,
+Colors, and Cairo packages.
 
 Nathan Clack's mltk-bary library.
 
-Tested with Julia v0.7.0, Cairo v0.5.6, Colors v0.9.5, Gadfly v1.0.1, HDF5
-v0.11.0, ImageMagick v0.7.2+, Images v0.17.2, JLD2 v0.1.2, Morton v0.1.0,
-YAML v0.3.2+ and mltk-bary master/84e15364.
+Tested with Julia v1.5.3, Cairo v1.0.5, Colors v0.12.6, Gadfly v1.3.1, HDF5
+v0.14.3, ImageMagick v1.1.6, Images v0.23.3, JLD2 v0.3.1, Morton v0.1.1,
+YAML v0.4.5 and mltk-bary master/84e15364.
 
 
 
@@ -26,10 +26,13 @@ Installation
 Install the mltk-bary library using make.sh.  Be sure to edit ```rootdir```
 and ```installdir``` therein appropriately.
 
-Download a precompiled binary of version 0.7.  Install the required packages
-by changing to the directory of the repository, starting Julia on the unix
-command line, entering Pkg mode by pressing `]`, and then invoking the
-`instantiate` and `precompile` commands.
+Download a precompiled binary of version 0.7 (1.1 should work too).  Install
+the required packages by changing to the directory of the render repository,
+starting Julia on the unix command line, entering Pkg mode by pressing `]`,
+and then invoking the `activate .`, `instantiate` and `precompile` commands.
+To install into a shared system directory, instead of your home directory,
+preceed these commands by `popfirst!(DEPOT_PATH)`.
+
 
 Make sure that ```RENDER_PATH```, ```LD_LIBRARY_PATH```, ```JULIA```,
 and ```JULIA_PROJECT``` in ```render```, ```monitor```, and ```project```
