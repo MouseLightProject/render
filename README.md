@@ -74,6 +74,33 @@ src/project <copy-of-projection-parameters.jl>
 More detailed documentation is at the top of each source code file.
 
 
+Troubleshooting
+===============
+
+If a squatter hangs, you can spoof its communication and get the director to continue
+with the inter-node merge by:
+
+```
+julia> sock = connect("<director_name>.int.janelia.org",2000)
+TcpSocket(open, 0 bytes waiting)
+
+julia> println(sock,"squatter <squatter_num> is finished")
+```
+
+To run a peon manually,
+
+```
+julia> using Sockets
+
+julia> server = listen(IPv4(0),2001)
+Sockets.TCPServer(RawFD(18) active)
+
+julia> accept(server)
+```
+
+and then in bash execute the peon.jl script with all of its arguments.
+
+
 Author
 ======
 
