@@ -183,9 +183,9 @@ t0=time()
         while isopen(sock)
           jobidx = nextidx()
           if which_cluster=="janelia"
-            njobs_remaining = min(0, length(job_aabbs)-jobidx)
+            njobs_remaining = max(0, length(job_aabbs)-jobidx)
             bjobs_nlines = chomp(read(pipeline(`bjobs -p $jobid`,`wc -l`), String))
-            nnodes_pending = min(0, (parse(Int,bjobs_nlines)-1)>>1)
+            nnodes_pending = max(0, (parse(Int,bjobs_nlines)-1)>>1)
             nnodes_tokill = nnodes_pending - njobs_remaining
             if nnodes_tokill>0
               @info string("DIRECTOR: ",njobs_remaining, " jobs remaining")
