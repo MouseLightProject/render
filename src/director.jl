@@ -225,7 +225,6 @@ t0=time()
     proc = Array{Any}(undef, nnodes)
     for n=1:nnodes
       pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n]) export RENDER_PATH=$(ENV["RENDER_PATH"]) \;
-            export LD_LIBRARY_PATH=$(ENV["LD_LIBRARY_PATH"]) \;
             export JULIA=$(ENV["JULIA"]) \;
             export JULIA_PROJECT=$(ENV["JULIA_PROJECT"]) \;
             export HOSTNAME=$(ENV["HOSTNAME"]) \;

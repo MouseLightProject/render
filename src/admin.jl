@@ -184,7 +184,7 @@ function _load_tile(filename,ext,shape)
       img[:,:,:,c] = rawview(channelview(load(fullfilename, false)))
     else
       h5open(fullfilename, "r") do fid
-        dataset = names(fid)[1]
+        dataset = keys(fid)[1]
         img[:,:,:,c] = read(fid, "/"*dataset)
       end
     end

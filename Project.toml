@@ -8,3 +8,6 @@ Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 Morton = "2a6d852e-3fac-5a38-885c-fe708af2d09e"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
+
+[compat]
+HDF5 = "0.14.0, 0.15.0"

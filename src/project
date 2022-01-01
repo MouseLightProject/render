@@ -5,7 +5,6 @@
 parameters_file=$1
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric5
-export LD_LIBRARY_PATH=/usr/local/hdf5/lib:/usr/local/gcc-6.1.0/lib64
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric5/julia-1.5.3/bin/julia
 
 export JULIA_PROJECT=$RENDER_PATH/src/render 
@@ -59,7 +58,6 @@ if [ $which_cluster == 'janelia' ]; then
         -o ${topath}/logs/project%I.log
 else
   pcmd="export RENDER_PATH=$RENDER_PATH;
-        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH;
         export JULIA=$JULIA;
         export JULIA_PROJECT=$JULIA_PROJECT;
         export HOSTNAME=$HOSTNAME;
