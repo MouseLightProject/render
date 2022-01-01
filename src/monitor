@@ -12,10 +12,11 @@ interval=120   # in seconds
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric5
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric5/julia-1.5.3/bin/julia
 
-read -a tmp <<< $($JULIA -L $parametersjl -e "print(destination,' ',shared_scratch,' ',logfile_scratch)")
+read -a tmp <<< $($JULIA -L $parametersjl -e "print(destination,' ',local_scratch,' ',shared_scratch,' ',logfile_scratch)")
 destination=${tmp[0]}
-shared_scratch=${tmp[1]}
-logfile_scratch=${tmp[2]}
+local_scratch=${tmp[1]}
+shared_scratch=${tmp[2]}
+logfile_scratch=${tmp[3]}
 
 outofString=$(grep "channels split into" ${logfile_scratch}/director.log)
 while [ -z "$outofString" ]; do

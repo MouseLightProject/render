@@ -31,7 +31,6 @@ num_procs = leaf_process_oversubscription*div(ncores,leaf_nthreads_per_process)
 
 @info string("MANAGER: ","AVX2 = ",has_avx2)
 
-const local_scratch="/scratch/"*readchomp(`whoami`)
 const manager_bbox = AABBMake(3)  # process all input tiles whose origins are within this bbox
 AABBSet(manager_bbox, map(x->parse(Int,x),origin_strs), map(x->parse(Int,x),shape_strs))
 const tiles = TileBaseOpen(destination)
@@ -39,6 +38,7 @@ const tiles = TileBaseOpen(destination)
 # delete /dev/shm and local_scratch
 t0=time()
 rmcontents("/dev/shm", "after", "MANAGER: ")
+mkpath(local_scratch)
 scratch0 = rmcontents(local_scratch, "after", "MANAGER: ")
 @info string("MANAGER: ","deleting /dev/shm and local_scratch = ",local_scratch," at start took ",round(Int,time()-t0)," sec")
 

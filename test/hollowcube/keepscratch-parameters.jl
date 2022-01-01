@@ -9,6 +9,7 @@ const file_infix="hollowcube"
 const file_format_load="tif"  # "tif" or "h5"
 const file_format_save="tif"  # "tif" or "h5"
 
+const local_scratch=joinpath(scratchpath,"keepscratch","local_scratch")
 const shared_scratch=joinpath(scratchpath,"keepscratch","shared_scratch")
 const logfile_scratch=joinpath(scratchpath,"keepscratch","logfile_scratch")  # should be on /groups
 const delete_scratch="never"   # "never", "at-end" or "as-you-go"

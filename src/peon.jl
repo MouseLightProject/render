@@ -12,7 +12,6 @@ include(ARGS[1])
 include("$destination/calculated_parameters.jl")
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 
-const local_scratch="/scratch/"*readchomp(`whoami`)
 const origin_str = ARGS[3]
 const in_tile_idx = parse(Int,ARGS[2])
 const solo_out_tiles = eval(Meta.parse(ARGS[4]))

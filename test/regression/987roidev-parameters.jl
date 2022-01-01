@@ -45,7 +45,8 @@ const cleanup_time_limit = 60    # one hour
 const source="/home/arthurb/projects/mouselight/src/render/test/regression"  # path to tilebase.cache.yml
 const destination="/nrs/mouselight/arthurb/987roidev"  # path to octree
 
-const shared_scratch="/nrs/mouselight/arthurb/scratch/987roidev"
+const local_scratch="/nrs/mouselight/arthurb/scratch/987roidev/local_scratch"
+const shared_scratch="/nrs/mouselight/arthurb/scratch/987roidev/shared_scratch"
 const logfile_scratch="/groups/mousebrainmicro/mousebrainmicro/scratch/arthurb/987roidev"  # should be on /groups
 const delete_scratch="as-you-go"   # "never", "at-end", or "as-you-go"
 

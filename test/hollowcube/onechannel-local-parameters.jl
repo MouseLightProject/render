@@ -9,6 +9,7 @@ const file_infix="hollowcube"
 const file_format_load="tif"  # "tif" or "h5"
 const file_format_save="tif"  # "tif" or "h5"
 
+const local_scratch=joinpath(scratchpath,"onechannel-local","local_scratch")
 const shared_scratch=joinpath(scratchpath,"onechannel-local","shared_scratch")
 const logfile_scratch=joinpath(scratchpath,"onechannel-local","logfile_scratch")  # should be on /groups
 const delete_scratch="as-you-go"   # "never", "at-end" or "as-you-go"

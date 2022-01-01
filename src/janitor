@@ -2,13 +2,17 @@
 
 # usage: ./janitor <logfile_scratch>
 
-# run this script to clean up the nodes if you have to qdel a ./render
+# run this script to clean up the nodes if you have to kill a ./render
 # if any julia processes remain, manually ssh in and kill them
+
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric5/julia-1.5.3/bin/julia
+
+read -a tmp <<< $($JULIA -L $parametersjl -e "print(local_scratch)")
+local_scratch=${tmp[0]}
 
 nodes=($(grep -o -P "(?<=is ready on )[^.]*" $1/render.log))
 
 for node in ${nodes[@]} ; do
-  cmd="ssh -q $node rm -rf /dev/shm/*"; echo "${cmd}"; eval $cmd
-  cmd="ssh -q $node rm -rf /scratch/$(whoami)/*"; echo "${cmd}"; eval $cmd
+  cmd="ssh -q $node rm -rf $local_scratch"; echo "${cmd}"; eval $cmd
   cmd="ssh -q $node ps auxc | grep julia"; echo "${cmd}"; eval $cmd
 done

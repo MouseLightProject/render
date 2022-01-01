@@ -9,6 +9,7 @@ const file_infix="halffilledtiles"
 const file_format_load="tif"  # "tif" or "h5"
 const file_format_save="tif"  # "tif" or "h5"
 
+const local_scratch=joinpath(scratch_path,"avx-cluster","local_scratch")
 const shared_scratch=joinpath(scratch_path,"avx-cluster","shared_scratch")
 const logfile_scratch=joinpath(scratch_path,"avx-cluster","logfile_scratch")  # should be on /groups
 const delete_scratch="as-you-go"   # "never", "at-end" or "as-you-go"
