@@ -41,6 +41,10 @@ const overall_time_limit = short_queue ? 60 : 4320  # three days
 const leaf_time_limit    = short_queue ? 60 : 2880  # two days
 const octree_time_limit  = 480   # eight hours
 const cleanup_time_limit = 60    # one hour
+const retry_n = 10
+const retry_first_delay = 10
+const retry_factor = 2
+const retry_max_delay = 60*60
 
 const source="/home/arthurb/projects/mouselight/src/render/test/regression"  # path to tilebase.cache.yml
 const destination="/nrs/mouselight/arthurb/987roidev"  # path to octree

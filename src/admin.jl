@@ -170,7 +170,7 @@ function calc_in_subtiles_aabb(tile,xlims,ylims,zlims,transform_nm)
 end
 
 load_tile(filename,ext,shape) = retry(() -> _load_tile(filename,ext,shape),
-    delays=ExponentialBackOff(n=10, first_delay=60, factor=3, max_delay=60*60*24),
+    delays=ExponentialBackOff(n=retry_n, first_delay=retry_first_delay, factor=retry_factor, max_delay=retry_max_delay),
     check=(s,e)->(@info string("load_tile($filename,$ext,$shape) failed.  will retry."); true))()
 
 function _load_tile(filename,ext,shape)
@@ -194,13 +194,13 @@ end
 
 save_tile(filesystem, path, basename0, ext, data) = retry(
     () -> _save_tile(filesystem, path, basename0, ext, data),
-    delays=ExponentialBackOff(n=10, first_delay=60, factor=3, max_delay=60*60*24),
+    delays=ExponentialBackOff(n=retry_n, first_delay=retry_first_delay, factor=retry_factor, max_delay=retry_max_delay),
     check=(s,e)->(@info string("save_tile($filesystem,$path,$basename0,$ext).  will retry."); true))()
 
 function _save_tile(filesystem, path, basename0, ext, data)
   filepath = joinpath(filesystem,path)
   retry(()->mkpath(filepath),
-      delays=ExponentialBackOff(n=10, first_delay=60, factor=3, max_delay=60*60*24),
+      delays=ExponentialBackOff(n=retry_n, first_delay=retry_first_delay, factor=retry_factor, max_delay=retry_max_delay),
       check=(s,e)->(@info string("mkpath(\"$filepath\").  will retry."); true))()
   for c=1:size(data,4)
     fullfilename = string(joinpath(filepath,basename0),'.',c-1,'.',ext)
@@ -256,7 +256,7 @@ function _merge_across_filesystems(destination, prefix, suffix, out_tile_path, r
   merge1 = Array{UInt16}(undef, shape_leaf_px...,nchannels)
 
   retry(()->mkpath(joinpath(destination,out_tile_path)),
-        delays=ExponentialBackOff(n=10, first_delay=60, factor=3, max_delay=60*60*24),
+        delays=ExponentialBackOff(n=retry_n, first_delay=retry_first_delay, factor=retry_factor, max_delay=retry_max_delay),
         check=(s,e)->(@info string("mkpath(\"$(joinpath(destination,out_tile_path))\").  will retry."); true))()
   destination2 = joinpath(destination, out_tile_path, prefix)
 

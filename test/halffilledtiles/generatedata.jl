@@ -3,7 +3,11 @@ using Images, Printf
 const shape_leaf_px = [1024, 1536, 251]
 const nchannels = 1
 const tile_type = convert(Cint,1)
-const raw_compression_ratios = []
+
+const retry_n = 10
+const retry_first_delay = 10
+const retry_factor = 2
+const retry_max_delay = 60*60
 
 const datapath = joinpath(ENV["RENDER_PATH"],"src/render/test/halffilledtiles/scratch/data")
 

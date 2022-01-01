@@ -3,7 +3,11 @@ using Images
 const shape_leaf_px = [16, 32, 64]
 const nchannels = 3
 const tile_type = convert(Cint,1)
-const raw_compression_ratios = []
+
+const retry_n = 10
+const retry_first_delay = 10
+const retry_factor = 2
+const retry_max_delay = 60*60
 
 const datapath = joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch/data")
 
