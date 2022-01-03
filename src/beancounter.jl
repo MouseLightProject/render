@@ -5,7 +5,6 @@
 const destination = ARGS[1]
 
 using Gadfly, Colors, Statistics
-import Cairo
 
 log_tar_gz = joinpath(destination,"logs.tar.gz")
 
@@ -103,4 +102,4 @@ for (idx, label) in [(1,"RAM (GB)"), (6,"CPU (%)"), (2,"swap (GB)"), (3,"scratch
   push!(plots, plot(layers..., Guide.xlabel("time"), Guide.ylabel(label)))
 end
 
-draw(PDF(joinpath(destination,"beancounter.pdf"), 3*4inch, 2*3inch), gridstack(reshape(plots,2,3)))
+draw(SVG(joinpath(destination,"beancounter.pdf"), 3*4inch, 2*3inch), gridstack(reshape(plots,2,3)))
