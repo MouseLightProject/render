@@ -129,7 +129,7 @@ fi
 
 # downsample the octree
 if [ "$nlevels" -gt "2" ]; then
-  expr="import ImageMagick;
+  expr="import TiffImages;
         import Serialization, SharedArrays, YAML, JLD2, Images, HDF5;
         using Distributed;
         p=addprocs(${octree_ncores_per_job});
@@ -170,7 +170,7 @@ if [ "$nlevels" -gt "2" ]; then
   hold="-w done(${jobname}2)"
 fi
 
-expr="import ImageMagick;
+expr="import TiffImages;
       import Serialization, SharedArrays, YAML, JLD2, Images, HDF5;
       using Distributed;
       p=addprocs(${octree_ncores_per_job});

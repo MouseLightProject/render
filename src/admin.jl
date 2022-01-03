@@ -1,4 +1,4 @@
-import ImageMagick
+import TiffImages
 using Distributed, Serialization, SharedArrays, YAML, JLD2, Images, HDF5
 
 const um2nm=1e3
@@ -181,7 +181,7 @@ function _load_tile(filename,ext,shape)
   for (c,file) in enumerate(files)
     fullfilename = string(filename,'.',c-1,'.',ext)
     if ext=="tif"
-      img[:,:,:,c] = rawview(channelview(load(fullfilename, false)))
+      img[:,:,:,c] = rawview(channelview(load(fullfilename, verbose=false)))
     else
       h5open(fullfilename, "r") do fid
         dataset = keys(fid)[1]

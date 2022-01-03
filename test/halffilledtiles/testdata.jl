@@ -1,4 +1,4 @@
-import ImageMagick
+import TiffImages
 using Test, Images, HDF5
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))

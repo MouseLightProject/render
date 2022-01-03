@@ -6,7 +6,7 @@
 
 const parameters_file = ARGS[1]
 
-import ImageMagick
+import TiffImages
 using Images, YAML, Morton
 
 include(parameters_file)

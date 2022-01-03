@@ -7,7 +7,7 @@
 const parameters_file = ARGS[1]
 const face_leaf_path_idx = parse(Int,ARGS[2]) - 1
 
-import ImageMagick
+import TiffImages
 using Images, YAML
 
 include(parameters_file)
