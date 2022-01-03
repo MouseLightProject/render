@@ -1,5 +1,3 @@
-using Images
-
 const shape_leaf_px = [16, 32, 64]
 const nchannels = 3
 const tile_type = convert(Cint,1)

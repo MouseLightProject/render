@@ -1,5 +1,5 @@
 import TiffImages
-using Test, Images, HDF5
+using Test
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))
 

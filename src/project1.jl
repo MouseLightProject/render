@@ -8,7 +8,7 @@ const parameters_file = ARGS[1]
 const face_leaf_path_idx = parse(Int,ARGS[2]) - 1
 
 import TiffImages
-using Images, YAML
+using FileIO, YAML
 
 include(parameters_file)
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
@@ -104,4 +104,5 @@ end
 mkpath(joinpath(topath,"tiles"))
 out_path = joinpath(topath, "tiles", join(face_leaf_path))
 @info string("saving to ",out_path)
-save(string(out_path,".",file_format_save), PermutedDimsArray(projection_img,(2,1)))
+save(string(out_path,".",file_format_save),
+     Gray.(reinterpret.(N0f16, PermutedDimsArray(projection_img,(2,1)))))

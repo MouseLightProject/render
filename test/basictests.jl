@@ -1,3 +1,6 @@
+import TiffImages
+using ImageCore, FileIO, HDF5
+
 function check_logfiles(logfilepath, correct_nmergelogs)
   logfiles = readlines(`tar tvzf $logfilepath`)
 
@@ -21,8 +24,8 @@ end
 
 function _load_tif_or_h5(filename, kind)
   if kind == :tif
-    img = load(filename, false)
-    return rawview(channelview(img))
+    img = load(filename)
+    return rawview(channelview(PermutedDimsArray(img, (2,1,3))))
   else
     return h5read(filename,"/data")
   end

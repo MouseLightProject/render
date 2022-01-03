@@ -1,4 +1,4 @@
-using Images, Printf
+using Printf
 
 const shape_leaf_px = [1024, 1536, 251]
 const nchannels = 1

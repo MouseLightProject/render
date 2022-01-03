@@ -1,5 +1,5 @@
 import TiffImages
-using Distributed, Serialization, SharedArrays, YAML, JLD2, Images, HDF5
+using Distributed, Serialization, SharedArrays, YAML, JLD2, ImageCore, FileIO, HDF5
 
 const um2nm=1e3
 
@@ -181,7 +181,7 @@ function _load_tile(filename,ext,shape)
   for (c,file) in enumerate(files)
     fullfilename = string(filename,'.',c-1,'.',ext)
     if ext=="tif"
-      img[:,:,:,c] = rawview(channelview(load(fullfilename, verbose=false)))
+      img[:,:,:,c] = rawview(channelview(PermutedDimsArray(load(fullfilename, verbose=false), (2,1,3))))
     else
       h5open(fullfilename, "r") do fid
         dataset = keys(fid)[1]
@@ -205,9 +205,10 @@ function _save_tile(filesystem, path, basename0, ext, data)
   for c=1:size(data,4)
     fullfilename = string(joinpath(filepath,basename0),'.',c-1,'.',ext)
     if ext=="tif"
-      save(fullfilename, data[:,:,:,c], false)
+      save(fullfilename,
+           Gray.(reinterpret.(N0f16, PermutedDimsArray((@view data[:,:,:,c]), (2,1,3)))))
     else
-      h5write(fullfilename, "/data", collect(sdata(data[:,:,:,c])))
+      h5write(fullfilename, "/data", collect(sdata((@view data[:,:,:,c]))))
     end
   end
 end

@@ -7,7 +7,7 @@
 const parameters_file = ARGS[1]
 
 import TiffImages
-using Images, YAML, Morton
+using ImageFiltering, ImageTransformations, FileIO, YAML, Morton
 
 include(parameters_file)
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
@@ -46,7 +46,8 @@ end
 out_path = joinpath(topath, "tiles", "projection-$(projection_size[1])x$(projection_size[2])")
 @info string("saving to ",out_path)
 flip = projection_size[1]>projection_size[2]
-save(out_path*'.'*file_format_save, flip ? transpose(projection_img) : projection_img)
+save(out_path*'.'*file_format_save,
+     Gray.(reinterpret.(N0f16, flip ? transpose(projection_img) : projection_img)))
 
 for output_pixel_size_um in output_pixel_sizes_um
   global out_path, flip
@@ -60,5 +61,6 @@ for output_pixel_size_um in output_pixel_sizes_um
   out_path = joinpath(topath, "projection-$(downsample_size[1])x$(downsample_size[2])-$(output_pixel_size_um)um")
   @info string("saving to ",out_path)
   flip = downsample_size[1]>downsample_size[2]
-  save(out_path*'.'*file_format_save, flip ? transpose(downsample_img) : downsample_img)
+  save(out_path*'.'*file_format_save,
+       Gray.(reinterpret.(N0f16, flip ? transpose(downsample_img) : downsample_img)))
 end
