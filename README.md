@@ -9,15 +9,14 @@ generate an octree for viewing with the Janelia Workstation.
 Requirements
 ============
 
-Julia, version >=0.7, plus the YAML, JLD2, Images, HDF5, Morton, Gadfly,
-Colors, and Cairo packages.
+Julia, version >=1.3, plus the Cairo, Colors, Gadfly, HDF5, ImageMagick,
+Images, JLD2, Morton, and YAML packages.
 
 Nathan Clack's mltk-bary library.
 
-Tested with Julia v1.5.3, Cairo v1.0.5, Colors v0.12.6, Gadfly v1.3.1, HDF5
-v0.14.3, ImageMagick v1.1.6, Images v0.23.3, JLD2 v0.3.1, Morton v0.1.1,
-YAML v0.4.5 and mltk-bary master/84e15364.
-
+Tested with Julia v1.7.1, Cairo v1.0.5, Colors v0.12.8, Gadfly v1.3.4, HDF5
+v0.15.7, ImageMagick v1.2.2, Images v0.25.0, JLD2 v0.4.17, Morton v0.1.1,
+YAML v0.4.7, and mltk-bary master/84e15364.
 
 
 Installation
@@ -26,7 +25,7 @@ Installation
 Install the mltk-bary library using make.sh.  Be sure to edit ```rootdir```
 and ```installdir``` therein appropriately.
 
-Download a precompiled binary of version 0.7 (1.1 should work too).  Install
+Download the latest precompiled binary of Julia.  Install
 the required packages by changing to the directory of the render repository,
 starting Julia on the unix command line, entering Pkg mode by pressing `]`,
 and then invoking the `activate .`, `instantiate` and `precompile` commands.
