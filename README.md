@@ -73,6 +73,42 @@ src/project <copy-of-projection-parameters.jl>
 More detailed documentation is at the top of each source code file.
 
 
+File formats
+============
+
+tilebase.cache.yml
+
+homography is now deprecated, and use to contain an affine transformation
+matrix before barycentric transforms were used instead
+
+dims is the size of the input tiles in voxels
+
+{x,y,z}lims specifies how to crop and partition the input tiles in voxels.
+a barycentric transform is applied to each partition
+
+coordinates specifies in nanometers the desired output position of each
+node in the partition.  if there is just one partition, there should be
+8 (nodes/corners) x 3 (dimensions) = 24 numbers.  more generally there are
+length(xlims)*length(ylims)*length(zlims) nodes.  the order of the numbers
+is as follow:
+
+  x1_n1, y1_n1, z1_n1,
+  x2_n1, y1_n1, z1_n1,
+  x1_n1, y2_n1, z1_n1,
+  x2_n1, y2_n1, z1_n1,
+  x1_n1, y1_n1, z2_n1,
+  x2_n1, y1_n1, z2_n1,
+  x1_n1, y2_n1, z2_n1,
+  x2_n1, y2_n1, z2_n1,
+  x1_n2, y1_n2, z1_n2,
+  ...
+
+and then repeat for node 2 (n2)
+
+ori is the minimum in each column of coordinates; shape is maximum in each
+column minus the minimum.
+
+
 Troubleshooting
 ===============
 
