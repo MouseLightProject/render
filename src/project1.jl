@@ -7,8 +7,7 @@
 const parameters_file = ARGS[1]
 const face_leaf_path_idx = parse(Int,ARGS[2]) - 1
 
-import TiffImages
-using FileIO, YAML
+using YAML
 
 include(parameters_file)
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))

@@ -1,5 +1,4 @@
-import TiffImages
-using Distributed, Serialization, SharedArrays, YAML, JLD2, ImageCore, FileIO, HDF5
+using Distributed, Serialization, SharedArrays, YAML, JLD2, ImageCore
 
 const um2nm=1e3
 
@@ -173,45 +172,10 @@ load_tile(filename,ext,shape) = retry(() -> _load_tile(filename,ext,shape),
     delays=ExponentialBackOff(n=retry_n, first_delay=retry_first_delay, factor=retry_factor, max_delay=retry_max_delay),
     check=(s,e)->(@info string("load_tile($filename,$ext,$shape) failed.  will retry."); true))()
 
-function _load_tile(filename,ext,shape)
-  regex = Regex("$(basename(filename)).[0-9].$ext\$")
-  files = filter(x->occursin(regex,x), readdir(dirname(filename)))
-  @assert length(files)==shape[end]
-  img = Array{UInt16}(undef, shape...)
-  for (c,file) in enumerate(files)
-    fullfilename = string(filename,'.',c-1,'.',ext)
-    if ext=="tif"
-      img[:,:,:,c] = rawview(channelview(PermutedDimsArray(load(fullfilename, verbose=false), (2,1,3))))
-    else
-      h5open(fullfilename, "r") do fid
-        dataset = keys(fid)[1]
-        img[:,:,:,c] = read(fid, "/"*dataset)
-      end
-    end
-  end
-  return img
-end
-
 save_tile(filesystem, path, basename0, ext, data) = retry(
     () -> _save_tile(filesystem, path, basename0, ext, data),
     delays=ExponentialBackOff(n=retry_n, first_delay=retry_first_delay, factor=retry_factor, max_delay=retry_max_delay),
     check=(s,e)->(@info string("save_tile($filesystem,$path,$basename0,$ext).  will retry."); true))()
-
-function _save_tile(filesystem, path, basename0, ext, data)
-  filepath = joinpath(filesystem,path)
-  retry(()->mkpath(filepath),
-      delays=ExponentialBackOff(n=retry_n, first_delay=retry_first_delay, factor=retry_factor, max_delay=retry_max_delay),
-      check=(s,e)->(@info string("mkpath(\"$filepath\").  will retry."); true))()
-  for c=1:size(data,4)
-    fullfilename = string(joinpath(filepath,basename0),'.',c-1,'.',ext)
-    if ext=="tif"
-      save(fullfilename,
-           Gray.(reinterpret.(N0f16, PermutedDimsArray((@view data[:,:,:,c]), (2,1,3)))))
-    else
-      h5write(fullfilename, "/data", collect(sdata((@view data[:,:,:,c]))))
-    end
-  end
-end
 
 # the merge API could perhaps be simplified. complexity arises because it is called:
 # by render to build the octree                       (recurse=n/a,    octree=true,  delete=either)

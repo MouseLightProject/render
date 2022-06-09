@@ -1,4 +1,3 @@
-import TiffImages
 using ImageCore, FileIO, HDF5
 
 function check_logfiles(logfilepath, correct_nmergelogs)

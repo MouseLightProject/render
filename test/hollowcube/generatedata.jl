@@ -11,6 +11,24 @@ const datapath = joinpath(ENV["RENDER_PATH"],"src/render/test/hollowcube/scratch
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
 
+function _save_tile(filesystem, path, basename0, ext, data)
+  filepath = joinpath(filesystem,path)
+  retry(()->mkpath(filepath),
+      delays=ExponentialBackOff(n=retry_n, first_delay=retry_first_delay, factor=retry_factor, max_delay=retry_max_delay),
+      check=(s,e)->(@info string("mkpath(\"$filepath\").  will retry."); true))()
+  for c=1:size(data,4)
+    fullfilename = string(joinpath(filepath,basename0),'.',c-1,'.',ext)
+    if ext=="tif"
+      save(fullfilename,
+           Gray.(reinterpret.(N0f16, PermutedDimsArray(view(data,:,:,:,c), (2,1,3)))))
+    elseif ext=="h5"
+      h5write(fullfilename, "/data", collect(sdata(view(data,:,:,:,c))))
+    elseif ext=="mp4" # mj2 gives error
+      VideoIO.save(fullfilename, eachslice(view(data,:,:,:,c), dims=3))
+    end
+  end
+end
+
 inset = 4
 in_tile_1 = zeros(UInt16,shape_leaf_px...,nchannels)
 

@@ -1,4 +1,3 @@
-import TiffImages
 using Test
 
 include(joinpath(ENV["RENDER_PATH"],"src/render/test/basictests.jl"))

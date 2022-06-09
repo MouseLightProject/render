@@ -129,9 +129,7 @@ fi
 
 # downsample the octree
 if [ "$nlevels" -gt "2" ]; then
-  expr="import TiffImages;
-        import Serialization, SharedArrays, YAML, JLD2, FileIO, HDF5;
-        using Distributed;
+  expr="using Distributed;
         p=addprocs(${octree_ncores_per_job});
         @everywhere include(joinpath(dirname(dirname(\"$JULIA\")),\"etc\",\"julia\",\"startup.jl\"));
         @everywhere include(\"${destination}/set_parameters.jl\");
@@ -170,9 +168,7 @@ if [ "$nlevels" -gt "2" ]; then
   hold="-w done(${jobname}2)"
 fi
 
-expr="import TiffImages;
-      import Serialization, SharedArrays, YAML, JLD2, FileIO, HDF5;
-      using Distributed;
+expr="using Distributed;
       p=addprocs(${octree_ncores_per_job});
       @everywhere include(joinpath(dirname(dirname(\"$JULIA\")),\"etc\",\"julia\",\"startup.jl\"));
       @everywhere include(\"${destination}/set_parameters.jl\");

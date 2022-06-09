@@ -4,10 +4,6 @@ const bill_userid = "mouselight"
 const source="/groups/mousebrainmicro/stitch/..."  # path to tilebase.cache.yml
 const destination="/nrs/mouselight/..."  # path to octree
 
-const file_infix="ngc"
-const file_format_load="tif"  # "tif" or "h5"
-const file_format_save="tif"  # "tif" or "h5"
-
 const local_scratch="/scratch/<yourId>"
 const shared_scratch="/nrs/mouselight/scratch/<yourId>"
 const logfile_scratch="/groups/mousebrainmicro/mousebrainmicro/scratch/<yourId>"  # should be on /groups
@@ -20,6 +16,54 @@ const voxelsize_um=[0.25, 0.25, 1]  # desired pixel size
 const interpolation = "nearest"  # "nearest" or "linear"
 
 const downsample_from_existing_leaves=false  # source points to previous destination
+
+const file_infix="ngc"
+const file_format_load="tif"  # "tif", "h5", or "mj2"
+const file_format_save="tif"  # "tif", "h5", or "mp4"
+
+# load and save tiles with the functions below.  the arg named `ext` is the
+# file_format_{load,save} parameter above
+
+using FileIO, HDF5, VideoIO, ImageCore
+
+function _load_tile(filename,ext,shape)
+  regex = Regex("$(basename(filename)).[0-9].$ext\$")
+  files = filter(x->occursin(regex,x), readdir(dirname(filename)))
+  @assert length(files)==shape[end]
+  img = Array{UInt16}(undef, shape...)
+  for (c,file) in enumerate(files)
+    fullfilename = string(filename,'.',c-1,'.',ext)
+    if ext=="tif"
+      img[:,:,:,c] = rawview(channelview(PermutedDimsArray(load(fullfilename, verbose=false), (2,1,3))))
+    elseif ext=="h5"
+      h5open(fullfilename, "r") do fid
+        dataset = keys(fid)[1]
+        img[:,:,:,c] = read(fid, "/"*dataset)
+      end
+    elseif ext=="mj2"
+      img[:,:,:,c] = rawview(channelview(PermutedDimsArray(cat(VideoIO.load(fullfilename)..., dims=3), (2,1,3))))
+    end
+  end
+  return img
+end
+
+function _save_tile(filesystem, path, basename0, ext, data)
+  filepath = joinpath(filesystem,path)
+  retry(()->mkpath(filepath),
+      delays=ExponentialBackOff(n=retry_n, first_delay=retry_first_delay, factor=retry_factor, max_delay=retry_max_delay),
+      check=(s,e)->(@info string("mkpath(\"$filepath\").  will retry."); true))()
+  for c=1:size(data,4)
+    fullfilename = string(joinpath(filepath,basename0),'.',c-1,'.',ext)
+    if ext=="tif"
+      save(fullfilename,
+           Gray.(reinterpret.(N0f16, PermutedDimsArray(view(data,:,:,:,c), (2,1,3)))))
+    elseif ext=="h5"
+      h5write(fullfilename, "/data", collect(sdata(view(data,:,:,:,c))))
+    elseif ext=="mp4" # mj2 gives error
+      VideoIO.save(fullfilename, eachslice(view(data,:,:,:,c), dims=3))
+    end
+  end
+end
 
 # build the octree with a function below.  should return UInt16
 

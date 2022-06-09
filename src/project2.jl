@@ -6,8 +6,7 @@
 
 const parameters_file = ARGS[1]
 
-import TiffImages
-using ImageFiltering, ImageTransformations, FileIO, YAML, Morton
+using ImageFiltering, ImageTransformations, YAML, Morton
 
 include(parameters_file)
 include(joinpath(ENV["RENDER_PATH"],"src/render/src/admin.jl"))
