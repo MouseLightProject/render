@@ -78,7 +78,7 @@ idx=7; label="# tile-channels"
 ydata=Float32[]
 for node in keys(data)
   if isempty(ydata)
-    ydata = data[node][:,idx]
+    global ydata = data[node][:,idx]
   elseif length(ydata) < size(data[node],1)
     push!(ydata, zeros(Float32,size(data[node],1)-length(ydata))...)
     ydata += data[node][:,idx]
@@ -102,4 +102,4 @@ for (idx, label) in [(1,"RAM (GB)"), (6,"CPU (%)"), (2,"swap (GB)"), (3,"scratch
   push!(plots, plot(layers..., Guide.xlabel("time"), Guide.ylabel(label)))
 end
 
-draw(SVG(joinpath(destination,"beancounter.pdf"), 3*4inch, 2*3inch), gridstack(reshape(plots,2,3)))
+draw(SVG(joinpath(destination,"beancounter.svg"), 3*4inch, 2*3inch), gridstack(reshape(plots,2,3)))
