@@ -7,7 +7,7 @@
 jobname=$1
 parametersjl=$2
 
-interval=120   # in seconds
+interval=600   # in seconds
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric6
 export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric6/julia-1.7.1/bin/julia
