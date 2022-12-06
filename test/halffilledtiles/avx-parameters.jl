@@ -112,7 +112,7 @@ const max_tilechannels_per_job=500  # maximum number of input tiles * nchannels 
 # larger is more efficient with file i/o; smaller is more parallel computation
 
 
-const which_cluster = [ENV["HOSTNAME"]] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
+const which_cluster = [Libc.gethostname()] # "janelia" or ["hostname1", "hostname2", "hostname3", ...]
 const bad_nodes = []  # e.g. ["h09u20"]
 
 const ncores_incluster = 48*32

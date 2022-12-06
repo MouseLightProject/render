@@ -229,7 +229,7 @@ t0=time()
               export JULIA=$(ENV["JULIA"]) \;
               export JULIA_PROJECT=$(ENV["JULIA_PROJECT"]) \;
               export JULIA_DEPOT_PATH=$(ENV["JULIA_DEPOT_PATH"]) \;
-              export HOSTNAME=$(ENV["HOSTNAME"]) \;
+              export HOSTNAME=$(Libc.gethostname()) \;
               export LSB_JOBINDEX=$n \;
               $cmd \&\> $logfile_scratch/squatter$n.log`
       @info string("DIRECTOR: ",pcmd)
