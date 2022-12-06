@@ -140,8 +140,8 @@ server, port = get_available_port(default_port)
 @async while true
   let sock = accept(server)
     @async begin
-      while isopen(sock) || bytesavailable(sock)>0
-        tmp = chomp(readline(sock,keep=true))
+      while !eof(sock)
+        tmp = readline(sock)
         length(tmp)==0 && continue
         @info string("DIRECTOR<SQUATTER: ",tmp)
         flush(stdout);  flush(stderr)

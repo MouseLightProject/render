@@ -24,7 +24,7 @@
 parameters_file=$1
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric6
-export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric6/julia-1.7.3/bin/julia
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric6/julia-1.8.3/bin/julia
 
 export JULIA_PROJECT=$RENDER_PATH/src/render 
 export JULIA_DEPOT_PATH=$(dirname $(dirname $JULIA))/local/share/julia

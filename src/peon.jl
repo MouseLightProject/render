@@ -110,7 +110,7 @@ function depth_first_traverse_over_output_tiles(bbox, out_tile_path, sub_tile_st
           t1=time()
           local msg_from_manager::String
           while true
-            msg_from_manager = chomp(readline(sock,keep=true))
+            msg_from_manager = readline(sock)
             length(msg_from_manager)==0 || break
           end
           time_waiting+=(time()-t1)

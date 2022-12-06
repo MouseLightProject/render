@@ -20,8 +20,8 @@ split(readchomp(`hostname`),".")[1] in bad_nodes && exit(1)
 sock = connect(ARGS[2],parse(Int,ARGS[3]))
 println(sock,"squatter ",proc_num," is ready on ",readchomp(`hostname`))
 
-while isopen(sock) || bytesavailable(sock)>0
-  tmp = chomp(readline(sock,keep=true))
+while !eof(sock)
+  tmp = readline(sock)
   length(tmp)==0 && continue
   @info string("SQUATTER<DIRECTOR: ",tmp)
   if occursin(dole_out,tmp)

@@ -131,8 +131,8 @@ const saved_msg = r"(peon for input tile )([0-9]*)( saved output tile )([1-8/]*)
 const finished_msg = r"(?<=peon for input tile )[0-9]*(?= is finished)"
 
 function wrangle_peon(sock)
-  while isopen(sock) || bytesavailable(sock)>0
-    msg_from_peon = chomp(readline(sock,keep=true))
+  while !eof(sock)
+    msg_from_peon = readline(sock)
     length(msg_from_peon)==0 && continue
     @info string("MANAGER<PEON: ",msg_from_peon)
     local in_tile_num::AbstractString, out_tile_path::AbstractString, out_tile::Array{UInt16,4}
