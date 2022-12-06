@@ -10,7 +10,10 @@ parametersjl=$2
 interval=600   # in seconds
 
 export RENDER_PATH=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric6
-export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric6/julia-1.7.1/bin/julia
+export JULIA=/groups/mousebrainmicro/mousebrainmicro/Software/barycentric6/julia-1.7.3/bin/julia
+
+export JULIA_PROJECT=$RENDER_PATH/src/render 
+export JULIA_DEPOT_PATH=$(dirname $(dirname $JULIA))/local/share/julia
 
 read -a tmp <<< $($JULIA -L $parametersjl -e "print(destination,' ',local_scratch,' ',shared_scratch,' ',logfile_scratch)")
 destination=${tmp[0]}

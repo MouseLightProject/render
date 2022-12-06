@@ -217,19 +217,21 @@ t0=time()
          $(ENV["JULIA"]) $(ENV["RENDER_PATH"])/src/render/src/squatter.jl $(ARGS[1]) $hostname $port`
   if which_cluster=="janelia"
     pcmd = pipeline(`echo $cmd`, `bsub -P $bill_userid -J $(jobname)1\[1-$nnodes\]
-          -R"select[avx2]" -W $leaf_time_limit -n $(leaf_ncores_per_job)
-          -o $logfile_scratch/squatter%I.log`)
+                     -R"select[avx2]" -W $leaf_time_limit -n $(leaf_ncores_per_job)
+                     -o $logfile_scratch/squatter%I.log`)
     @info string("DIRECTOR: ",pcmd)
     jobid = match(r"(?<=Job <)[0-9]*", readchomp(pcmd)).match
   else
     proc = Array{Any}(undef, nnodes)
     for n=1:nnodes
-      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n]) export RENDER_PATH=$(ENV["RENDER_PATH"]) \;
-            export JULIA=$(ENV["JULIA"]) \;
-            export JULIA_PROJECT=$(ENV["JULIA_PROJECT"]) \;
-            export HOSTNAME=$(ENV["HOSTNAME"]) \;
-            export LSB_JOBINDEX=$n \;
-            $cmd \&\> $logfile_scratch/squatter$n.log`
+      pcmd = `ssh -o StrictHostKeyChecking=no $(which_cluster[n])
+              export RENDER_PATH=$(ENV["RENDER_PATH"]) \;
+              export JULIA=$(ENV["JULIA"]) \;
+              export JULIA_PROJECT=$(ENV["JULIA_PROJECT"]) \;
+              export JULIA_DEPOT_PATH=$(ENV["JULIA_DEPOT_PATH"]) \;
+              export HOSTNAME=$(ENV["HOSTNAME"]) \;
+              export LSB_JOBINDEX=$n \;
+              $cmd \&\> $logfile_scratch/squatter$n.log`
       @info string("DIRECTOR: ",pcmd)
       proc[n] = run(pcmd, wait=false)
     end
